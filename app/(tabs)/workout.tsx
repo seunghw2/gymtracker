@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   getExercises,
   addCustomExercise,
@@ -23,6 +24,9 @@ import {
   getSessionHistory,
   getSessionSets,
   getExerciseRest,
+  deleteWorkoutSet,
+  deleteSession,
+  updateSessionDate,
   Exercise,
   SessionSummary,
   SessionSetRow,
@@ -84,6 +88,7 @@ export default function WorkoutScreen() {
     addSetToExercise,
     markSetDone,
     removeSet,
+    removeExercise,
     startRestTimer,
     restTimerActive,
   } = useWorkoutStore();
@@ -103,6 +108,11 @@ export default function WorkoutScreen() {
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [detailSession, setDetailSession] = useState<SessionSummary | null>(null);
   const [detailSets, setDetailSets] = useState<SessionSetRow[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [startDate, setStartDate] = useState(getTodayStr());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showDetailPicker, setShowDetailPicker] = useState(false);
+  const detailSwipeRefs = useRef<Map<number, Swipeable>>(new Map());
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -124,9 +134,8 @@ export default function WorkoutScreen() {
   }, [activeSessionId]);
 
   const handleStartWorkout = async () => {
-    const today = getTodayStr();
-    const sessionId = await createWorkoutSession(today);
-    startSession(sessionId, today);
+    const sessionId = await createWorkoutSession(startDate);
+    startSession(sessionId, startDate);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -150,6 +159,7 @@ export default function WorkoutScreen() {
     setSelectedMuscle(null);
     setSelectedEquipment(null);
     setSelectedBrand(null);
+    setSearchText('');
     setShowExerciseModal(true);
   };
 
@@ -174,8 +184,8 @@ export default function WorkoutScreen() {
     const ex = exercises[exIdx];
     const s = ex.sets[setIdx];
     const orm = epley(s.weight_kg, s.reps);
-    await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm);
-    markSetDone(exIdx, setIdx, orm);
+    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm);
+    markSetDone(exIdx, setIdx, orm, setId);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const nextSet = ex.sets[setIdx + 1];
@@ -198,6 +208,56 @@ export default function WorkoutScreen() {
     setDetailSession(session);
   };
 
+  const handleRemoveExercise = (exIdx: number) => {
+    const ex = exercises[exIdx];
+    Alert.alert('운동 삭제', `${ex.exerciseName}을(를) 삭제할까요?`, [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제', style: 'destructive', onPress: async () => {
+          const doneIds = ex.sets.filter(s => s.done && s.setId).map(s => s.setId as number);
+          await Promise.all(doneIds.map(id => deleteWorkoutSet(id).catch(() => {})));
+          removeExercise(exIdx);
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteActiveSet = async (exIdx: number, setIdx: number) => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (s?.done && s.setId) await deleteWorkoutSet(s.setId).catch(() => {});
+    removeSet(exIdx, setIdx);
+  };
+
+  const handleDeleteSession = () => {
+    if (!detailSession) return;
+    const id = detailSession.id;
+    Alert.alert('세션 삭제', '이 운동 기록을 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제', style: 'destructive', onPress: async () => {
+          await deleteSession(id);
+          setDetailSession(null);
+          getSessionHistory().then(setHistory);
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteDetailSet = async (setId: number) => {
+    if (!detailSession) return;
+    await deleteWorkoutSet(setId);
+    const sets = await getSessionSets(detailSession.id);
+    setDetailSets(sets);
+    getSessionHistory().then(setHistory);
+  };
+
+  const handleChangeDetailDate = async (newDate: string) => {
+    if (!detailSession) return;
+    await updateSessionDate(detailSession.id, newDate);
+    setDetailSession({ ...detailSession, date: newDate });
+    getSessionHistory().then(setHistory);
+  };
+
   const groupedDetailSets = detailSets.reduce<Record<number, { name: string; brand: string | null; sets: SessionSetRow[] }>>(
     (acc, row) => {
       if (!acc[row.exercise_id]) acc[row.exercise_id] = { name: row.exercise_name, brand: row.brand, sets: [] };
@@ -212,16 +272,29 @@ export default function WorkoutScreen() {
       <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.homeContent}>
-          {/* 오늘 시작 */}
+          {/* 시작 */}
           <View style={styles.startBox}>
-            <View>
-              <Text style={styles.startTitle}>오늘의 운동</Text>
-              <Text style={styles.startDate}>{formatDate(getTodayStr())}</Text>
-            </View>
+            <Pressable onPress={() => setShowStartPicker(true)}>
+              <Text style={styles.startTitle}>
+                {startDate === getTodayStr() ? '오늘의 운동' : '운동 기록'}
+              </Text>
+              <Text style={styles.startDate}>{formatDate(startDate)} ›</Text>
+            </Pressable>
             <Pressable style={styles.startBtn} onPress={handleStartWorkout}>
               <Text style={styles.startBtnText}>시작</Text>
             </Pressable>
           </View>
+          {showStartPicker && (
+            <DateTimePicker
+              value={new Date(startDate)}
+              mode="date"
+              maximumDate={new Date()}
+              onChange={(event, date) => {
+                setShowStartPicker(false);
+                if (event.type === 'set' && date) setStartDate(date.toISOString().slice(0, 10));
+              }}
+            />
+          )}
 
           {/* 히스토리 */}
           {history.length > 0 && (
@@ -254,11 +327,26 @@ export default function WorkoutScreen() {
               <Pressable onPress={() => setDetailSession(null)}>
                 <Text style={styles.modalBack}>✕ 닫기</Text>
               </Pressable>
-              <Text style={styles.detailHeaderTitle}>
-                {detailSession ? formatDate(detailSession.date) : ''}
-              </Text>
-              <View style={{ width: 60 }} />
+              <Pressable onPress={() => setShowDetailPicker(true)}>
+                <Text style={styles.detailHeaderTitle}>
+                  {detailSession ? `${formatDate(detailSession.date)} ›` : ''}
+                </Text>
+              </Pressable>
+              <Pressable onPress={handleDeleteSession}>
+                <Text style={styles.detailDelete}>삭제</Text>
+              </Pressable>
             </View>
+            {showDetailPicker && detailSession && (
+              <DateTimePicker
+                value={new Date(detailSession.date)}
+                mode="date"
+                maximumDate={new Date()}
+                onChange={(event, date) => {
+                  setShowDetailPicker(false);
+                  if (event.type === 'set' && date) handleChangeDetailDate(date.toISOString().slice(0, 10));
+                }}
+              />
+            )}
             <ScrollView contentContainerStyle={styles.scrollContent}>
               {Object.values(groupedDetailSets).map((group, i) => (
                 <View key={i} style={styles.exerciseCard}>
@@ -274,15 +362,36 @@ export default function WorkoutScreen() {
                     <Text style={styles.setCol}>횟수</Text>
                     <Text style={styles.setCol}>추정 1RM</Text>
                   </View>
-                  {group.sets.map((s, j) => (
-                    <View key={j} style={[styles.setRow, styles.setRowDone]}>
-                      <Text style={[styles.setNum, { flex: 0.5 }]}>{s.set_order}</Text>
-                      <Text style={styles.setReadOnly}>{s.weight_kg}</Text>
-                      <Text style={styles.setReadOnly}>{s.reps}</Text>
-                      <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
-                        {s.estimated_1rm ? `${s.estimated_1rm}kg` : '-'}
-                      </Text>
-                    </View>
+                  {group.sets.map((s) => (
+                    <Swipeable
+                      key={s.id}
+                      ref={ref => {
+                        if (ref) detailSwipeRefs.current.set(s.id, ref);
+                        else detailSwipeRefs.current.delete(s.id);
+                      }}
+                      renderRightActions={() => (
+                        <Pressable
+                          style={styles.deleteAction}
+                          onPress={() => {
+                            detailSwipeRefs.current.get(s.id)?.close();
+                            handleDeleteDetailSet(s.id);
+                          }}
+                        >
+                          <Text style={styles.deleteActionText}>삭제</Text>
+                        </Pressable>
+                      )}
+                      rightThreshold={40}
+                      overshootRight={false}
+                    >
+                      <View style={[styles.setRow, styles.setRowDone]}>
+                        <Text style={[styles.setNum, { flex: 0.5 }]}>{s.set_order}</Text>
+                        <Text style={styles.setReadOnly}>{s.weight_kg}</Text>
+                        <Text style={styles.setReadOnly}>{s.reps}</Text>
+                        <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
+                          {s.estimated_1rm ? `${s.estimated_1rm}kg` : '-'}
+                        </Text>
+                      </View>
+                    </Swipeable>
                   ))}
                 </View>
               ))}
@@ -299,7 +408,7 @@ export default function WorkoutScreen() {
       style={styles.deleteAction}
       onPress={() => {
         swipeableRefs.current.get(`${exIdx}-${setIdx}`)?.close();
-        removeSet(exIdx, setIdx);
+        handleDeleteActiveSet(exIdx, setIdx);
       }}
     >
       <Text style={styles.deleteActionText}>삭제</Text>
@@ -339,9 +448,14 @@ export default function WorkoutScreen() {
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
                 </View>
-                {bestORM > 0 && (
-                  <Text style={styles.ormBadge}>1RM {bestORM}kg</Text>
-                )}
+                <View style={styles.exerciseHeaderRight}>
+                  {bestORM > 0 && (
+                    <Text style={styles.ormBadge}>1RM {bestORM}kg</Text>
+                  )}
+                  <Pressable onPress={() => handleRemoveExercise(exIdx)} hitSlop={8} style={styles.exDeleteBtn}>
+                    <Text style={styles.exDeleteText}>✕</Text>
+                  </Pressable>
+                </View>
               </View>
 
               <View style={styles.setHeader}>
@@ -510,9 +624,22 @@ export default function WorkoutScreen() {
 
           {selectStep === 'list' && (
             <FlatList
-              data={exerciseList}
+              data={exerciseList.filter(e =>
+                e.name.toLowerCase().includes(searchText.trim().toLowerCase())
+              )}
               keyExtractor={item => String(item.id)}
               contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="종목 검색"
+                  placeholderTextColor="#48484A"
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  clearButtonMode="while-editing"
+                />
+              }
               renderItem={({ item }) => (
                 <Pressable style={styles.exItem} onPress={() => handleSelectExercise(item)}>
                   <View>
@@ -606,6 +733,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#1C1C1E',
   },
   detailHeaderTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  detailDelete: { color: '#FF453A', fontSize: 16, fontWeight: '600', width: 60, textAlign: 'right' },
   setReadOnly: {
     flex: 1,
     color: '#FFFFFF',
@@ -660,6 +788,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
   },
+  exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  exDeleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2C2C2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exDeleteText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
 
   setHeader: { flexDirection: 'row', marginBottom: 4 },
   setCol: { flex: 1, color: '#8E8E93', fontSize: 12, textAlign: 'center' },
@@ -731,6 +869,15 @@ const styles = StyleSheet.create({
   modalBack: { color: '#30D158', fontSize: 16, width: 60 },
   modalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   modalContent: { padding: 16 },
+  searchInput: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginBottom: 12,
+  },
   muscleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   muscleBtn: {
     width: '46%',

@@ -6,6 +6,7 @@ export type SetEntry = {
   reps: number;
   done: boolean;
   estimated_1rm?: number;
+  setId?: number;
 };
 
 export type ExerciseEntry = {
@@ -30,8 +31,9 @@ type WorkoutState = {
   addExercise: (entry: ExerciseEntry) => void;
   updateSet: (exIdx: number, setIdx: number, data: Partial<SetEntry>) => void;
   addSetToExercise: (exIdx: number) => void;
-  markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number) => void;
+  markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
+  removeExercise: (exIdx: number) => void;
   startRestTimer: (durationSec: number, info?: { nextLabel?: string }) => void;
   adjustRestTimer: (deltaSec: number) => void;
   setRestTimer: (durationSec: number) => void;
@@ -95,15 +97,18 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       return { exercises };
     }),
 
-  markSetDone: (exIdx, setIdx, estimated_1rm) =>
+  markSetDone: (exIdx, setIdx, estimated_1rm, setId) =>
     set((state) => {
       const exercises = state.exercises.map((ex, i) => {
         if (i !== exIdx) return ex;
-        const sets = ex.sets.map((s, j) => j === setIdx ? { ...s, done: true, estimated_1rm } : s);
+        const sets = ex.sets.map((s, j) => j === setIdx ? { ...s, done: true, estimated_1rm, setId } : s);
         return { ...ex, sets };
       });
       return { exercises };
     }),
+
+  removeExercise: (exIdx) =>
+    set((state) => ({ exercises: state.exercises.filter((_, i) => i !== exIdx) })),
 
   removeSet: (exIdx, setIdx) =>
     set((state) => {

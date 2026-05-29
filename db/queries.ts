@@ -197,6 +197,21 @@ export async function addWorkoutSet(
   return result.id;
 }
 
+export async function deleteWorkoutSet(setId: number): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sets/${setId}`, { method: 'DELETE' });
+}
+
+export async function deleteSession(sessionId: number): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sessions/${sessionId}`, { method: 'DELETE' });
+}
+
+export async function updateSessionDate(sessionId: number, date: string): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: { date },
+  });
+}
+
 export async function getLastSessionSets(exercise_id: number): Promise<WorkoutSet[]> {
   const list = await apiRequest<ApiSetDto[]>(`/api/v1/workouts/exercises/${exercise_id}/last-sets`);
   return list.map(mapSetDtoToWorkoutSet);
