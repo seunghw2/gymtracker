@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function RootLayout() {
@@ -19,9 +20,7 @@ export default function RootLayout() {
     const firstSegment = segments[0] as string | undefined;
     const inAuthGroup = firstSegment === '(auth)';
 
-    if (status === 'authenticated' && inAuthGroup) {
-      router.replace('/(tabs)');
-    } else if (status === 'guest' && !inAuthGroup) {
+    if (inAuthGroup) {
       router.replace('/(tabs)');
     }
   }, [status, segments]);
@@ -35,12 +34,12 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
-    </>
+    </GestureHandlerRootView>
   );
 }

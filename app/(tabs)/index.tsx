@@ -70,12 +70,17 @@ export default function HomeScreen() {
     const today = getTodayStr();
     const { start, end, monday } = getWeekRange();
 
-    const [count, todayLog, latestLog, allDates] = await Promise.all([
-      getWeeklyWorkoutCount(start, end),
-      getTodayBodyLog(today),
-      getLatestBodyLog(),
-      getAllWorkoutDates(),
-    ]);
+    let count: number, todayLog: any, latestLog: any, allDates: string[];
+    try {
+      [count, todayLog, latestLog, allDates] = await Promise.all([
+        getWeeklyWorkoutCount(start, end),
+        getTodayBodyLog(today),
+        getLatestBodyLog(),
+        getAllWorkoutDates(),
+      ]);
+    } catch {
+      return;
+    }
 
     setWeekCount(count);
     setStreak(calcStreak(allDates));
@@ -100,7 +105,11 @@ export default function HomeScreen() {
   useEffect(() => { load(); }, [load]);
 
   const handleSaveWeight = async () => {
-    await upsertBodyLog(getTodayStr(), dialValue);
+    try {
+      await upsertBodyLog(getTodayStr(), dialValue);
+    } catch {
+      // 저장 실패해도 모달은 닫아 화면 멈춤 방지
+    }
     setTodayWeight(dialValue);
     setShowWeightModal(false);
   };
