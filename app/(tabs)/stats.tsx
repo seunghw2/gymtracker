@@ -7,9 +7,11 @@ import {
   Pressable,
   SafeAreaView,
   Dimensions,
+  Modal,
+  FlatList,
 } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
-import { getExercises, get1RMHistory, getBodyLogs, Exercise, BodyLog } from '../../db/queries';
+import { LineChart, BarChart } from 'react-native-chart-kit';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, TrainedExercise, BodyLog, VolumeStats } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 
@@ -17,20 +19,52 @@ type Chip = '1RM 성장' | '체중' | '볼륨';
 
 const WIDTH = Dimensions.get('window').width - 40;
 
+function formatVolume(v: number): string {
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
+  return String(Math.round(v));
+}
+
+const volumeChartConfig = {
+  backgroundColor: '#1C1C1E',
+  backgroundGradientFrom: '#1C1C1E',
+  backgroundGradientTo: '#1C1C1E',
+  decimalPlaces: 0,
+  color: (opacity = 1) => `rgba(48, 209, 88, ${opacity})`,
+  labelColor: () => '#8E8E93',
+  style: { borderRadius: 12 },
+  propsForDots: { r: '4', strokeWidth: '2', stroke: '#30D158' },
+  barPercentage: 0.7,
+  formatYLabel: (y: string) => formatVolume(Number(y)),
+};
+
 export default function StatsScreen() {
   const [activeChip, setActiveChip] = useState<Chip>('1RM 성장');
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [selectedEx, setSelectedEx] = useState<Exercise | null>(null);
+  const [trainedExercises, setTrainedExercises] = useState<TrainedExercise[] | null>(null);
+  const [selectedEx, setSelectedEx] = useState<TrainedExercise | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [ormData, setOrmData] = useState<{ date: string; estimated_1rm: number }[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
+  const [volume, setVolume] = useState<VolumeStats | null>(null);
   const { goalWeightKg } = useSettingsStore();
 
   const load = useCallback(async () => {
-    const exList = await getExercises();
-    setExercises(exList);
     const logs = await getBodyLogs(30);
     setBodyLogs(logs.reverse());
   }, []);
+
+  useEffect(() => {
+    if (activeChip === '1RM 성장' && !trainedExercises) {
+      getTrainedExercises()
+        .then(list => {
+          setTrainedExercises(list);
+          if (list.length > 0) setSelectedEx(prev => prev ?? list[0]);
+        })
+        .catch(() => setTrainedExercises([]));
+    }
+    if (activeChip === '볼륨' && !volume) {
+      getVolumeStats().then(setVolume).catch(() => setVolume({ daily: [], byMuscle: [] }));
+    }
+  }, [activeChip, trainedExercises, volume]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -69,31 +103,63 @@ export default function StatsScreen() {
 
         {activeChip === '1RM 성장' && (
           <View>
-            <Text style={styles.sectionTitle}>종목 선택</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.exScroll}>
-              {exercises.map(ex => (
-                <Pressable
-                  key={ex.id}
-                  style={[styles.exChip, selectedEx?.id === ex.id && styles.exChipActive]}
-                  onPress={() => setSelectedEx(ex)}
-                >
-                  <Text style={[styles.exChipText, selectedEx?.id === ex.id && styles.exChipTextActive]}>
-                    {ex.name}{ex.brand ? ` (${ex.brand})` : ''}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            {selectedEx && (
-              <OneRMChart
-                data={ormData}
-                title={`${selectedEx.name} 추정 1RM`}
-              />
-            )}
-            {!selectedEx && (
+            {trainedExercises && trainedExercises.length === 0 ? (
               <View style={styles.placeholder}>
-                <Text style={styles.placeholderText}>종목을 선택하면 그래프가 표시됩니다</Text>
+                <Text style={styles.placeholderText}>기록된 운동이 없습니다</Text>
               </View>
+            ) : (
+              <>
+                <Text style={styles.sectionTitle}>종목</Text>
+                <Pressable style={styles.exSelectBtn} onPress={() => setPickerOpen(true)}>
+                  <Text style={styles.exSelectText} numberOfLines={1}>
+                    {selectedEx
+                      ? `${selectedEx.name}${selectedEx.brand ? ` (${selectedEx.brand})` : ''}`
+                      : '종목 선택'}
+                  </Text>
+                  <Text style={styles.exSelectChevron}>⌄</Text>
+                </Pressable>
+
+                {selectedEx ? (
+                  <OneRMChart data={ormData} title={`${selectedEx.name} 추정 1RM`} />
+                ) : (
+                  <View style={styles.placeholder}>
+                    <Text style={styles.placeholderText}>종목을 선택하면 그래프가 표시됩니다</Text>
+                  </View>
+                )}
+              </>
             )}
+
+            <Modal visible={pickerOpen} animationType="slide">
+              <SafeAreaView style={styles.modalSafe}>
+                <View style={styles.modalHeader}>
+                  <Pressable onPress={() => setPickerOpen(false)}>
+                    <Text style={styles.modalBack}>✕ 닫기</Text>
+                  </Pressable>
+                  <Text style={styles.modalTitle}>종목 선택</Text>
+                  <View style={{ width: 60 }} />
+                </View>
+                <FlatList
+                  data={trainedExercises ?? []}
+                  keyExtractor={item => String(item.id)}
+                  contentContainerStyle={styles.modalContent}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={[styles.exItem, selectedEx?.id === item.id && styles.exItemActive]}
+                      onPress={() => { setSelectedEx(item); setPickerOpen(false); }}
+                    >
+                      <View>
+                        <Text style={styles.exItemName}>{item.name}</Text>
+                        {item.brand && <Text style={styles.exItemBrand}>{item.brand}</Text>}
+                      </View>
+                      {selectedEx?.id === item.id && <Text style={styles.exItemCheck}>✓</Text>}
+                    </Pressable>
+                  )}
+                  ListEmptyComponent={
+                    <Text style={styles.placeholderText}>기록된 운동이 없습니다</Text>
+                  }
+                />
+              </SafeAreaView>
+            </Modal>
           </View>
         )}
 
@@ -148,8 +214,54 @@ export default function StatsScreen() {
         )}
 
         {activeChip === '볼륨' && (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>볼륨 통계 준비 중</Text>
+          <View>
+            {!volume ? (
+              <View style={styles.placeholder}>
+                <Text style={styles.placeholderText}>불러오는 중…</Text>
+              </View>
+            ) : volume.daily.length === 0 ? (
+              <View style={styles.placeholder}>
+                <Text style={styles.placeholderText}>볼륨 기록이 없습니다</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.sectionTitle}>일자별 총볼륨 (최근 8회)</Text>
+                <BarChart
+                  data={{
+                    labels: volume.daily.slice(-8).map(d => d.date.slice(5)),
+                    datasets: [{ data: volume.daily.slice(-8).map(d => Math.round(d.volume)) }],
+                  }}
+                  width={WIDTH}
+                  height={220}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  fromZero
+                  chartConfig={volumeChartConfig}
+                  style={{ borderRadius: 12, marginBottom: 24 }}
+                  showValuesOnTopOfBars
+                />
+
+                {volume.byMuscle.length > 0 && (
+                  <>
+                    <Text style={styles.sectionTitle}>부위별 볼륨</Text>
+                    <BarChart
+                      data={{
+                        labels: volume.byMuscle.map(m => m.muscleGroup),
+                        datasets: [{ data: volume.byMuscle.map(m => Math.round(m.volume)) }],
+                      }}
+                      width={WIDTH}
+                      height={220}
+                      yAxisLabel=""
+                      yAxisSuffix=""
+                      fromZero
+                      chartConfig={volumeChartConfig}
+                      style={{ borderRadius: 12 }}
+                      showValuesOnTopOfBars
+                    />
+                  </>
+                )}
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -175,17 +287,44 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 10 },
 
-  exScroll: { marginBottom: 16 },
-  exChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+  exSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#1C1C1E',
-    marginRight: 8,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
   },
-  exChipActive: { backgroundColor: '#1A3D27', borderColor: '#30D158', borderWidth: 1 },
-  exChipText: { color: '#8E8E93', fontSize: 13 },
-  exChipTextActive: { color: '#30D158' },
+  exSelectText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', flex: 1 },
+  exSelectChevron: { color: '#30D158', fontSize: 18, marginLeft: 8 },
+
+  modalSafe: { flex: 1, backgroundColor: '#000000' },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1C1C1E',
+  },
+  modalBack: { color: '#30D158', fontSize: 16, width: 60 },
+  modalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  modalContent: { padding: 16 },
+  exItem: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  exItemActive: { borderColor: '#30D158', borderWidth: 1 },
+  exItemName: { color: '#FFFFFF', fontSize: 16 },
+  exItemBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
+  exItemCheck: { color: '#30D158', fontSize: 18, fontWeight: '700' },
 
   placeholder: {
     height: 200,

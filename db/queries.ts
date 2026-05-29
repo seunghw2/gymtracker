@@ -247,6 +247,36 @@ export async function get1RMHistory(exercise_id: number): Promise<{ date: string
   return list.map(r => ({ date: String(r.date), estimated_1rm: r.oneRm }));
 }
 
+export type TrainedExercise = {
+  id: number;
+  name: string;
+  brand: string | null;
+};
+
+export async function getTrainedExercises(): Promise<TrainedExercise[]> {
+  const list = await apiRequest<{ id: number; name: string; brand: string | null }[]>(
+    '/api/v1/stats/trained-exercises'
+  );
+  return list.map(e => ({ id: e.id, name: e.name, brand: e.brand }));
+}
+
+export type VolumeStats = {
+  daily: { date: string; volume: number }[];
+  byMuscle: { muscleGroup: string; volume: number }[];
+};
+
+export async function getVolumeStats(): Promise<VolumeStats> {
+  type ApiVolume = {
+    daily: { date: string; volume: number }[];
+    byMuscle: { muscleGroup: string; volume: number }[];
+  };
+  const res = await apiRequest<ApiVolume>('/api/v1/stats/volume');
+  return {
+    daily: res.daily.map(d => ({ date: String(d.date), volume: d.volume })),
+    byMuscle: res.byMuscle.map(m => ({ muscleGroup: m.muscleGroup, volume: m.volume })),
+  };
+}
+
 // ─── 신체 기록 ─────────────────────────────────────────────────────────
 
 export async function getTodayBodyLog(date: string): Promise<BodyLog | null> {
