@@ -323,6 +323,17 @@ export async function setSetting(key: string, value: string): Promise<void> {
   settingsCache = null;
 }
 
+// 종목별 휴식시간(초). 미설정 시 fallback 반환.
+export async function getExerciseRest(exerciseId: number, fallback: number): Promise<number> {
+  const raw = await getSetting(`rest_ex_${exerciseId}`, '');
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+export async function setExerciseRest(exerciseId: number, sec: number): Promise<void> {
+  await setSetting(`rest_ex_${exerciseId}`, String(sec));
+}
+
 // ─── 헬스장 ────────────────────────────────────────────────────────────
 
 export async function getGyms(): Promise<Gym[]> {

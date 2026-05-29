@@ -22,6 +22,8 @@ type WorkoutState = {
   exercises: ExerciseEntry[];
   restTimerActive: boolean;
   restTimerEnd: number | null;
+  restTotalSec: number;
+  restNextLabel: string | null;
 
   startSession: (sessionId: number, date: string) => void;
   finishSession: () => void;
@@ -30,7 +32,9 @@ type WorkoutState = {
   addSetToExercise: (exIdx: number) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
-  startRestTimer: (durationSec: number) => void;
+  startRestTimer: (durationSec: number, info?: { nextLabel?: string }) => void;
+  adjustRestTimer: (deltaSec: number) => void;
+  setRestTimer: (durationSec: number) => void;
   stopRestTimer: () => void;
 };
 
@@ -53,12 +57,14 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   exercises: [],
   restTimerActive: false,
   restTimerEnd: null,
+  restTotalSec: 0,
+  restNextLabel: null,
 
   startSession: (sessionId, date) =>
     set({ activeSessionId: sessionId, sessionDate: date, sessionStartTime: Date.now(), exercises: [] }),
 
   finishSession: () =>
-    set({ activeSessionId: null, sessionDate: null, sessionStartTime: null, exercises: [], restTimerActive: false, restTimerEnd: null }),
+    set({ activeSessionId: null, sessionDate: null, sessionStartTime: null, exercises: [], restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
 
   addExercise: (entry) =>
     set((state) => ({ exercises: [...state.exercises, entry] })),
@@ -111,10 +117,30 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       return { exercises };
     }),
 
-  startRestTimer: (durationSec) =>
-    set({ restTimerActive: true, restTimerEnd: Date.now() + durationSec * 1000 }),
+  startRestTimer: (durationSec, info) =>
+    set({
+      restTimerActive: true,
+      restTimerEnd: Date.now() + durationSec * 1000,
+      restTotalSec: durationSec,
+      restNextLabel: info?.nextLabel ?? null,
+    }),
 
-  stopRestTimer: () => set({ restTimerActive: false, restTimerEnd: null }),
+  adjustRestTimer: (deltaSec) =>
+    set((state) => {
+      if (!state.restTimerActive || !state.restTimerEnd) return state;
+      const newEnd = Math.max(Date.now() + 1000, state.restTimerEnd + deltaSec * 1000);
+      const newTotal = Math.max(1, state.restTotalSec + deltaSec);
+      return { restTimerEnd: newEnd, restTotalSec: newTotal };
+    }),
+
+  setRestTimer: (durationSec) =>
+    set({
+      restTimerActive: true,
+      restTimerEnd: Date.now() + durationSec * 1000,
+      restTotalSec: durationSec,
+    }),
+
+  stopRestTimer: () => set({ restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
 }));
 
 export const useSettingsStore = create<SettingsState>((set) => ({

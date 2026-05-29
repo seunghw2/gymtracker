@@ -22,6 +22,7 @@ import {
   updateSessionDuration,
   getSessionHistory,
   getSessionSets,
+  getExerciseRest,
   Exercise,
   SessionSummary,
   SessionSetRow,
@@ -84,6 +85,7 @@ export default function WorkoutScreen() {
     markSetDone,
     removeSet,
     startRestTimer,
+    restTimerActive,
   } = useWorkoutStore();
   const { restDurationSec } = useSettingsStore();
   const elapsed = useElapsedTime(sessionStartTime);
@@ -175,7 +177,11 @@ export default function WorkoutScreen() {
     await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm);
     markSetDone(exIdx, setIdx, orm);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    startRestTimer(restDurationSec);
+
+    const nextSet = ex.sets[setIdx + 1];
+    const nextLabel = nextSet ? `${nextSet.weight_kg}kg × ${nextSet.reps}회` : undefined;
+    const restSec = await getExerciseRest(ex.exerciseId, restDurationSec);
+    startRestTimer(restSec, { nextLabel });
   };
 
   const saveCustomExercise = async () => {
@@ -314,9 +320,7 @@ export default function WorkoutScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <RestTimer />
-
+      <ScrollView contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest]}>
         {exercises.length === 0 && (
           <View style={styles.emptyHint}>
             <Text style={styles.emptyHintText}>아래 버튼으로 운동을 추가하세요</Text>
@@ -400,6 +404,11 @@ export default function WorkoutScreen() {
           <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
         </Pressable>
       </ScrollView>
+
+      {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
+      <View style={styles.restDock} pointerEvents="box-none">
+        <RestTimer />
+      </View>
 
       {/* 운동 선택 모달 */}
       <Modal visible={showExerciseModal} animationType="slide">
@@ -622,6 +631,8 @@ const styles = StyleSheet.create({
   finishBtnText: { color: '#000000', fontSize: 15, fontWeight: '700' },
 
   scrollContent: { padding: 16, paddingBottom: 60 },
+  scrollContentRest: { paddingBottom: 220 },
+  restDock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 
   emptyHint: { alignItems: 'center', paddingVertical: 40 },
   emptyHintText: { color: '#48484A', fontSize: 15 },

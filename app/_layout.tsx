@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/useAuthStore';
+import { configureNotifications, ensurePermission } from '../lib/notifications';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     bootstrap();
+    configureNotifications();
+    ensurePermission();
   }, []);
 
   useEffect(() => {

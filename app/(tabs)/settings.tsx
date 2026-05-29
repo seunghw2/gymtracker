@@ -16,8 +16,10 @@ import {
   deleteGym,
   getCustomExercises,
   deleteCustomExercise,
+  getExercises,
   getSetting,
   setSetting,
+  setExerciseRest,
   Gym,
   Exercise,
 } from '../../db/queries';
@@ -40,6 +42,8 @@ export default function SettingsScreen() {
 
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
+  const [allExercises, setAllExercises] = useState<Exercise[]>([]);
+  const [restByEx, setRestByEx] = useState<Record<number, string>>({});
   const [gymName, setGymName] = useState('');
   const [gymLocation, setGymLocation] = useState('');
   const [goalWeightInput, setGoalWeightInput] = useState(String(goalWeightKg));
@@ -47,14 +51,22 @@ export default function SettingsScreen() {
   const [restInput, setRestInput] = useState(String(restDurationSec));
 
   const load = useCallback(async () => {
-    const [gymList, exList] = await Promise.all([getGyms(), getCustomExercises()]);
+    const [gymList, exList, allEx] = await Promise.all([getGyms(), getCustomExercises(), getExercises()]);
     setGyms(gymList);
     setCustomExercises(exList);
+    setAllExercises(allEx);
 
     const gw = await getSetting('goal_weight_kg', String(goalWeightKg));
     const gf = await getSetting('goal_body_fat_pct', String(goalBodyFatPct));
     const rd = await getSetting('rest_duration_sec', String(restDurationSec));
     const uk = await getSetting('unit_kg', '1');
+
+    const restMap: Record<number, string> = {};
+    for (const ex of allEx) {
+      const v = await getSetting(`rest_ex_${ex.id}`, '');
+      if (v) restMap[ex.id] = v;
+    }
+    setRestByEx(restMap);
 
     setGoalWeight(parseFloat(gw));
     setGoalBodyFat(parseFloat(gf));
@@ -65,6 +77,14 @@ export default function SettingsScreen() {
     setGoalFatInput(gf);
     setRestInput(rd);
   }, []);
+
+  const saveExerciseRest = async (exId: number) => {
+    const raw = restByEx[exId];
+    const n = parseInt(raw ?? '', 10);
+    if (Number.isFinite(n) && n > 0) {
+      await setExerciseRest(exId, n);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -194,6 +214,35 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* 종목별 휴식시간 */}
+        <Text style={styles.sectionTitle}>종목별 휴식시간 (초)</Text>
+        <View style={styles.card}>
+          <Text style={[styles.listItemSub, { marginBottom: 4 }]}>
+            비워두면 기본 {restDurationSec}초 적용
+          </Text>
+          {allExercises.map(ex => (
+            <View key={ex.id} style={styles.listItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.listItemName}>{ex.name}</Text>
+                {ex.brand && <Text style={styles.listItemSub}>{ex.brand}</Text>}
+              </View>
+              <TextInput
+                style={styles.restInput}
+                value={restByEx[ex.id] ?? ''}
+                onChangeText={t => setRestByEx(prev => ({ ...prev, [ex.id]: t.replace(/[^0-9]/g, '') }))}
+                onEndEditing={() => saveExerciseRest(ex.id)}
+                keyboardType="number-pad"
+                placeholder={String(restDurationSec)}
+                placeholderTextColor="#48484A"
+                selectTextOnFocus
+              />
+            </View>
+          ))}
+          {allExercises.length === 0 && (
+            <Text style={styles.emptyText}>종목이 없습니다</Text>
+          )}
+        </View>
+
         {/* 헬스장 관리 */}
         <Text style={styles.sectionTitle}>헬스장 관리</Text>
         <View style={styles.card}>
@@ -280,6 +329,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'right',
     minWidth: 70,
+    fontVariant: ['tabular-nums'],
+  },
+  restInput: {
+    color: '#30D158',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    minWidth: 64,
+    backgroundColor: '#2C2C2E',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     fontVariant: ['tabular-nums'],
   },
 
