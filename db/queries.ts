@@ -50,6 +50,9 @@ export type SessionSummary = {
   exercise_count: number;
   set_count: number;
   exercise_names: string;
+  title: string | null;
+  note: string | null;
+  gym_id: number | null;
 };
 
 export type SessionSetRow = {
@@ -84,6 +87,7 @@ type ApiSessionSummary = {
   durationSec: number | null;
   exerciseCount: number; setCount: number;
   exerciseNames: string[];
+  title: string | null; note: string | null; gymId: number | null;
 };
 
 type ApiBodyLog = {
@@ -167,12 +171,34 @@ export async function getCustomExercises(): Promise<Exercise[]> {
 
 // ─── 운동 세션 ─────────────────────────────────────────────────────────
 
-export async function createWorkoutSession(date: string, gym_id?: number): Promise<number> {
+export async function createWorkoutSession(date: string, gym_id?: number | null, title?: string): Promise<number> {
   const result = await apiRequest<{ id: number }>('/api/v1/workouts/sessions', {
     method: 'POST',
-    body: { date, gymId: gym_id ?? null },
+    body: { date, gymId: gym_id ?? null, title: title?.trim() || null },
   });
   return result.id;
+}
+
+export type SessionPatch = {
+  title?: string;
+  note?: string;
+  gymId?: number | null;
+  date?: string;
+  durationSec?: number;
+};
+
+export async function updateSession(sessionId: number, patch: SessionPatch): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: patch,
+  });
+}
+
+export async function updateWorkoutSet(setId: number, weight_kg: number, reps: number): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sets/${setId}`, {
+    method: 'PATCH',
+    body: { weightKg: weight_kg, reps },
+  });
 }
 
 export async function updateSessionDuration(sessionId: number, duration_sec: number): Promise<void> {
@@ -226,6 +252,9 @@ export async function getSessionHistory(limit = 30): Promise<SessionSummary[]> {
     exercise_count: Number(s.exerciseCount),
     set_count: Number(s.setCount),
     exercise_names: s.exerciseNames.join(', '),
+    title: s.title ?? null,
+    note: s.note ?? null,
+    gym_id: s.gymId ?? null,
   }));
 }
 

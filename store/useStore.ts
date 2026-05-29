@@ -20,13 +20,16 @@ type WorkoutState = {
   activeSessionId: number | null;
   sessionDate: string | null;
   sessionStartTime: number | null;
+  sessionTitle: string | null;
+  sessionGymId: number | null;
   exercises: ExerciseEntry[];
   restTimerActive: boolean;
   restTimerEnd: number | null;
   restTotalSec: number;
   restNextLabel: string | null;
 
-  startSession: (sessionId: number, date: string) => void;
+  startSession: (sessionId: number, date: string, title?: string | null, gymId?: number | null) => void;
+  setSessionTitle: (title: string) => void;
   finishSession: () => void;
   addExercise: (entry: ExerciseEntry) => void;
   updateSet: (exIdx: number, setIdx: number, data: Partial<SetEntry>) => void;
@@ -56,17 +59,21 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   activeSessionId: null,
   sessionDate: null,
   sessionStartTime: null,
+  sessionTitle: null,
+  sessionGymId: null,
   exercises: [],
   restTimerActive: false,
   restTimerEnd: null,
   restTotalSec: 0,
   restNextLabel: null,
 
-  startSession: (sessionId, date) =>
-    set({ activeSessionId: sessionId, sessionDate: date, sessionStartTime: Date.now(), exercises: [] }),
+  startSession: (sessionId, date, title, gymId) =>
+    set({ activeSessionId: sessionId, sessionDate: date, sessionStartTime: Date.now(), sessionTitle: title ?? null, sessionGymId: gymId ?? null, exercises: [] }),
+
+  setSessionTitle: (title) => set({ sessionTitle: title }),
 
   finishSession: () =>
-    set({ activeSessionId: null, sessionDate: null, sessionStartTime: null, exercises: [], restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
+    set({ activeSessionId: null, sessionDate: null, sessionStartTime: null, sessionTitle: null, sessionGymId: null, exercises: [], restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
 
   addExercise: (entry) =>
     set((state) => ({ exercises: [...state.exercises, entry] })),
