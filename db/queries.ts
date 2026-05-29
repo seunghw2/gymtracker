@@ -1,4 +1,5 @@
 import { apiRequest } from '../lib/api';
+import type { SetType } from '../store/useStore';
 
 export type Exercise = {
   id: number;
@@ -27,6 +28,7 @@ export type WorkoutSet = {
   weight_kg: number;
   reps: number;
   estimated_1rm: number | null;
+  set_type: SetType;
   created_at: string;
 };
 
@@ -64,6 +66,12 @@ export type SessionSetRow = {
   weight_kg: number;
   reps: number;
   estimated_1rm: number | null;
+  set_type: SetType;
+};
+
+export type ExerciseNote = {
+  exercise_id: number;
+  note: string | null;
 };
 
 // ─── API 응답 형식 (백엔드 camelCase) ───────────────────────────────────
@@ -80,6 +88,7 @@ type ApiSetDto = {
   exerciseName: string; brand: string | null;
   setOrder: number; weightKg: number;
   reps: number; estimated1rm: number | null;
+  setType: string | null;
 };
 
 type ApiSessionSummary = {
@@ -112,11 +121,16 @@ function mapExercise(e: ApiExercise): Exercise {
   };
 }
 
+function normSetType(raw: string | null | undefined): SetType {
+  const v = (raw ?? 'NORMAL').toUpperCase();
+  return v === 'WARMUP' || v === 'DROP' || v === 'FAILURE' ? v : 'NORMAL';
+}
+
 function mapSetDtoToWorkoutSet(s: ApiSetDto): WorkoutSet {
   return {
     id: s.id, session_id: 0, exercise_id: s.exerciseId,
     set_order: s.setOrder, weight_kg: s.weightKg, reps: s.reps,
-    estimated_1rm: s.estimated1rm, created_at: '',
+    estimated_1rm: s.estimated1rm, set_type: normSetType(s.setType), created_at: '',
   };
 }
 
@@ -125,7 +139,7 @@ function mapSetDtoToSessionSetRow(s: ApiSetDto): SessionSetRow {
     id: s.id, exercise_id: s.exerciseId,
     exercise_name: s.exerciseName, brand: s.brand,
     set_order: s.setOrder, weight_kg: s.weightKg,
-    reps: s.reps, estimated_1rm: s.estimated1rm,
+    reps: s.reps, estimated_1rm: s.estimated1rm, set_type: normSetType(s.setType),
   };
 }
 
@@ -164,6 +178,15 @@ export async function deleteCustomExercise(id: number): Promise<void> {
   await apiRequest(`/api/v1/exercises/${id}`, { method: 'DELETE' });
 }
 
+/** 종목 영구 메모 수정. 갱신된 Exercise 반환. */
+export async function updateExerciseNote(id: number, note: string): Promise<Exercise> {
+  const result = await apiRequest<ApiExercise>(`/api/v1/exercises/${id}`, {
+    method: 'PATCH',
+    body: { note },
+  });
+  return mapExercise(result);
+}
+
 export async function getCustomExercises(): Promise<Exercise[]> {
   const list = await apiRequest<ApiExercise[]>('/api/v1/exercises/custom');
   return list.map(mapExercise);
@@ -194,10 +217,10 @@ export async function updateSession(sessionId: number, patch: SessionPatch): Pro
   });
 }
 
-export async function updateWorkoutSet(setId: number, weight_kg: number, reps: number): Promise<void> {
+export async function updateWorkoutSet(setId: number, weight_kg: number, reps: number, set_type?: SetType): Promise<void> {
   await apiRequest(`/api/v1/workouts/sets/${setId}`, {
     method: 'PATCH',
-    body: { weightKg: weight_kg, reps },
+    body: { weightKg: weight_kg, reps, setType: set_type },
   });
 }
 
@@ -215,10 +238,11 @@ export async function addWorkoutSet(
   weight_kg: number,
   reps: number,
   estimated_1rm: number,
+  set_type: SetType = 'NORMAL',
 ): Promise<number> {
   const result = await apiRequest<ApiSetDto>(`/api/v1/workouts/sessions/${session_id}/sets`, {
     method: 'POST',
-    body: { exerciseId: exercise_id, setOrder: set_order, weightKg: weight_kg, reps },
+    body: { exerciseId: exercise_id, setOrder: set_order, weightKg: weight_kg, reps, setType: set_type },
   });
   return result.id;
 }
@@ -263,6 +287,22 @@ export async function getSessionSets(sessionId: number): Promise<SessionSetRow[]
   return detail.sets.map(mapSetDtoToSessionSetRow);
 }
 
+type ApiExerciseNote = { exerciseId: number; note: string | null };
+
+/** 세션별 종목 메모 목록. */
+export async function getSessionExerciseNotes(sessionId: number): Promise<ExerciseNote[]> {
+  const detail = await apiRequest<{ exerciseNotes?: ApiExerciseNote[] }>(`/api/v1/workouts/sessions/${sessionId}`);
+  return (detail.exerciseNotes ?? []).map(n => ({ exercise_id: n.exerciseId, note: n.note }));
+}
+
+/** 이번 세션의 그 종목 메모 저장(upsert). */
+export async function upsertExerciseSessionNote(sessionId: number, exerciseId: number, note: string): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sessions/${sessionId}/exercises/${exerciseId}/note`, {
+    method: 'PUT',
+    body: { note },
+  });
+}
+
 // ─── 캘린더 / 통계 ─────────────────────────────────────────────────────
 
 export async function getWorkoutDates(year: number, month: number): Promise<string[]> {
@@ -295,13 +335,14 @@ export type TrainedExercise = {
   id: number;
   name: string;
   brand: string | null;
+  note: string | null;
 };
 
 export async function getTrainedExercises(): Promise<TrainedExercise[]> {
-  const list = await apiRequest<{ id: number; name: string; brand: string | null }[]>(
+  const list = await apiRequest<{ id: number; name: string; brand: string | null; note: string | null }[]>(
     '/api/v1/stats/trained-exercises'
   );
-  return list.map(e => ({ id: e.id, name: e.name, brand: e.brand }));
+  return list.map(e => ({ id: e.id, name: e.name, brand: e.brand, note: e.note ?? null }));
 }
 
 export type VolumeStats = {

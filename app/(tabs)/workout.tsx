@@ -27,10 +27,14 @@ import {
   deleteSession,
   updateSession,
   updateWorkoutSet,
+  updateExerciseNote,
+  upsertExerciseSessionNote,
+  getTrainedExercises,
   getGyms,
   Exercise,
   SessionSummary,
   SessionSetRow,
+  TrainedExercise,
   Gym,
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
@@ -41,10 +45,18 @@ import {
   MuscleGroup,
   EquipmentType,
 } from '../../constants/exercises';
-import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry } from '../../store/useStore';
+import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
 import RestTimer from '../../components/RestTimer';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
+
+/** 세트 타입별 짧은 표시(W/D/F) + 색상. NORMAL은 표시 없음. */
+const SET_TYPE_META: Record<SetType, { label: string; color: string } | null> = {
+  NORMAL: null,
+  WARMUP: { label: 'W', color: '#FF9F0A' },
+  DROP: { label: 'D', color: '#BF5AF2' },
+  FAILURE: { label: 'F', color: '#FF453A' },
+};
 
 function epley(weight: number, reps: number) {
   return Math.round(weight * (1 + reps / 30) * 10) / 10;
@@ -91,6 +103,9 @@ export default function WorkoutScreen() {
     finishSession,
     addExercise,
     updateSet,
+    cycleSetType,
+    setExerciseNote,
+    setExerciseSessionNote,
     addSetToExercise,
     markSetDone,
     removeSet,
@@ -126,6 +141,7 @@ export default function WorkoutScreen() {
   const [sessionNote, setSessionNote] = useState('');
   const [detailTitle, setDetailTitle] = useState('');
   const [detailNote, setDetailNote] = useState('');
+  const [recents, setRecents] = useState<TrainedExercise[]>([]);
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -149,6 +165,11 @@ export default function WorkoutScreen() {
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
   }, []);
+
+  // 운동 추가 모달 열릴 때 최근 종목 로드(빠른 추가용)
+  useEffect(() => {
+    if (showExerciseModal) getTrainedExercises().then(setRecents).catch(() => {});
+  }, [showExerciseModal]);
 
   const gymName = (id: number | null | undefined) => gyms.find(g => g.id === id)?.name ?? null;
 
@@ -206,7 +227,33 @@ export default function WorkoutScreen() {
     if (!s) return;
     const orm = epley(s.weight_kg, s.reps);
     updateSet(exIdx, setIdx, { estimated_1rm: orm });
-    if (s.done && s.setId) await updateWorkoutSet(s.setId, s.weight_kg, s.reps).catch(() => {});
+    if (s.done && s.setId) await updateWorkoutSet(s.setId, s.weight_kg, s.reps, s.setType ?? 'NORMAL').catch(() => {});
+  };
+
+  // 세트 번호 탭 → 타입 순환(일반→W→D→F). 이미 저장된 세트면 백엔드도 갱신.
+  const handleCycleSetType = (exIdx: number, setIdx: number) => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (!s) return;
+    cycleSetType(exIdx, setIdx);
+    Haptics.selectionAsync();
+    const next = nextSetType(s.setType);
+    if (s.done && s.setId) {
+      updateWorkoutSet(s.setId, s.weight_kg, s.reps, next).catch(() => {});
+    }
+  };
+
+  // 종목 영구 메모 저장
+  const handleExerciseNoteBlur = async (exIdx: number) => {
+    const ex = exercises[exIdx];
+    if (!ex) return;
+    await updateExerciseNote(ex.exerciseId, ex.note ?? '').catch(() => {});
+  };
+
+  // 세션별 종목 메모 저장
+  const handleExerciseSessionNoteBlur = async (exIdx: number) => {
+    const ex = exercises[exIdx];
+    if (!ex || !activeSessionId) return;
+    await upsertExerciseSessionNote(activeSessionId, ex.exerciseId, ex.sessionNote ?? '').catch(() => {});
   };
 
   const openExerciseSelect = () => {
@@ -218,28 +265,36 @@ export default function WorkoutScreen() {
     setShowExerciseModal(true);
   };
 
-  const handleSelectExercise = async (ex: Exercise) => {
+  const addExerciseToWorkout = async (ex: { id: number; name: string; brand: string | null; note: string | null }) => {
     setShowExerciseModal(false);
     const prev = await getLastSessionSets(ex.id);
+    // 지난 세션 값으로 입력칸 프리필 + 원본은 힌트용으로 보존
     const initSets: SetEntry[] = prev.length > 0
-      ? prev.map((s, i) => ({ setOrder: i + 1, weight_kg: s.weight_kg, reps: s.reps, done: false }))
-      : [{ setOrder: 1, weight_kg: 60, reps: 10, done: false }];
+      ? prev.map((s, i) => ({ setOrder: i + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: 'NORMAL' }))
+      : [{ setOrder: 1, weight_kg: 60, reps: 10, done: false, setType: 'NORMAL' }];
+    const lastSets = prev.map(s => ({ weight_kg: s.weight_kg, reps: s.reps }));
 
     const entry: ExerciseEntry = {
       exerciseId: ex.id,
       exerciseName: ex.name,
       brand: ex.brand,
       sets: initSets,
+      lastSets,
+      note: ex.note ?? null,
+      sessionNote: '',
     };
     addExercise(entry);
   };
+
+  const handleSelectExercise = (ex: Exercise) => addExerciseToWorkout(ex);
+  const handleQuickAdd = (ex: TrainedExercise) => addExerciseToWorkout(ex);
 
   const handleCompleteSet = async (exIdx: number, setIdx: number) => {
     if (!activeSessionId) return;
     const ex = exercises[exIdx];
     const s = ex.sets[setIdx];
     const orm = epley(s.weight_kg, s.reps);
-    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm);
+    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm, s.setType ?? 'NORMAL');
     markSetDone(exIdx, setIdx, orm, setId);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -488,24 +543,39 @@ export default function WorkoutScreen() {
                       rightThreshold={40}
                       overshootRight={false}
                     >
-                      <View style={styles.setRow}>
-                        <Text style={[styles.setNum, { flex: 0.5 }]}>{s.set_order}</Text>
-                        <TextInput
-                          style={styles.setInput}
-                          value={String(s.weight_kg)}
-                          keyboardType="decimal-pad"
-                          selectTextOnFocus
-                          onChangeText={v => handleEditDetailSet(s.id, parseFloat(v) || 0, s.reps)}
-                          onEndEditing={() => handleEditDetailSetBlur(s.id)}
-                        />
-                        <TextInput
-                          style={styles.setInput}
-                          value={String(s.reps)}
-                          keyboardType="number-pad"
-                          selectTextOnFocus
-                          onChangeText={v => handleEditDetailSet(s.id, s.weight_kg, parseInt(v) || 0)}
-                          onEndEditing={() => handleEditDetailSetBlur(s.id)}
-                        />
+                      <View style={[styles.setRow, (s.set_type ?? 'NORMAL') === 'WARMUP' && styles.setRowWarmup]}>
+                        <View style={[styles.setNum, { flex: 0.5 }]}>
+                          {SET_TYPE_META[s.set_type ?? 'NORMAL'] ? (
+                            <Text style={[styles.setTypeBadge, {
+                              color: SET_TYPE_META[s.set_type ?? 'NORMAL']!.color,
+                              borderColor: SET_TYPE_META[s.set_type ?? 'NORMAL']!.color,
+                            }]}>
+                              {SET_TYPE_META[s.set_type ?? 'NORMAL']!.label}
+                            </Text>
+                          ) : (
+                            <Text style={styles.setNumText}>{s.set_order}</Text>
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <TextInput
+                            style={styles.setInput}
+                            value={String(s.weight_kg)}
+                            keyboardType="decimal-pad"
+                            selectTextOnFocus
+                            onChangeText={v => handleEditDetailSet(s.id, parseFloat(v) || 0, s.reps)}
+                            onEndEditing={() => handleEditDetailSetBlur(s.id)}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <TextInput
+                            style={styles.setInput}
+                            value={String(s.reps)}
+                            keyboardType="number-pad"
+                            selectTextOnFocus
+                            onChangeText={v => handleEditDetailSet(s.id, s.weight_kg, parseInt(v) || 0)}
+                            onEndEditing={() => handleEditDetailSetBlur(s.id)}
+                          />
+                        </View>
                         <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
                           {s.estimated_1rm ? `${s.estimated_1rm}kg` : '-'}
                         </Text>
@@ -603,13 +673,23 @@ export default function WorkoutScreen() {
           const bestORM = ex.sets
             .filter(s => s.done && s.estimated_1rm)
             .reduce((m, s) => Math.max(m, s.estimated_1rm ?? 0), 0);
+          // 워밍업 제외 볼륨 + 완료 세트 수
+          const doneSets = ex.sets.filter(s => s.done);
+          const volume = doneSets
+            .filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP')
+            .reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
 
           return (
             <View key={exIdx} style={styles.exerciseCard}>
               <View style={styles.exerciseCardHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
+                  {(volume > 0 || doneSets.length > 0) && (
+                    <Text style={styles.exVolume}>
+                      볼륨 {Math.round(volume).toLocaleString()}kg · {doneSets.length}세트
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.exerciseHeaderRight}>
                   {bestORM > 0 && (
@@ -621,6 +701,27 @@ export default function WorkoutScreen() {
                 </View>
               </View>
 
+              {/* 종목 영구 메모 (모든 세션 공통) */}
+              <TextInput
+                style={styles.exNoteInput}
+                placeholder="📌 종목 메모 (예: 손목 각도 주의 — 항상 표시)"
+                placeholderTextColor="#48484A"
+                value={ex.note ?? ''}
+                onChangeText={t => setExerciseNote(exIdx, t)}
+                onEndEditing={() => handleExerciseNoteBlur(exIdx)}
+                multiline
+              />
+              {/* 이번 세션의 종목 메모 */}
+              <TextInput
+                style={styles.exSessionNoteInput}
+                placeholder="📝 오늘 메모 (이 세션만)"
+                placeholderTextColor="#48484A"
+                value={ex.sessionNote ?? ''}
+                onChangeText={t => setExerciseSessionNote(exIdx, t)}
+                onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
+                multiline
+              />
+
               <View style={styles.setHeader}>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
                 <Text style={styles.setCol}>무게(kg)</Text>
@@ -628,47 +729,71 @@ export default function WorkoutScreen() {
                 <Text style={[styles.setCol, { flex: 0.5 }]}>✓</Text>
               </View>
 
-              {ex.sets.map((s, setIdx) => (
-                <Swipeable
-                  key={setIdx}
-                  ref={ref => {
-                    const key = `${exIdx}-${setIdx}`;
-                    if (ref) swipeableRefs.current.set(key, ref);
-                    else swipeableRefs.current.delete(key);
-                  }}
-                  renderRightActions={() => renderDeleteAction(exIdx, setIdx)}
-                  rightThreshold={40}
-                  overshootRight={false}
-                >
-                  <View style={[styles.setRow, s.done && styles.setRowDone]}>
-                    <Text style={[styles.setNum, { flex: 0.5 }]}>{s.setOrder}</Text>
-                    <TextInput
-                      style={styles.setInput}
-                      value={String(s.weight_kg)}
-                      keyboardType="decimal-pad"
-                      onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: parseFloat(v) || 0 })}
-                      onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
-                      selectTextOnFocus
-                    />
-                    <TextInput
-                      style={styles.setInput}
-                      value={String(s.reps)}
-                      keyboardType="number-pad"
-                      onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
-                      onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
-                      selectTextOnFocus
-                    />
-                    <Pressable
-                      style={[styles.checkBtn, { flex: 0.5 }]}
-                      onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
-                    >
-                      <Text style={[styles.checkText, s.done && styles.checkDone]}>
-                        {s.done ? '✓' : '○'}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </Swipeable>
-              ))}
+              {ex.sets.map((s, setIdx) => {
+                const meta = SET_TYPE_META[s.setType ?? 'NORMAL'];
+                const isWarmup = (s.setType ?? 'NORMAL') === 'WARMUP';
+                const prev = ex.lastSets?.[setIdx];
+                return (
+                  <Swipeable
+                    key={setIdx}
+                    ref={ref => {
+                      const key = `${exIdx}-${setIdx}`;
+                      if (ref) swipeableRefs.current.set(key, ref);
+                      else swipeableRefs.current.delete(key);
+                    }}
+                    renderRightActions={() => renderDeleteAction(exIdx, setIdx)}
+                    rightThreshold={40}
+                    overshootRight={false}
+                  >
+                    <View style={[styles.setRow, s.done && styles.setRowDone, isWarmup && styles.setRowWarmup]}>
+                      {/* 세트 번호/타입 — 탭하면 일반→W→D→F 순환 */}
+                      <Pressable
+                        style={[styles.setNum, { flex: 0.5 }]}
+                        onPress={() => handleCycleSetType(exIdx, setIdx)}
+                        hitSlop={6}
+                      >
+                        {meta ? (
+                          <Text style={[styles.setTypeBadge, { color: meta.color, borderColor: meta.color }]}>
+                            {meta.label}
+                          </Text>
+                        ) : (
+                          <Text style={styles.setNumText}>{s.setOrder}</Text>
+                        )}
+                      </Pressable>
+                      <View style={{ flex: 1 }}>
+                        <TextInput
+                          style={styles.setInput}
+                          value={String(s.weight_kg)}
+                          keyboardType="decimal-pad"
+                          onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: parseFloat(v) || 0 })}
+                          onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
+                          selectTextOnFocus
+                        />
+                        {prev && <Text style={styles.prevHint}>이전 {prev.weight_kg}</Text>}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <TextInput
+                          style={styles.setInput}
+                          value={String(s.reps)}
+                          keyboardType="number-pad"
+                          onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
+                          onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
+                          selectTextOnFocus
+                        />
+                        {prev && <Text style={styles.prevHint}>×{prev.reps}</Text>}
+                      </View>
+                      <Pressable
+                        style={[styles.checkBtn, { flex: 0.5 }]}
+                        onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
+                      >
+                        <Text style={[styles.checkText, s.done && styles.checkDone]}>
+                          {s.done ? '✓' : '○'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </Swipeable>
+                );
+              })}
 
               <Pressable style={styles.addSetBtn} onPress={() => addSetToExercise(exIdx)}>
                 <Text style={styles.addSetText}>+ 세트 추가</Text>
@@ -713,7 +838,21 @@ export default function WorkoutScreen() {
           </View>
 
           {selectStep === 'muscle' && (
-            <View style={styles.modalContent}>
+            <ScrollView contentContainerStyle={styles.modalContent}>
+              {recents.length > 0 && (
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
+                  <View style={styles.chipWrap}>
+                    {recents.slice(0, 8).map(r => (
+                      <Pressable key={r.id} style={styles.chip} onPress={() => handleQuickAdd(r)}>
+                        <Text style={styles.chipText} numberOfLines={1}>{r.name}</Text>
+                        {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
+              <Text style={styles.quickAddTitle}>부위로 찾기</Text>
               <View style={styles.muscleGrid}>
                 {MUSCLE_GROUPS.map(mg => (
                   <Pressable key={mg} style={styles.muscleBtn} onPress={() => { setSelectedMuscle(mg); setSelectStep('equipment'); }}>
@@ -721,7 +860,7 @@ export default function WorkoutScreen() {
                   </Pressable>
                 ))}
               </View>
-            </View>
+            </ScrollView>
           )}
 
           {selectStep === 'equipment' && (
@@ -1005,6 +1144,26 @@ const styles = StyleSheet.create({
   },
   exerciseName: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   exerciseBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
+  exVolume: { color: '#30D158', fontSize: 12, marginTop: 4, fontVariant: ['tabular-nums'] },
+  exNoteInput: {
+    backgroundColor: '#23201A',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#E5C07B',
+    fontSize: 13,
+    marginBottom: 6,
+    marginTop: 2,
+  },
+  exSessionNoteInput: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#FFFFFF',
+    fontSize: 13,
+    marginBottom: 10,
+  },
   ormBadge: {
     color: '#30D158',
     fontSize: 13,
@@ -1035,14 +1194,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#2C2C2E',
   },
   setRowDone: { opacity: 0.45 },
-  setNum: { flex: 1, color: '#8E8E93', textAlign: 'center', fontSize: 14 },
+  setRowWarmup: { backgroundColor: '#2A2620' },
+  setNum: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  setNumText: { color: '#8E8E93', textAlign: 'center', fontSize: 14 },
+  setTypeBadge: {
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+    minWidth: 22,
+    borderWidth: 1.5,
+    borderRadius: 6,
+    paddingVertical: 1,
+    overflow: 'hidden',
+  },
   setInput: {
-    flex: 1,
+    width: '100%',
     color: '#FFFFFF',
     textAlign: 'center',
     fontSize: 18,
     fontWeight: '600',
     paddingVertical: 10,
+    fontVariant: ['tabular-nums'],
+  },
+  prevHint: {
+    color: '#6E6E73',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: -6,
+    marginBottom: 4,
     fontVariant: ['tabular-nums'],
   },
   checkBtn: { flex: 1, alignItems: 'center', paddingVertical: 10 },
@@ -1104,6 +1283,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
   },
+  quickAddTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase' },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    backgroundColor: '#1A3D27',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    maxWidth: '48%',
+  },
+  chipText: { color: '#30D158', fontSize: 14, fontWeight: '600' },
+  chipBrand: { color: '#6E9E7E', fontSize: 11, marginTop: 1 },
   muscleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   muscleBtn: {
     width: '46%',

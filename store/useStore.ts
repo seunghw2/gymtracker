@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 
+export type SetType = 'NORMAL' | 'WARMUP' | 'DROP' | 'FAILURE';
+
+/** 세트 타입 순환 순서 (세트 번호 탭 시). */
+export const SET_TYPE_CYCLE: SetType[] = ['NORMAL', 'WARMUP', 'DROP', 'FAILURE'];
+
+export function nextSetType(t: SetType | undefined): SetType {
+  const idx = SET_TYPE_CYCLE.indexOf(t ?? 'NORMAL');
+  return SET_TYPE_CYCLE[(idx + 1) % SET_TYPE_CYCLE.length];
+}
+
 export type SetEntry = {
   setOrder: number;
   weight_kg: number;
@@ -7,6 +17,7 @@ export type SetEntry = {
   done: boolean;
   estimated_1rm?: number;
   setId?: number;
+  setType?: SetType;
 };
 
 export type ExerciseEntry = {
@@ -14,6 +25,12 @@ export type ExerciseEntry = {
   exerciseName: string;
   brand: string | null;
   sets: SetEntry[];
+  /** 지난 세션의 원본 세트값 (입력 힌트용, 수정되지 않음) */
+  lastSets?: { weight_kg: number; reps: number }[];
+  /** 종목 영구 메모 (모든 세션 공통) */
+  note?: string | null;
+  /** 이번 세션의 그 종목 메모 */
+  sessionNote?: string;
 };
 
 type WorkoutState = {
@@ -33,6 +50,9 @@ type WorkoutState = {
   finishSession: () => void;
   addExercise: (entry: ExerciseEntry) => void;
   updateSet: (exIdx: number, setIdx: number, data: Partial<SetEntry>) => void;
+  cycleSetType: (exIdx: number, setIdx: number) => void;
+  setExerciseNote: (exIdx: number, note: string) => void;
+  setExerciseSessionNote: (exIdx: number, note: string) => void;
   addSetToExercise: (exIdx: number) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
@@ -48,11 +68,13 @@ type SettingsState = {
   goalWeightKg: number;
   goalBodyFatPct: number;
   unitKg: boolean;
+  soundOnSilent: boolean;
 
   setRestDuration: (sec: number) => void;
   setGoalWeight: (kg: number) => void;
   setGoalBodyFat: (pct: number) => void;
   setUnitKg: (isKg: boolean) => void;
+  setSoundOnSilent: (on: boolean) => void;
 };
 
 export const useWorkoutStore = create<WorkoutState>((set) => ({
@@ -88,6 +110,28 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       return { exercises };
     }),
 
+  cycleSetType: (exIdx, setIdx) =>
+    set((state) => {
+      const exercises = state.exercises.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        const sets = ex.sets.map((s, j) =>
+          j === setIdx ? { ...s, setType: nextSetType(s.setType) } : s
+        );
+        return { ...ex, sets };
+      });
+      return { exercises };
+    }),
+
+  setExerciseNote: (exIdx, note) =>
+    set((state) => ({
+      exercises: state.exercises.map((ex, i) => i === exIdx ? { ...ex, note } : ex),
+    })),
+
+  setExerciseSessionNote: (exIdx, note) =>
+    set((state) => ({
+      exercises: state.exercises.map((ex, i) => i === exIdx ? { ...ex, sessionNote: note } : ex),
+    })),
+
   addSetToExercise: (exIdx) =>
     set((state) => {
       const exercises = state.exercises.map((ex, i) => {
@@ -98,6 +142,7 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
           weight_kg: last?.weight_kg ?? 60,
           reps: last?.reps ?? 10,
           done: false,
+          setType: 'NORMAL',
         };
         return { ...ex, sets: [...ex.sets, newSet] };
       });
@@ -160,9 +205,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   goalWeightKg: 70,
   goalBodyFatPct: 15,
   unitKg: true,
+  soundOnSilent: true,
 
   setRestDuration: (sec) => set({ restDurationSec: sec }),
   setGoalWeight: (kg) => set({ goalWeightKg: kg }),
   setGoalBodyFat: (pct) => set({ goalBodyFatPct: pct }),
   setUnitKg: (isKg) => set({ unitKg: isKg }),
+  setSoundOnSilent: (on) => set({ soundOnSilent: on }),
 }));

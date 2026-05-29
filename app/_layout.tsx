@@ -5,6 +5,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/useAuthStore';
 import { configureNotifications, ensurePermission } from '../lib/notifications';
+import { configureAudio } from '../lib/sound';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function RootLayout() {
   useEffect(() => {
     bootstrap();
     configureNotifications();
+    configureAudio();
     ensurePermission();
   }, []);
 

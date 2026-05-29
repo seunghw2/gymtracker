@@ -28,8 +28,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 export default function SettingsScreen() {
   const {
-    goalWeightKg, goalBodyFatPct, restDurationSec, unitKg,
-    setGoalWeight, setGoalBodyFat, setRestDuration, setUnitKg,
+    goalWeightKg, goalBodyFatPct, restDurationSec, unitKg, soundOnSilent,
+    setGoalWeight, setGoalBodyFat, setRestDuration, setUnitKg, setSoundOnSilent,
   } = useSettingsStore();
   const { user, logout } = useAuthStore();
 
@@ -60,6 +60,7 @@ export default function SettingsScreen() {
     const gf = await getSetting('goal_body_fat_pct', String(goalBodyFatPct));
     const rd = await getSetting('rest_duration_sec', String(restDurationSec));
     const uk = await getSetting('unit_kg', '1');
+    const sos = await getSetting('sound_silent_override', '1');
 
     const restMap: Record<number, string> = {};
     for (const ex of allEx) {
@@ -72,6 +73,7 @@ export default function SettingsScreen() {
     setGoalBodyFat(parseFloat(gf));
     setRestDuration(parseInt(rd));
     setUnitKg(uk === '1');
+    setSoundOnSilent(sos === '1');
 
     setGoalWeightInput(gw);
     setGoalFatInput(gf);
@@ -132,6 +134,11 @@ export default function SettingsScreen() {
   const toggleUnit = async (val: boolean) => {
     setUnitKg(val);
     await setSetting('unit_kg', val ? '1' : '0');
+  };
+
+  const toggleSoundOnSilent = async (val: boolean) => {
+    setSoundOnSilent(val);
+    await setSetting('sound_silent_override', val ? '1' : '0');
   };
 
   return (
@@ -208,6 +215,25 @@ export default function SettingsScreen() {
             <Switch
               value={unitKg}
               onValueChange={toggleUnit}
+              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        {/* 알림 */}
+        <Text style={styles.sectionTitle}>휴식 알림</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.label}>무음 모드에서도 소리</Text>
+              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
+                휴대폰이 무음이어도 휴식 완료음 재생 (앱 사용 중)
+              </Text>
+            </View>
+            <Switch
+              value={soundOnSilent}
+              onValueChange={toggleSoundOnSilent}
               trackColor={{ false: '#3A3A3C', true: '#30D158' }}
               thumbColor="#FFFFFF"
             />

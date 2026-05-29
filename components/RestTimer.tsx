@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useWorkoutStore } from '../store/useStore';
+import { useWorkoutStore, useSettingsStore } from '../store/useStore';
 import { scheduleRestEnd, cancelRest } from '../lib/notifications';
+import { playRestDoneSound } from '../lib/sound';
 
 const PRESETS = [60, 90, 120];
 
@@ -27,6 +28,8 @@ export default function RestTimer() {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRemaining(0);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // 무음에도 들리는 포그라운드 사운드 (설정 ON일 때). 최신값 직접 조회로 stale 방지.
+        if (useSettingsStore.getState().soundOnSilent) playRestDoneSound();
         stopRestTimer(); // 예약 알림은 취소하지 않음 → 포그라운드 소리/백그라운드 알림 발화
       } else {
         setRemaining(rem);
