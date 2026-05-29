@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import {
   getExercises,
@@ -19,7 +20,11 @@ import {
   addWorkoutSet,
   getLastSessionSets,
   updateSessionDuration,
+  getSessionHistory,
+  getSessionSets,
   Exercise,
+  SessionSummary,
+  SessionSetRow,
 } from '../../db/queries';
 import {
   MUSCLE_GROUPS,
@@ -31,7 +36,7 @@ import {
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry } from '../../store/useStore';
 import RestTimer from '../../components/RestTimer';
 
-type SelectStep = 'muscle' | 'equipment' | 'brand' | 'list' | 'custom';
+type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
 
 function epley(weight: number, reps: number) {
   return Math.round(weight * (1 + reps / 30) * 10) / 10;
@@ -44,6 +49,13 @@ function getTodayStr() {
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function formatDuration(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}시간 ${m}분`;
+  return `${m}분`;
 }
 
 function useElapsedTime(startTime: number | null) {
@@ -70,6 +82,7 @@ export default function WorkoutScreen() {
     updateSet,
     addSetToExercise,
     markSetDone,
+    removeSet,
     startRestTimer,
   } = useWorkoutStore();
   const { restDurationSec } = useSettingsStore();
@@ -82,6 +95,12 @@ export default function WorkoutScreen() {
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
   const [customName, setCustomName] = useState('');
+  const [customBrandInput, setCustomBrandInput] = useState('');
+  const [extraBrands, setExtraBrands] = useState<string[]>([]);
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
+  const [history, setHistory] = useState<SessionSummary[]>([]);
+  const [detailSession, setDetailSession] = useState<SessionSummary | null>(null);
+  const [detailSets, setDetailSets] = useState<SessionSetRow[]>([]);
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -95,6 +114,12 @@ export default function WorkoutScreen() {
   useEffect(() => {
     if (selectStep === 'list') loadExercises();
   }, [selectStep, loadExercises]);
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      getSessionHistory().then(setHistory);
+    }
+  }, [activeSessionId]);
 
   const handleStartWorkout = async () => {
     const today = getTodayStr();
@@ -161,21 +186,122 @@ export default function WorkoutScreen() {
     loadExercises();
   };
 
+  const openDetail = async (session: SessionSummary) => {
+    const sets = await getSessionSets(session.id);
+    setDetailSets(sets);
+    setDetailSession(session);
+  };
+
+  const groupedDetailSets = detailSets.reduce<Record<number, { name: string; brand: string | null; sets: SessionSetRow[] }>>(
+    (acc, row) => {
+      if (!acc[row.exercise_id]) acc[row.exercise_id] = { name: row.exercise_name, brand: row.brand, sets: [] };
+      acc[row.exercise_id].sets.push(row);
+      return acc;
+    },
+    {}
+  );
+
   if (!activeSessionId) {
     return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.startContainer}>
-          <Text style={styles.startTitle}>오늘의 운동</Text>
-          <Text style={styles.startDate}>{formatDate(getTodayStr())}</Text>
-          <Pressable style={styles.startBtn} onPress={handleStartWorkout}>
-            <Text style={styles.startBtnText}>운동 시작</Text>
-          </Pressable>
-        </View>
+        <ScrollView contentContainerStyle={styles.homeContent}>
+          {/* 오늘 시작 */}
+          <View style={styles.startBox}>
+            <View>
+              <Text style={styles.startTitle}>오늘의 운동</Text>
+              <Text style={styles.startDate}>{formatDate(getTodayStr())}</Text>
+            </View>
+            <Pressable style={styles.startBtn} onPress={handleStartWorkout}>
+              <Text style={styles.startBtnText}>시작</Text>
+            </Pressable>
+          </View>
+
+          {/* 히스토리 */}
+          {history.length > 0 && (
+            <>
+              <Text style={styles.historyTitle}>지난 루틴</Text>
+              {history.map(session => (
+                <Pressable key={session.id} style={styles.historyCard} onPress={() => openDetail(session)}>
+                  <View style={styles.historyCardTop}>
+                    <Text style={styles.historyDate}>{formatDate(session.date)}</Text>
+                    {session.duration_sec ? (
+                      <Text style={styles.historyDuration}>{formatDuration(session.duration_sec)}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.historyExercises} numberOfLines={1}>
+                    {session.exercise_names || '운동 없음'}
+                  </Text>
+                  <Text style={styles.historyMeta}>
+                    {session.exercise_count}가지 운동 · {session.set_count}세트
+                  </Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+        </ScrollView>
+
+        {/* 세션 상세 모달 */}
+        <Modal visible={!!detailSession} animationType="slide">
+          <SafeAreaView style={styles.safe}>
+            <View style={styles.detailHeader}>
+              <Pressable onPress={() => setDetailSession(null)}>
+                <Text style={styles.modalBack}>✕ 닫기</Text>
+              </Pressable>
+              <Text style={styles.detailHeaderTitle}>
+                {detailSession ? formatDate(detailSession.date) : ''}
+              </Text>
+              <View style={{ width: 60 }} />
+            </View>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              {Object.values(groupedDetailSets).map((group, i) => (
+                <View key={i} style={styles.exerciseCard}>
+                  <View style={styles.exerciseCardHeader}>
+                    <View>
+                      <Text style={styles.exerciseName}>{group.name}</Text>
+                      {group.brand && <Text style={styles.exerciseBrand}>{group.brand}</Text>}
+                    </View>
+                  </View>
+                  <View style={styles.setHeader}>
+                    <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
+                    <Text style={styles.setCol}>무게(kg)</Text>
+                    <Text style={styles.setCol}>횟수</Text>
+                    <Text style={styles.setCol}>추정 1RM</Text>
+                  </View>
+                  {group.sets.map((s, j) => (
+                    <View key={j} style={[styles.setRow, styles.setRowDone]}>
+                      <Text style={[styles.setNum, { flex: 0.5 }]}>{s.set_order}</Text>
+                      <Text style={styles.setReadOnly}>{s.weight_kg}</Text>
+                      <Text style={styles.setReadOnly}>{s.reps}</Text>
+                      <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
+                        {s.estimated_1rm ? `${s.estimated_1rm}kg` : '-'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
+      </GestureHandlerRootView>
     );
   }
 
+  const renderDeleteAction = (exIdx: number, setIdx: number) => (
+    <Pressable
+      style={styles.deleteAction}
+      onPress={() => {
+        swipeableRefs.current.get(`${exIdx}-${setIdx}`)?.close();
+        removeSet(exIdx, setIdx);
+      }}
+    >
+      <Text style={styles.deleteActionText}>삭제</Text>
+    </Pressable>
+  );
+
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe}>
       {/* 헤더 */}
       <View style={styles.sessionHeader}>
@@ -222,33 +348,45 @@ export default function WorkoutScreen() {
               </View>
 
               {ex.sets.map((s, setIdx) => (
-                <View key={setIdx} style={[styles.setRow, s.done && styles.setRowDone]}>
-                  <Text style={[styles.setNum, { flex: 0.5 }]}>{s.setOrder}</Text>
-                  <TextInput
-                    style={styles.setInput}
-                    value={String(s.weight_kg)}
-                    keyboardType="decimal-pad"
-                    onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: parseFloat(v) || 0 })}
-                    editable={!s.done}
-                    selectTextOnFocus
-                  />
-                  <TextInput
-                    style={styles.setInput}
-                    value={String(s.reps)}
-                    keyboardType="number-pad"
-                    onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
-                    editable={!s.done}
-                    selectTextOnFocus
-                  />
-                  <Pressable
-                    style={[styles.checkBtn, { flex: 0.5 }]}
-                    onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
-                  >
-                    <Text style={[styles.checkText, s.done && styles.checkDone]}>
-                      {s.done ? '✓' : '○'}
-                    </Text>
-                  </Pressable>
-                </View>
+                <Swipeable
+                  key={setIdx}
+                  ref={ref => {
+                    const key = `${exIdx}-${setIdx}`;
+                    if (ref) swipeableRefs.current.set(key, ref);
+                    else swipeableRefs.current.delete(key);
+                  }}
+                  renderRightActions={() => renderDeleteAction(exIdx, setIdx)}
+                  rightThreshold={40}
+                  overshootRight={false}
+                >
+                  <View style={[styles.setRow, s.done && styles.setRowDone]}>
+                    <Text style={[styles.setNum, { flex: 0.5 }]}>{s.setOrder}</Text>
+                    <TextInput
+                      style={styles.setInput}
+                      value={String(s.weight_kg)}
+                      keyboardType="decimal-pad"
+                      onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: parseFloat(v) || 0 })}
+                      editable={!s.done}
+                      selectTextOnFocus
+                    />
+                    <TextInput
+                      style={styles.setInput}
+                      value={String(s.reps)}
+                      keyboardType="number-pad"
+                      onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
+                      editable={!s.done}
+                      selectTextOnFocus
+                    />
+                    <Pressable
+                      style={[styles.checkBtn, { flex: 0.5 }]}
+                      onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
+                    >
+                      <Text style={[styles.checkText, s.done && styles.checkDone]}>
+                        {s.done ? '✓' : '○'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Swipeable>
               ))}
 
               <Pressable style={styles.addSetBtn} onPress={() => addSetToExercise(exIdx)}>
@@ -271,6 +409,7 @@ export default function WorkoutScreen() {
               if (selectStep === 'muscle') { setShowExerciseModal(false); }
               else if (selectStep === 'equipment') setSelectStep('muscle');
               else if (selectStep === 'brand') setSelectStep('equipment');
+              else if (selectStep === 'custom-brand') setSelectStep('brand');
               else if (selectStep === 'list') setSelectStep(selectedEquipment === 'Machine' ? 'brand' : 'equipment');
               else if (selectStep === 'custom') setSelectStep('list');
             }}>
@@ -280,6 +419,7 @@ export default function WorkoutScreen() {
               {selectStep === 'muscle' && '부위 선택'}
               {selectStep === 'equipment' && '장비 선택'}
               {selectStep === 'brand' && '브랜드 선택'}
+              {selectStep === 'custom-brand' && '브랜드 직접 입력'}
               {selectStep === 'list' && '운동 선택'}
               {selectStep === 'custom' && '직접 등록'}
             </Text>
@@ -312,14 +452,49 @@ export default function WorkoutScreen() {
           )}
 
           {selectStep === 'brand' && (
-            <View style={styles.modalContent}>
-              {MACHINE_BRANDS.map(b => (
-                <Pressable key={b} style={styles.choiceBtn} onPress={() => { setSelectedBrand(b); setSelectStep('list'); }}>
+            <ScrollView contentContainerStyle={styles.modalContent}>
+              {[...MACHINE_BRANDS, ...extraBrands].map(b => (
+                <Pressable
+                  key={b}
+                  style={styles.choiceBtn}
+                  onPress={() => { setSelectedBrand(b); setSelectStep('list'); }}
+                >
                   <Text style={styles.choiceText}>{b}</Text>
                 </Pressable>
               ))}
-              <Pressable style={[styles.choiceBtn, { borderColor: '#30D158', borderWidth: 1 }]} onPress={() => { setSelectedBrand(null); setSelectStep('list'); }}>
-                <Text style={styles.choiceText}>전체 보기</Text>
+              <Pressable
+                style={[styles.choiceBtn, styles.choiceBtnOutline]}
+                onPress={() => { setCustomBrandInput(''); setSelectStep('custom-brand'); }}
+              >
+                <Text style={[styles.choiceText, { color: '#30D158' }]}>+ 직접 등록</Text>
+              </Pressable>
+            </ScrollView>
+          )}
+
+          {selectStep === 'custom-brand' && (
+            <View style={styles.modalContent}>
+              <Text style={styles.customFormLabel}>브랜드 이름</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: Technogym, Matrix..."
+                placeholderTextColor="#48484A"
+                value={customBrandInput}
+                onChangeText={setCustomBrandInput}
+                autoFocus
+              />
+              <Pressable
+                style={[styles.saveBtn, { marginTop: 16 }, !customBrandInput.trim() && { opacity: 0.4 }]}
+                onPress={() => {
+                  const brand = customBrandInput.trim();
+                  if (!brand) return;
+                  setExtraBrands(prev => [...prev, brand]);
+                  setCustomBrandInput('');
+                  setSelectStep('brand');
+                  Alert.alert('브랜드 추가', `${brand} 브랜드가 추가되었습니다.`);
+                }}
+                disabled={!customBrandInput.trim()}
+              >
+                <Text style={styles.saveBtnText}>저장</Text>
               </Pressable>
             </View>
           )}
@@ -373,28 +548,63 @@ export default function WorkoutScreen() {
       </Modal>
 
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
 
-  startContainer: {
-    flex: 1,
+  homeContent: { padding: 20, paddingBottom: 40 },
+  startBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 12,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 28,
   },
-  startTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '700' },
-  startDate: { color: '#8E8E93', fontSize: 17, marginBottom: 32 },
+  startTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+  startDate: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
   startBtn: {
     backgroundColor: '#30D158',
-    borderRadius: 20,
-    paddingHorizontal: 60,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
   },
-  startBtnText: { color: '#000000', fontSize: 19, fontWeight: '700' },
+  startBtnText: { color: '#000000', fontSize: 16, fontWeight: '700' },
+
+  historyTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', marginBottom: 12 },
+  historyCard: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+  },
+  historyCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  historyDate: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  historyDuration: { color: '#8E8E93', fontSize: 13 },
+  historyExercises: { color: '#8E8E93', fontSize: 14, marginBottom: 4 },
+  historyMeta: { color: '#48484A', fontSize: 12 },
+
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1C1C1E',
+  },
+  detailHeaderTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  setReadOnly: {
+    flex: 1,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontSize: 16,
+    paddingVertical: 10,
+    fontVariant: ['tabular-nums'],
+  },
 
   sessionHeader: {
     flexDirection: 'row',
@@ -464,6 +674,19 @@ const styles = StyleSheet.create({
   checkText: { color: '#48484A', fontSize: 20 },
   checkDone: { color: '#30D158' },
 
+  deleteAction: {
+    backgroundColor: '#FF453A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 72,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  deleteActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   addSetBtn: {
     borderWidth: 1,
     borderColor: '#3A3A3C',
@@ -511,6 +734,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 18,
     marginBottom: 10,
+  },
+  choiceBtnOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#30D158',
   },
   choiceText: { color: '#FFFFFF', fontSize: 17 },
   exItem: {

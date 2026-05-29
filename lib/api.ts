@@ -1,0 +1,116 @@
+import { API_URL } from './config';
+import { tokenStore } from './tokenStore';
+
+export type ApiError = { code: string; message: string; details?: Record<string, string> };
+
+export class ApiException extends Error {
+  status: number;
+  body: ApiError;
+  constructor(status: number, body: ApiError) {
+    super(body.message);
+    this.status = status;
+    this.body = body;
+  }
+}
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  if (isRefreshing && refreshPromise) return refreshPromise;
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = await tokenStore.getRefreshToken();
+      if (!refreshToken) return false;
+      const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      await tokenStore.saveTokens(data.accessToken, data.refreshToken);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+type RequestOpts = {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  body?: unknown;
+  auth?: boolean;
+  retried?: boolean;
+};
+
+export async function apiRequest<T = unknown>(path: string, opts: RequestOpts = {}): Promise<T> {
+  const { method = 'GET', body, auth = true, retried = false } = opts;
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (auth) {
+    const token = await tokenStore.getAccessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  if (res.status === 401 && auth && !retried) {
+    const ok = await tryRefresh();
+    if (ok) return apiRequest<T>(path, { ...opts, retried: true });
+  }
+
+  if (res.status === 204) return undefined as T;
+
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : undefined;
+
+  if (!res.ok) {
+    throw new ApiException(res.status, data ?? { code: 'UNKNOWN', message: '요청 실패' });
+  }
+  return data as T;
+}
+
+// 도메인별 wrapper
+export const authApi = {
+  signup: (email: string, password: string, name: string) =>
+    apiRequest<TokenResponse>('/api/v1/auth/signup', {
+      method: 'POST', auth: false, body: { email, password, name },
+    }),
+  login: (email: string, password: string) =>
+    apiRequest<TokenResponse>('/api/v1/auth/login', {
+      method: 'POST', auth: false, body: { email, password },
+    }),
+  kakao: (accessToken: string) =>
+    apiRequest<TokenResponse>('/api/v1/auth/kakao', {
+      method: 'POST', auth: false, body: { accessToken },
+    }),
+  logout: (refreshToken: string) =>
+    apiRequest<void>('/api/v1/auth/logout', {
+      method: 'POST', auth: false, body: { refreshToken },
+    }),
+  me: () => apiRequest<UserSummary>('/api/v1/auth/me'),
+};
+
+export type UserSummary = {
+  id: number;
+  email: string;
+  name: string;
+  profileImage: string | null;
+  provider: 'LOCAL' | 'KAKAO';
+};
+
+export type TokenResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: UserSummary;
+};

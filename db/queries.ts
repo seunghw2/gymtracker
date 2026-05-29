@@ -1,32 +1,4 @@
-import * as SQLite from 'expo-sqlite';
-import { CREATE_TABLES } from './schema';
-import { SEED_EXERCISES } from '../constants/exercises';
-
-let db: SQLite.SQLiteDatabase | null = null;
-
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync('gymtracker.db');
-    await db.execAsync('PRAGMA journal_mode = WAL;');
-    await db.execAsync(CREATE_TABLES);
-    await seedIfNeeded(db);
-  }
-  return db;
-}
-
-async function seedIfNeeded(database: SQLite.SQLiteDatabase) {
-  const row = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM exercise_master WHERE is_system = 1'
-  );
-  if (row && row.count > 0) return;
-
-  for (const ex of SEED_EXERCISES) {
-    await database.runAsync(
-      'INSERT INTO exercise_master (name, muscle_group, equipment_type, brand, is_system, is_custom) VALUES (?, ?, ?, ?, ?, ?)',
-      [ex.name, ex.muscle_group, ex.equipment_type, ex.brand ?? null, ex.is_system, ex.is_custom]
-    );
-  }
-}
+import { apiRequest } from '../lib/api';
 
 export type Exercise = {
   id: number;
@@ -71,48 +43,143 @@ export type Gym = {
   location: string | null;
 };
 
+export type SessionSummary = {
+  id: number;
+  date: string;
+  duration_sec: number | null;
+  exercise_count: number;
+  set_count: number;
+  exercise_names: string;
+};
+
+export type SessionSetRow = {
+  id: number;
+  exercise_id: number;
+  exercise_name: string;
+  brand: string | null;
+  set_order: number;
+  weight_kg: number;
+  reps: number;
+  estimated_1rm: number | null;
+};
+
+// ─── API 응답 형식 (백엔드 camelCase) ───────────────────────────────────
+
+type ApiExercise = {
+  id: number; name: string;
+  muscleGroup: string; equipmentType: string;
+  brand: string | null; note: string | null;
+  isSystem: boolean; isCustom: boolean;
+};
+
+type ApiSetDto = {
+  id: number; exerciseId: number;
+  exerciseName: string; brand: string | null;
+  setOrder: number; weightKg: number;
+  reps: number; estimated1rm: number | null;
+};
+
+type ApiSessionSummary = {
+  id: number; date: string;
+  durationSec: number | null;
+  exerciseCount: number; setCount: number;
+  exerciseNames: string[];
+};
+
+type ApiBodyLog = {
+  id: number; date: string;
+  weightKg: number | null; bodyFatPct: number | null;
+};
+
+type ApiCalendar = {
+  year: number; month: number;
+  workoutDates: string[];
+  count: number; totalDurationSec: number;
+};
+
+// ─── 변환 함수 ─────────────────────────────────────────────────────────
+
+function mapExercise(e: ApiExercise): Exercise {
+  return {
+    id: e.id, name: e.name,
+    muscle_group: e.muscleGroup, equipment_type: e.equipmentType,
+    brand: e.brand, note: e.note,
+    is_system: e.isSystem ? 1 : 0, is_custom: e.isCustom ? 1 : 0,
+  };
+}
+
+function mapSetDtoToWorkoutSet(s: ApiSetDto): WorkoutSet {
+  return {
+    id: s.id, session_id: 0, exercise_id: s.exerciseId,
+    set_order: s.setOrder, weight_kg: s.weightKg, reps: s.reps,
+    estimated_1rm: s.estimated1rm, created_at: '',
+  };
+}
+
+function mapSetDtoToSessionSetRow(s: ApiSetDto): SessionSetRow {
+  return {
+    id: s.id, exercise_id: s.exerciseId,
+    exercise_name: s.exerciseName, brand: s.brand,
+    set_order: s.setOrder, weight_kg: s.weightKg,
+    reps: s.reps, estimated_1rm: s.estimated1rm,
+  };
+}
+
+function mapBodyLog(b: ApiBodyLog): BodyLog {
+  return {
+    id: b.id, date: b.date,
+    weight_kg: b.weightKg, body_fat_pct: b.bodyFatPct,
+  };
+}
+
+// ─── 설정 캐시 ─────────────────────────────────────────────────────────
+
+let settingsCache: Record<string, string> | null = null;
+
+// ─── 운동 종목 ─────────────────────────────────────────────────────────
+
 export async function getExercises(muscle_group?: string, equipment_type?: string, brand?: string): Promise<Exercise[]> {
-  const database = await getDb();
-  let query = 'SELECT * FROM exercise_master WHERE 1=1';
-  const params: (string | number | null)[] = [];
-
-  if (muscle_group) { query += ' AND muscle_group = ?'; params.push(muscle_group); }
-  if (equipment_type) { query += ' AND equipment_type = ?'; params.push(equipment_type); }
-  if (brand) { query += ' AND brand = ?'; params.push(brand); }
-
-  query += ' ORDER BY is_system DESC, name ASC';
-  return database.getAllAsync<Exercise>(query, params);
+  const params = new URLSearchParams();
+  if (muscle_group) params.set('muscleGroup', muscle_group);
+  if (equipment_type) params.set('equipmentType', equipment_type);
+  if (brand) params.set('brand', brand);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const list = await apiRequest<ApiExercise[]>(`/api/v1/exercises${qs}`);
+  return list.map(mapExercise);
 }
 
 export async function addCustomExercise(name: string, muscle_group: string, equipment_type: string, brand?: string): Promise<number> {
-  const database = await getDb();
-  const result = await database.runAsync(
-    'INSERT INTO exercise_master (name, muscle_group, equipment_type, brand, is_system, is_custom) VALUES (?, ?, ?, ?, 0, 1)',
-    [name, muscle_group, equipment_type, brand ?? null]
-  );
-  return result.lastInsertRowId;
+  const result = await apiRequest<ApiExercise>('/api/v1/exercises', {
+    method: 'POST',
+    body: { name, muscleGroup: muscle_group, equipmentType: equipment_type, brand: brand ?? null },
+  });
+  return result.id;
 }
 
 export async function deleteCustomExercise(id: number): Promise<void> {
-  const database = await getDb();
-  await database.runAsync('DELETE FROM exercise_master WHERE id = ? AND is_custom = 1', [id]);
+  await apiRequest(`/api/v1/exercises/${id}`, { method: 'DELETE' });
 }
 
+export async function getCustomExercises(): Promise<Exercise[]> {
+  const list = await apiRequest<ApiExercise[]>('/api/v1/exercises/custom');
+  return list.map(mapExercise);
+}
+
+// ─── 운동 세션 ─────────────────────────────────────────────────────────
+
 export async function createWorkoutSession(date: string, gym_id?: number): Promise<number> {
-  const database = await getDb();
-  const result = await database.runAsync(
-    'INSERT INTO workout_session (date, gym_id) VALUES (?, ?)',
-    [date, gym_id ?? null]
-  );
-  return result.lastInsertRowId;
+  const result = await apiRequest<{ id: number }>('/api/v1/workouts/sessions', {
+    method: 'POST',
+    body: { date, gymId: gym_id ?? null },
+  });
+  return result.id;
 }
 
 export async function updateSessionDuration(sessionId: number, duration_sec: number): Promise<void> {
-  const database = await getDb();
-  await database.runAsync(
-    'UPDATE workout_session SET duration_sec = ? WHERE id = ?',
-    [duration_sec, sessionId]
-  );
+  await apiRequest(`/api/v1/workouts/sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: { durationSec: duration_sec },
+  });
 }
 
 export async function addWorkoutSet(
@@ -121,143 +188,125 @@ export async function addWorkoutSet(
   set_order: number,
   weight_kg: number,
   reps: number,
-  estimated_1rm: number
+  estimated_1rm: number,
 ): Promise<number> {
-  const database = await getDb();
-  const result = await database.runAsync(
-    'INSERT INTO workout_set (session_id, exercise_id, set_order, weight_kg, reps, estimated_1rm) VALUES (?, ?, ?, ?, ?, ?)',
-    [session_id, exercise_id, set_order, weight_kg, reps, estimated_1rm]
-  );
-  return result.lastInsertRowId;
+  const result = await apiRequest<ApiSetDto>(`/api/v1/workouts/sessions/${session_id}/sets`, {
+    method: 'POST',
+    body: { exerciseId: exercise_id, setOrder: set_order, weightKg: weight_kg, reps },
+  });
+  return result.id;
 }
 
 export async function getLastSessionSets(exercise_id: number): Promise<WorkoutSet[]> {
-  const database = await getDb();
-  const lastSession = await database.getFirstAsync<{ session_id: number }>(
-    `SELECT session_id FROM workout_set WHERE exercise_id = ? ORDER BY created_at DESC LIMIT 1`,
-    [exercise_id]
-  );
-  if (!lastSession) return [];
-  return database.getAllAsync<WorkoutSet>(
-    'SELECT * FROM workout_set WHERE session_id = ? AND exercise_id = ? ORDER BY set_order ASC',
-    [lastSession.session_id, exercise_id]
-  );
+  const list = await apiRequest<ApiSetDto[]>(`/api/v1/workouts/exercises/${exercise_id}/last-sets`);
+  return list.map(mapSetDtoToWorkoutSet);
 }
 
-export async function getWeeklyWorkoutCount(startDate: string, endDate: string): Promise<number> {
-  const database = await getDb();
-  const row = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM workout_session WHERE date >= ? AND date <= ?',
-    [startDate, endDate]
-  );
-  return row?.count ?? 0;
+export async function getSessionHistory(limit = 30): Promise<SessionSummary[]> {
+  const list = await apiRequest<ApiSessionSummary[]>(`/api/v1/workouts/sessions?limit=${limit}`);
+  return list.map(s => ({
+    id: s.id,
+    date: String(s.date),
+    duration_sec: s.durationSec,
+    exercise_count: Number(s.exerciseCount),
+    set_count: Number(s.setCount),
+    exercise_names: s.exerciseNames.join(', '),
+  }));
 }
+
+export async function getSessionSets(sessionId: number): Promise<SessionSetRow[]> {
+  const detail = await apiRequest<{ session: unknown; sets: ApiSetDto[] }>(`/api/v1/workouts/sessions/${sessionId}`);
+  return detail.sets.map(mapSetDtoToSessionSetRow);
+}
+
+// ─── 캘린더 / 통계 ─────────────────────────────────────────────────────
 
 export async function getWorkoutDates(year: number, month: number): Promise<string[]> {
-  const database = await getDb();
-  const start = `${year}-${String(month).padStart(2, '0')}-01`;
-  const end = `${year}-${String(month).padStart(2, '0')}-31`;
-  const rows = await database.getAllAsync<{ date: string }>(
-    'SELECT DISTINCT date FROM workout_session WHERE date >= ? AND date <= ? ORDER BY date',
-    [start, end]
-  );
-  return rows.map(r => r.date);
+  const cal = await apiRequest<ApiCalendar>(`/api/v1/stats/calendar?year=${year}&month=${month}`);
+  return cal.workoutDates.map(d => String(d));
 }
 
 export async function getAllWorkoutDates(): Promise<string[]> {
-  const database = await getDb();
-  const rows = await database.getAllAsync<{ date: string }>(
-    'SELECT DISTINCT date FROM workout_session ORDER BY date DESC'
-  );
-  return rows.map(r => r.date);
+  const dates = await apiRequest<string[]>('/api/v1/stats/workout-dates');
+  return dates.map(d => String(d));
+}
+
+export async function getWeeklyWorkoutCount(_startDate: string, _endDate: string): Promise<number> {
+  const result = await apiRequest<{ from: string; to: string; count: number }>('/api/v1/stats/weekly-count');
+  return result.count;
 }
 
 export async function getMonthStats(year: number, month: number): Promise<{ count: number; totalSec: number }> {
-  const database = await getDb();
-  const start = `${year}-${String(month).padStart(2, '0')}-01`;
-  const end = `${year}-${String(month).padStart(2, '0')}-31`;
-  const row = await database.getFirstAsync<{ count: number; totalSec: number }>(
-    'SELECT COUNT(*) as count, COALESCE(SUM(duration_sec), 0) as totalSec FROM workout_session WHERE date >= ? AND date <= ?',
-    [start, end]
-  );
-  return { count: row?.count ?? 0, totalSec: row?.totalSec ?? 0 };
-}
-
-export async function getTodayBodyLog(date: string): Promise<BodyLog | null> {
-  const database = await getDb();
-  return database.getFirstAsync<BodyLog>('SELECT * FROM body_log WHERE date = ?', [date]);
-}
-
-export async function getLatestBodyLog(): Promise<BodyLog | null> {
-  const database = await getDb();
-  return database.getFirstAsync<BodyLog>('SELECT * FROM body_log ORDER BY date DESC LIMIT 1');
-}
-
-export async function upsertBodyLog(date: string, weight_kg: number, body_fat_pct?: number): Promise<void> {
-  const database = await getDb();
-  await database.runAsync(
-    `INSERT INTO body_log (date, weight_kg, body_fat_pct) VALUES (?, ?, ?)
-     ON CONFLICT(date) DO UPDATE SET weight_kg = excluded.weight_kg, body_fat_pct = COALESCE(excluded.body_fat_pct, body_fat_pct)`,
-    [date, weight_kg, body_fat_pct ?? null]
-  );
-}
-
-export async function getBodyLogs(limit = 30): Promise<BodyLog[]> {
-  const database = await getDb();
-  return database.getAllAsync<BodyLog>('SELECT * FROM body_log ORDER BY date DESC LIMIT ?', [limit]);
+  const cal = await apiRequest<ApiCalendar>(`/api/v1/stats/calendar?year=${year}&month=${month}`);
+  return { count: Number(cal.count), totalSec: Number(cal.totalDurationSec) };
 }
 
 export async function get1RMHistory(exercise_id: number): Promise<{ date: string; estimated_1rm: number }[]> {
-  const database = await getDb();
-  return database.getAllAsync<{ date: string; estimated_1rm: number }>(
-    `SELECT ws.date, MAX(wset.estimated_1rm) as estimated_1rm
-     FROM workout_set wset
-     JOIN workout_session ws ON ws.id = wset.session_id
-     WHERE wset.exercise_id = ? AND wset.estimated_1rm IS NOT NULL
-     GROUP BY ws.date
-     ORDER BY ws.date ASC`,
-    [exercise_id]
-  );
+  type ApiOneRm = { date: string; oneRm: number };
+  const list = await apiRequest<ApiOneRm[]>(`/api/v1/stats/one-rm?exerciseId=${exercise_id}`);
+  return list.map(r => ({ date: String(r.date), estimated_1rm: r.oneRm }));
 }
 
+// ─── 신체 기록 ─────────────────────────────────────────────────────────
+
+export async function getTodayBodyLog(date: string): Promise<BodyLog | null> {
+  const latest = await getLatestBodyLog();
+  if (latest && latest.date === date) return latest;
+  return null;
+}
+
+export async function getLatestBodyLog(): Promise<BodyLog | null> {
+  try {
+    const result = await apiRequest<ApiBodyLog | undefined>('/api/v1/body-logs/latest');
+    return result ? mapBodyLog(result) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function upsertBodyLog(date: string, weight_kg: number, body_fat_pct?: number): Promise<void> {
+  await apiRequest('/api/v1/body-logs', {
+    method: 'POST',
+    body: { date, weightKg: weight_kg, bodyFatPct: body_fat_pct ?? null },
+  });
+}
+
+export async function getBodyLogs(limit = 30): Promise<BodyLog[]> {
+  const list = await apiRequest<ApiBodyLog[]>(`/api/v1/body-logs?limit=${limit}`);
+  return list.map(mapBodyLog);
+}
+
+// ─── 설정 ──────────────────────────────────────────────────────────────
+
 export async function getSetting(key: string, defaultValue: string): Promise<string> {
-  const database = await getDb();
-  const row = await database.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_settings WHERE key = ?', [key]
-  );
-  return row?.value ?? defaultValue;
+  if (!settingsCache) {
+    settingsCache = await apiRequest<Record<string, string>>('/api/v1/settings');
+  }
+  return settingsCache[key] ?? defaultValue;
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
-  const database = await getDb();
-  await database.runAsync(
-    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-    [key, value]
-  );
+  await apiRequest(`/api/v1/settings/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: { value },
+  });
+  settingsCache = null;
 }
 
+// ─── 헬스장 ────────────────────────────────────────────────────────────
+
 export async function getGyms(): Promise<Gym[]> {
-  const database = await getDb();
-  return database.getAllAsync<Gym>('SELECT * FROM gym ORDER BY name ASC');
+  return apiRequest<Gym[]>('/api/v1/gyms');
 }
 
 export async function addGym(name: string, location?: string): Promise<number> {
-  const database = await getDb();
-  const result = await database.runAsync(
-    'INSERT INTO gym (name, location) VALUES (?, ?)',
-    [name, location ?? null]
-  );
-  return result.lastInsertRowId;
+  const result = await apiRequest<Gym>('/api/v1/gyms', {
+    method: 'POST',
+    body: { name, location: location ?? null },
+  });
+  return result.id;
 }
 
 export async function deleteGym(id: number): Promise<void> {
-  const database = await getDb();
-  await database.runAsync('DELETE FROM gym WHERE id = ?', [id]);
-}
-
-export async function getCustomExercises(): Promise<Exercise[]> {
-  const database = await getDb();
-  return database.getAllAsync<Exercise>(
-    'SELECT * FROM exercise_master WHERE is_custom = 1 ORDER BY name ASC'
-  );
+  await apiRequest(`/api/v1/gyms/${id}`, { method: 'DELETE' });
 }

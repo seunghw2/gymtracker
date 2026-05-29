@@ -8,7 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.seunghw2.gymtracker",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -29,6 +33,12 @@
     "experiments": {
       "typedRoutes": true,
       "newArchEnabled": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d73ddea7-ee09-4c55-ba90-8b212ef384b1"
+      }
     }
   }
 }

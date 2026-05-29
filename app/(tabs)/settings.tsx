@@ -22,12 +22,21 @@ import {
   Exercise,
 } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function SettingsScreen() {
   const {
     goalWeightKg, goalBodyFatPct, restDurationSec, unitKg,
     setGoalWeight, setGoalBodyFat, setRestDuration, setUnitKg,
   } = useSettingsStore();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    Alert.alert('로그아웃', '정말 로그아웃하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '로그아웃', style: 'destructive', onPress: () => logout() },
+    ]);
+  };
 
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
@@ -109,6 +118,27 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.header}>설정</Text>
+
+        {/* 계정 */}
+        {user && (
+          <>
+            <Text style={styles.sectionTitle}>계정</Text>
+            <View style={styles.card}>
+              <View style={styles.row}>
+                <View>
+                  <Text style={styles.label}>{user.name}</Text>
+                  <Text style={[styles.listItemSub, { marginTop: 4 }]}>
+                    {user.email ?? '카카오 로그인'}  ·  {user.provider}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <Pressable onPress={handleLogout} style={styles.row}>
+                <Text style={[styles.label, { color: '#FF453A' }]}>로그아웃</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
 
         {/* 목표 설정 */}
         <Text style={styles.sectionTitle}>목표 설정</Text>
