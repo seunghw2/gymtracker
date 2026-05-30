@@ -67,6 +67,7 @@ export type SessionSetRow = {
   reps: number;
   estimated_1rm: number | null;
   set_type: SetType;
+  superset_group: number | null;
 };
 
 export type ExerciseNote = {
@@ -89,6 +90,7 @@ type ApiSetDto = {
   setOrder: number; weightKg: number;
   reps: number; estimated1rm: number | null;
   setType: string | null;
+  supersetGroup: number | null;
 };
 
 type ApiSessionSummary = {
@@ -140,6 +142,7 @@ function mapSetDtoToSessionSetRow(s: ApiSetDto): SessionSetRow {
     exercise_name: s.exerciseName, brand: s.brand,
     set_order: s.setOrder, weight_kg: s.weightKg,
     reps: s.reps, estimated_1rm: s.estimated1rm, set_type: normSetType(s.setType),
+    superset_group: s.supersetGroup ?? null,
   };
 }
 
@@ -239,10 +242,11 @@ export async function addWorkoutSet(
   reps: number,
   estimated_1rm: number,
   set_type: SetType = 'NORMAL',
+  superset_group: number | null = null,
 ): Promise<number> {
   const result = await apiRequest<ApiSetDto>(`/api/v1/workouts/sessions/${session_id}/sets`, {
     method: 'POST',
-    body: { exerciseId: exercise_id, setOrder: set_order, weightKg: weight_kg, reps, setType: set_type },
+    body: { exerciseId: exercise_id, setOrder: set_order, weightKg: weight_kg, reps, setType: set_type, supersetGroup: superset_group },
   });
   return result.id;
 }

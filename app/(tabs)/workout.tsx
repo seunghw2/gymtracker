@@ -126,6 +126,8 @@ export default function WorkoutScreen() {
     prependWarmupSets,
     markSetDone,
     moveExercise,
+    linkSupersetWithNext,
+    unlinkSuperset,
     removeSet,
     removeExercise,
     startRestTimer,
@@ -466,7 +468,7 @@ export default function WorkoutScreen() {
     const ex = exercises[exIdx];
     const s = ex.sets[setIdx];
     const orm = epley(s.weight_kg, s.reps);
-    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm, s.setType ?? 'NORMAL');
+    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm, s.setType ?? 'NORMAL', ex.supersetGroup ?? null);
     // PR: 워밍업이 아니고 종목 역대 최고 1RM을 넘으면
     const isPR = (s.setType ?? 'NORMAL') !== 'WARMUP'
       && (ex.prevBest1rm ?? 0) > 0
@@ -477,6 +479,11 @@ export default function WorkoutScreen() {
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+
+    // 슈퍼세트: 같은 그룹의 다음 종목이 있으면 휴식 없이 바로 다음 종목으로
+    const nextExSameGroup = ex.supersetGroup != null
+      && exercises[exIdx + 1]?.supersetGroup === ex.supersetGroup;
+    if (nextExSameGroup) return;
 
     const nextSet = ex.sets[setIdx + 1];
     const nextLabel = nextSet ? `${toDisplay(nextSet.weight_kg, unitKg)}${u} × ${nextSet.reps}회` : undefined;
@@ -910,8 +917,14 @@ export default function WorkoutScreen() {
             .filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP')
             .reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
 
+          const inSuperset = ex.supersetGroup != null;
+          const hasNext = exIdx < exercises.length - 1;
+
           return (
-            <View key={exIdx} style={styles.exerciseCard}>
+            <View key={exIdx} style={[styles.exerciseCard, inSuperset && styles.exerciseCardSuperset]}>
+              {inSuperset && (
+                <Text style={styles.supersetLabel}>🔗 슈퍼세트</Text>
+              )}
               <View style={styles.exerciseCardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
@@ -947,6 +960,17 @@ export default function WorkoutScreen() {
                   </Pressable>
                 </View>
               </View>
+
+              {/* 슈퍼세트 묶기/해제 */}
+              {inSuperset ? (
+                <Pressable style={styles.supersetBtn} onPress={() => unlinkSuperset(exIdx)}>
+                  <Text style={styles.supersetBtnText}>슈퍼세트 해제</Text>
+                </Pressable>
+              ) : hasNext ? (
+                <Pressable style={styles.supersetBtn} onPress={() => linkSupersetWithNext(exIdx)}>
+                  <Text style={styles.supersetBtnText}>🔗 다음 종목과 슈퍼세트로 묶기</Text>
+                </Pressable>
+              ) : null}
 
               {/* 종목 영구 메모 (모든 세션 공통) */}
               <TextInput
@@ -1554,6 +1578,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
+  exerciseCardSuperset: { borderLeftWidth: 3, borderLeftColor: '#5E5CE6' },
+  supersetLabel: { color: '#9D9BF5', fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  supersetBtn: {
+    backgroundColor: '#26263A',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  supersetBtnText: { color: '#9D9BF5', fontSize: 13, fontWeight: '600' },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',
