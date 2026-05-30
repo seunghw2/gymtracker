@@ -109,6 +109,12 @@ export default function HomeScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  const openWeightModal = () => {
+    setDialValue(todayWeight ?? dialValue);
+    setBodyFatInput(todayBodyFat != null ? String(todayBodyFat) : bodyFatInput);
+    setShowWeightModal(true);
+  };
+
   const handleSaveWeight = async () => {
     const fat = parseFloat(bodyFatInput);
     const fatVal = Number.isFinite(fat) && fat > 0 ? fat : undefined;
@@ -146,8 +152,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 목표 체중 카드 */}
-        <View style={styles.goalCard}>
+        {/* 목표 체중 카드 (탭하여 기록) */}
+        <Pressable style={styles.goalCard} onPress={openWeightModal}>
           <View style={styles.goalHeader}>
             <Text style={styles.goalTitle}>목표 체중</Text>
             <Text style={styles.goalTarget}>{goalWeightKg} kg</Text>
@@ -170,7 +176,8 @@ export default function HomeScreen() {
               체지방 {todayBodyFat.toFixed(1)}% · 목표 {goalBodyFatPct}%
             </Text>
           )}
-        </View>
+          <Text style={styles.tapHint}>탭하여 체중·체지방 기록</Text>
+        </Pressable>
 
         {/* 이번주 스트릭 도트 */}
         <View style={styles.weekCard}>
@@ -265,6 +272,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: '#30D158', borderRadius: 4 },
   progressHint: { color: '#8E8E93', fontSize: 12, marginTop: 6 },
   fatHint: { color: '#30D158', fontSize: 12, marginTop: 4 },
+  tapHint: { color: '#48484A', fontSize: 11, marginTop: 8, textAlign: 'right' },
 
   weekCard: {
     backgroundColor: '#1C1C1E',

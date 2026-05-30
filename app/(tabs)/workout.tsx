@@ -166,6 +166,10 @@ export default function WorkoutScreen() {
   const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
   const [repeatLoading, setRepeatLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
+  const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
+  const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
+  const [detailSaving, setDetailSaving] = useState(false);
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -293,32 +297,40 @@ export default function WorkoutScreen() {
     }
   };
 
-  // 현재 진행 중인 운동을 루틴으로 저장
-  const handleSaveAsTemplate = () => {
-    if (exercises.length === 0) {
-      Alert.alert('루틴 저장', '종목을 먼저 추가하세요.');
+  // 과거 세션을 루틴(템플릿)으로 저장
+  const handleSaveDetailAsTemplate = () => {
+    if (!detailSession || detailSets.length === 0) {
+      Alert.alert('루틴 저장', '세트가 없는 운동입니다.');
       return;
     }
-    Alert.prompt?.('루틴 저장', '루틴 이름을 입력하세요', async (name?: string) => {
-      const trimmed = (name ?? '').trim();
+    const order: number[] = [];
+    const groups: Record<number, { reps: number; weight: number; count: number }> = {};
+    for (const s of detailSets) {
+      if (!groups[s.exercise_id]) { order.push(s.exercise_id); groups[s.exercise_id] = { reps: s.reps, weight: s.weight_kg, count: 0 }; }
+      if ((s.set_type ?? 'NORMAL') !== 'WARMUP') groups[s.exercise_id].count += 1;
+    }
+    const payload = order.map(id => ({
+      exerciseId: id,
+      sets: Math.max(1, groups[id].count),
+      reps: groups[id].reps,
+      weightKg: groups[id].weight,
+    }));
+    const doSave = async (name: string) => {
+      const trimmed = name.trim();
       if (!trimmed) return;
-      const payload = exercises.map(ex => {
-        const working = ex.sets.filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP');
-        const ref = working[0] ?? ex.sets[0];
-        return {
-          exerciseId: ex.exerciseId,
-          sets: Math.max(1, working.length || ex.sets.length),
-          reps: ref?.reps ?? 10,
-          weightKg: ref?.weight_kg ?? 0,
-        };
-      });
       try {
         await createTemplate(trimmed, payload);
+        getTemplates().then(setTemplates).catch(() => {});
         Alert.alert('저장됨', `"${trimmed}" 루틴이 저장되었습니다.`);
       } catch {
         Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
       }
-    }, 'plain-text', sessionTitle ?? '');
+    };
+    if (Alert.prompt) {
+      Alert.prompt('루틴으로 저장', '루틴 이름을 입력하세요', (name?: string) => doSave(name ?? ''), 'plain-text', detailSession.title ?? '');
+    } else {
+      doSave(detailSession.title?.trim() || formatDate(detailSession.date));
+    }
   };
 
   const handleDeleteTemplate = (tpl: TemplateSummary) => {
@@ -390,7 +402,7 @@ export default function WorkoutScreen() {
     }
   };
 
-  // 첫 본세트 무게 기준 40/60/80% 워밍업 자동 생성
+  // 워밍업 설정 모달 열기 (퍼센트/횟수 사용자화)
   const handleAddWarmup = (exIdx: number) => {
     const ex = exercises[exIdx];
     if (!ex) return;
@@ -400,13 +412,26 @@ export default function WorkoutScreen() {
       Alert.alert('워밍업 추가', '본세트 무게를 먼저 입력하세요.');
       return;
     }
-    const round = (w: number) => Math.max(0, Math.round((w) / 2.5) * 2.5);
-    const warmups = [
-      { weight_kg: round(base * 0.4), reps: 10 },
-      { weight_kg: round(base * 0.6), reps: 6 },
-      { weight_kg: round(base * 0.8), reps: 3 },
-    ];
-    prependWarmupSets(exIdx, warmups);
+    setWarmupExIdx(exIdx);
+    setWarmupRows([
+      { percent: '40', reps: '10' },
+      { percent: '60', reps: '6' },
+      { percent: '80', reps: '3' },
+    ]);
+  };
+
+  const applyWarmup = () => {
+    if (warmupExIdx == null) return;
+    const ex = exercises[warmupExIdx];
+    const working = ex?.sets.find(s => (s.setType ?? 'NORMAL') !== 'WARMUP' && s.weight_kg > 0);
+    const base = working?.weight_kg ?? ex?.sets[0]?.weight_kg ?? 0;
+    const round = (w: number) => Math.max(0, Math.round(w / 2.5) * 2.5);
+    const warmups = warmupRows
+      .map(r => ({ pct: parseFloat(r.percent) || 0, reps: parseInt(r.reps) || 0 }))
+      .filter(r => r.pct > 0 && r.reps > 0)
+      .map(r => ({ weight_kg: round(base * r.pct / 100), reps: r.reps }));
+    if (warmups.length > 0) prependWarmupSets(warmupExIdx, warmups);
+    setWarmupExIdx(null);
     Haptics.selectionAsync();
   };
 
@@ -424,7 +449,8 @@ export default function WorkoutScreen() {
     await upsertExerciseSessionNote(activeSessionId, ex.exerciseId, ex.sessionNote ?? '').catch(() => {});
   };
 
-  const openExerciseSelect = () => {
+  const openExerciseSelect = (target: 'active' | 'detail' = 'active') => {
+    setSelectTarget(target);
     setSelectStep('muscle');
     setSelectedMuscle(null);
     setSelectedEquipment(null);
@@ -460,8 +486,53 @@ export default function WorkoutScreen() {
     addExercise(entry);
   };
 
-  const handleSelectExercise = (ex: Exercise) => addExerciseToWorkout(ex);
-  const handleQuickAdd = (ex: TrainedExercise) => addExerciseToWorkout(ex);
+  const handleSelectExercise = (ex: Exercise) =>
+    selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout(ex);
+  const handleQuickAdd = (ex: TrainedExercise) =>
+    selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout(ex);
+
+  // 과거 세션에 종목 추가 (기본 1세트, 지난 기록 있으면 그 값으로)
+  const addExerciseToDetail = async (ex: { id: number; name: string; brand: string | null }) => {
+    setShowExerciseModal(false);
+    if (!detailSession) return;
+    const prev = await getLastSessionSets(ex.id).catch(() => []);
+    const w = prev[0]?.weight_kg ?? 60;
+    const r = prev[0]?.reps ?? 10;
+    await addWorkoutSet(detailSession.id, ex.id, 1, w, r, epley(w, r), 'NORMAL').catch(() => {});
+    const sets = await getSessionSets(detailSession.id);
+    setDetailSets(sets);
+    getSessionHistory().then(setHistory);
+  };
+
+  // 과거 세션에 세트 추가 (해당 종목 마지막 세트 복사)
+  const addSetToDetail = async (exerciseId: number) => {
+    if (!detailSession) return;
+    const groupSets = detailSets.filter(s => s.exercise_id === exerciseId);
+    const last = groupSets[groupSets.length - 1];
+    const w = last?.weight_kg ?? 60;
+    const r = last?.reps ?? 10;
+    const nextOrder = (last?.set_order ?? 0) + 1;
+    await addWorkoutSet(detailSession.id, exerciseId, nextOrder, w, r, epley(w, r), last?.set_type ?? 'NORMAL').catch(() => {});
+    const sets = await getSessionSets(detailSession.id);
+    setDetailSets(sets);
+    getSessionHistory().then(setHistory);
+  };
+
+  // 과거 세션 편집 내용(세트 무게/횟수 + 제목/메모) 일괄 저장
+  const handleSaveDetail = async () => {
+    if (!detailSession || detailSaving) return;
+    setDetailSaving(true);
+    try {
+      await Promise.all(detailSets.map(s => updateWorkoutSet(s.id, s.weight_kg, s.reps, s.set_type).catch(() => {})));
+      await updateSession(detailSession.id, { title: detailTitle, note: detailNote }).catch(() => {});
+      setDetailSession({ ...detailSession, title: detailTitle, note: detailNote });
+      getSessionHistory().then(setHistory);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('저장됨', '변경사항이 저장되었습니다.');
+    } finally {
+      setDetailSaving(false);
+    }
+  };
 
   const handleCompleteSet = async (exIdx: number, setIdx: number) => {
     if (!activeSessionId) return;
@@ -603,6 +674,180 @@ export default function WorkoutScreen() {
     {}
   );
 
+  const renderExerciseModal = () => (
+    <Modal visible={showExerciseModal} animationType="slide">
+      <SafeAreaView style={styles.modalSafe}>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={() => {
+            if (selectStep === 'muscle') { setShowExerciseModal(false); }
+            else if (selectStep === 'equipment') setSelectStep('muscle');
+            else if (selectStep === 'brand') setSelectStep('equipment');
+            else if (selectStep === 'custom-brand') setSelectStep('brand');
+            else if (selectStep === 'list') setSelectStep(selectedEquipment === 'Machine' ? 'brand' : 'equipment');
+            else if (selectStep === 'custom') setSelectStep('list');
+          }}>
+            <Text style={styles.modalBack}>← 뒤로</Text>
+          </Pressable>
+          <Text style={styles.modalTitle}>
+            {selectStep === 'muscle' && '부위 선택'}
+            {selectStep === 'equipment' && '장비 선택'}
+            {selectStep === 'brand' && '브랜드 선택'}
+            {selectStep === 'custom-brand' && '브랜드 직접 입력'}
+            {selectStep === 'list' && '운동 선택'}
+            {selectStep === 'custom' && '직접 등록'}
+          </Text>
+          <View style={{ width: 60 }} />
+        </View>
+
+        {selectStep === 'muscle' && (
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            {recents.length > 0 && (
+              <View style={{ marginBottom: 20 }}>
+                <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
+                <View style={styles.chipWrap}>
+                  {recents.slice(0, 8).map(r => (
+                    <Pressable key={r.id} style={styles.chip} onPress={() => handleQuickAdd(r)}>
+                      <Text style={styles.chipText} numberOfLines={1}>{r.name}</Text>
+                      {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+            <Text style={styles.quickAddTitle}>부위로 찾기</Text>
+            <View style={styles.muscleGrid}>
+              {MUSCLE_GROUPS.map(mg => (
+                <Pressable key={mg} style={styles.muscleBtn} onPress={() => { setSelectedMuscle(mg); setSelectStep('equipment'); }}>
+                  <Text style={styles.muscleBtnText}>{mg}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+
+        {selectStep === 'equipment' && (
+          <View style={styles.modalContent}>
+            {EQUIPMENT_TYPES.map(eq => (
+              <Pressable key={eq} style={styles.choiceBtn} onPress={() => {
+                setSelectedEquipment(eq);
+                setSelectStep(eq === 'Machine' ? 'brand' : 'list');
+              }}>
+                <Text style={styles.choiceText}>{eq}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {selectStep === 'brand' && (
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            {[...MACHINE_BRANDS, ...extraBrands].map(b => (
+              <Pressable
+                key={b}
+                style={styles.choiceBtn}
+                onPress={() => { setSelectedBrand(b); setSelectStep('list'); }}
+              >
+                <Text style={styles.choiceText}>{b}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.choiceBtn, styles.choiceBtnOutline]}
+              onPress={() => { setCustomBrandInput(''); setSelectStep('custom-brand'); }}
+            >
+              <Text style={[styles.choiceText, { color: '#30D158' }]}>+ 직접 등록</Text>
+            </Pressable>
+          </ScrollView>
+        )}
+
+        {selectStep === 'custom-brand' && (
+          <View style={styles.modalContent}>
+            <Text style={styles.customFormLabel}>브랜드 이름</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="예: Technogym, Matrix..."
+              placeholderTextColor="#48484A"
+              value={customBrandInput}
+              onChangeText={setCustomBrandInput}
+              autoFocus
+            />
+            <Pressable
+              style={[styles.saveBtn, { marginTop: 16 }, !customBrandInput.trim() && { opacity: 0.4 }]}
+              onPress={() => {
+                const brand = customBrandInput.trim();
+                if (!brand) return;
+                setExtraBrands(prev => [...prev, brand]);
+                setCustomBrandInput('');
+                setSelectStep('brand');
+                Alert.alert('브랜드 추가', `${brand} 브랜드가 추가되었습니다.`);
+              }}
+              disabled={!customBrandInput.trim()}
+            >
+              <Text style={styles.saveBtnText}>저장</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {selectStep === 'list' && (
+          <FlatList
+            data={exerciseList.filter(e =>
+              e.name.toLowerCase().includes(searchText.trim().toLowerCase())
+            )}
+            keyExtractor={item => String(item.id)}
+            contentContainerStyle={styles.modalContent}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              <TextInput
+                style={styles.searchInput}
+                placeholder="종목 검색"
+                placeholderTextColor="#48484A"
+                value={searchText}
+                onChangeText={setSearchText}
+                clearButtonMode="while-editing"
+              />
+            }
+            renderItem={({ item }) => (
+              <Pressable style={styles.exItem} onPress={() => handleSelectExercise(item)}>
+                <View>
+                  <Text style={styles.exName}>{item.name}</Text>
+                  {item.brand && <Text style={styles.exBrand}>{item.brand}</Text>}
+                </View>
+                <Text style={styles.exArrow}>›</Text>
+              </Pressable>
+            )}
+            ListFooterComponent={
+              <Pressable style={styles.customBtn} onPress={() => { setCustomName(''); setSelectStep('custom'); }}>
+                <Text style={styles.customBtnText}>+ 직접 등록</Text>
+              </Pressable>
+            }
+          />
+        )}
+
+        {selectStep === 'custom' && (
+          <View style={styles.modalContent}>
+            <Text style={styles.customFormLabel}>운동 이름</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="예: 케이블 크런치"
+              placeholderTextColor="#48484A"
+              value={customName}
+              onChangeText={setCustomName}
+              autoFocus
+            />
+            <Text style={styles.customFormSub}>
+              부위: {selectedMuscle}  |  장비: {selectedEquipment}{selectedBrand ? `  |  브랜드: ${selectedBrand}` : ''}
+            </Text>
+            <Pressable
+              style={[styles.saveBtn, !customName.trim() && { opacity: 0.4 }]}
+              onPress={saveCustomExercise}
+              disabled={!customName.trim()}
+            >
+              <Text style={styles.saveBtnText}>저장하고 추가</Text>
+            </Pressable>
+          </View>
+        )}
+      </SafeAreaView>
+    </Modal>
+  );
+
   if (!activeSessionId) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -727,7 +972,6 @@ export default function WorkoutScreen() {
                 placeholderTextColor="#48484A"
                 value={detailTitle}
                 onChangeText={setDetailTitle}
-                onEndEditing={handleDetailTitleBlur}
               />
               {gymName(detailSession?.gym_id) ? (
                 <Text style={styles.detailGym}>📍 {gymName(detailSession?.gym_id)}</Text>
@@ -738,7 +982,6 @@ export default function WorkoutScreen() {
                 placeholderTextColor="#48484A"
                 value={detailNote}
                 onChangeText={setDetailNote}
-                onEndEditing={handleDetailNoteBlur}
                 multiline
               />
               {Object.values(groupedDetailSets).map((group, i) => (
@@ -800,8 +1043,8 @@ export default function WorkoutScreen() {
                             value={String(toDisplay(s.weight_kg, unitKg))}
                             keyboardType="decimal-pad"
                             selectTextOnFocus
+                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
                             onChangeText={v => handleEditDetailSet(s.id, fromInput(parseFloat(v) || 0, unitKg), s.reps)}
-                            onEndEditing={() => handleEditDetailSetBlur(s.id)}
                           />
                         </View>
                         <View style={{ flex: 1 }}>
@@ -810,8 +1053,8 @@ export default function WorkoutScreen() {
                             value={String(s.reps)}
                             keyboardType="number-pad"
                             selectTextOnFocus
+                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
                             onChangeText={v => handleEditDetailSet(s.id, s.weight_kg, parseInt(v) || 0)}
-                            onEndEditing={() => handleEditDetailSetBlur(s.id)}
                           />
                         </View>
                         <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
@@ -820,11 +1063,28 @@ export default function WorkoutScreen() {
                       </View>
                     </Swipeable>
                   ))}
+                  <Pressable style={styles.addSetBtn} onPress={() => addSetToDetail(group.exerciseId)}>
+                    <Text style={styles.addSetText}>+ 세트 추가</Text>
+                  </Pressable>
                 </View>
               ))}
+
+              <Pressable style={styles.addExerciseBtn} onPress={() => openExerciseSelect('detail')}>
+                <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
+              </Pressable>
+
+              <Pressable style={styles.detailSaveBtn} onPress={handleSaveDetail} disabled={detailSaving}>
+                <Text style={styles.detailSaveText}>{detailSaving ? '저장 중…' : '저장'}</Text>
+              </Pressable>
+              <Pressable style={styles.detailTemplateBtn} onPress={handleSaveDetailAsTemplate}>
+                <Text style={styles.detailTemplateText}>⭐ 루틴으로 저장</Text>
+              </Pressable>
             </ScrollView>
           </SafeAreaView>
         </Modal>
+
+        {/* 운동 선택 모달 (과거 세션 종목 추가용) */}
+        {renderExerciseModal()}
 
         {/* 헬스장 선택 모달 */}
         <Modal visible={showGymPicker} transparent animationType="slide" onRequestClose={() => setShowGymPicker(false)}>
@@ -1080,15 +1340,9 @@ export default function WorkoutScreen() {
           );
         })}
 
-        <Pressable style={styles.addExerciseBtn} onPress={openExerciseSelect}>
+        <Pressable style={styles.addExerciseBtn} onPress={() => openExerciseSelect('active')}>
           <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
         </Pressable>
-
-        {exercises.length > 0 && (
-          <Pressable style={styles.saveTemplateBtn} onPress={handleSaveAsTemplate}>
-            <Text style={styles.saveTemplateText}>⭐ 이 구성을 루틴으로 저장</Text>
-          </Pressable>
-        )}
       </ScrollView>
 
       {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
@@ -1107,178 +1361,51 @@ export default function WorkoutScreen() {
         </InputAccessoryView>
       )}
 
-      {/* 운동 선택 모달 */}
-      <Modal visible={showExerciseModal} animationType="slide">
-        <SafeAreaView style={styles.modalSafe}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => {
-              if (selectStep === 'muscle') { setShowExerciseModal(false); }
-              else if (selectStep === 'equipment') setSelectStep('muscle');
-              else if (selectStep === 'brand') setSelectStep('equipment');
-              else if (selectStep === 'custom-brand') setSelectStep('brand');
-              else if (selectStep === 'list') setSelectStep(selectedEquipment === 'Machine' ? 'brand' : 'equipment');
-              else if (selectStep === 'custom') setSelectStep('list');
-            }}>
-              <Text style={styles.modalBack}>← 뒤로</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>
-              {selectStep === 'muscle' && '부위 선택'}
-              {selectStep === 'equipment' && '장비 선택'}
-              {selectStep === 'brand' && '브랜드 선택'}
-              {selectStep === 'custom-brand' && '브랜드 직접 입력'}
-              {selectStep === 'list' && '운동 선택'}
-              {selectStep === 'custom' && '직접 등록'}
-            </Text>
-            <View style={{ width: 60 }} />
-          </View>
-
-          {selectStep === 'muscle' && (
-            <ScrollView contentContainerStyle={styles.modalContent}>
-              {recents.length > 0 && (
-                <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
-                  <View style={styles.chipWrap}>
-                    {recents.slice(0, 8).map(r => (
-                      <Pressable key={r.id} style={styles.chip} onPress={() => handleQuickAdd(r)}>
-                        <Text style={styles.chipText} numberOfLines={1}>{r.name}</Text>
-                        {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-              <Text style={styles.quickAddTitle}>부위로 찾기</Text>
-              <View style={styles.muscleGrid}>
-                {MUSCLE_GROUPS.map(mg => (
-                  <Pressable key={mg} style={styles.muscleBtn} onPress={() => { setSelectedMuscle(mg); setSelectStep('equipment'); }}>
-                    <Text style={styles.muscleBtnText}>{mg}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </ScrollView>
-          )}
-
-          {selectStep === 'equipment' && (
-            <View style={styles.modalContent}>
-              {EQUIPMENT_TYPES.map(eq => (
-                <Pressable key={eq} style={styles.choiceBtn} onPress={() => {
-                  setSelectedEquipment(eq);
-                  setSelectStep(eq === 'Machine' ? 'brand' : 'list');
-                }}>
-                  <Text style={styles.choiceText}>{eq}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-
-          {selectStep === 'brand' && (
-            <ScrollView contentContainerStyle={styles.modalContent}>
-              {[...MACHINE_BRANDS, ...extraBrands].map(b => (
-                <Pressable
-                  key={b}
-                  style={styles.choiceBtn}
-                  onPress={() => { setSelectedBrand(b); setSelectStep('list'); }}
-                >
-                  <Text style={styles.choiceText}>{b}</Text>
-                </Pressable>
-              ))}
-              <Pressable
-                style={[styles.choiceBtn, styles.choiceBtnOutline]}
-                onPress={() => { setCustomBrandInput(''); setSelectStep('custom-brand'); }}
-              >
-                <Text style={[styles.choiceText, { color: '#30D158' }]}>+ 직접 등록</Text>
-              </Pressable>
-            </ScrollView>
-          )}
-
-          {selectStep === 'custom-brand' && (
-            <View style={styles.modalContent}>
-              <Text style={styles.customFormLabel}>브랜드 이름</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="예: Technogym, Matrix..."
-                placeholderTextColor="#48484A"
-                value={customBrandInput}
-                onChangeText={setCustomBrandInput}
-                autoFocus
-              />
-              <Pressable
-                style={[styles.saveBtn, { marginTop: 16 }, !customBrandInput.trim() && { opacity: 0.4 }]}
-                onPress={() => {
-                  const brand = customBrandInput.trim();
-                  if (!brand) return;
-                  setExtraBrands(prev => [...prev, brand]);
-                  setCustomBrandInput('');
-                  setSelectStep('brand');
-                  Alert.alert('브랜드 추가', `${brand} 브랜드가 추가되었습니다.`);
-                }}
-                disabled={!customBrandInput.trim()}
-              >
-                <Text style={styles.saveBtnText}>저장</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {selectStep === 'list' && (
-            <FlatList
-              data={exerciseList.filter(e =>
-                e.name.toLowerCase().includes(searchText.trim().toLowerCase())
-              )}
-              keyExtractor={item => String(item.id)}
-              contentContainerStyle={styles.modalContent}
-              keyboardShouldPersistTaps="handled"
-              ListHeaderComponent={
+      {/* 워밍업 설정 모달 */}
+      <Modal visible={warmupExIdx !== null} transparent animationType="slide" onRequestClose={() => setWarmupExIdx(null)}>
+        <Pressable style={styles.gymBackdrop} onPress={() => setWarmupExIdx(null)}>
+          <Pressable style={styles.warmupSheet} onPress={() => {}}>
+            <Text style={styles.warmupTitle}>워밍업 설정</Text>
+            <Text style={styles.warmupHint}>본세트 무게 대비 % · 횟수</Text>
+            {warmupRows.map((row, i) => (
+              <View key={i} style={styles.warmupRow}>
                 <TextInput
-                  style={styles.searchInput}
-                  placeholder="종목 검색"
-                  placeholderTextColor="#48484A"
-                  value={searchText}
-                  onChangeText={setSearchText}
-                  clearButtonMode="while-editing"
+                  style={styles.warmupInput}
+                  value={row.percent}
+                  keyboardType="number-pad"
+                  onChangeText={v => setWarmupRows(rows => rows.map((r, j) => j === i ? { ...r, percent: v.replace(/[^0-9]/g, '') } : r))}
+                  selectTextOnFocus
                 />
-              }
-              renderItem={({ item }) => (
-                <Pressable style={styles.exItem} onPress={() => handleSelectExercise(item)}>
-                  <View>
-                    <Text style={styles.exName}>{item.name}</Text>
-                    {item.brand && <Text style={styles.exBrand}>{item.brand}</Text>}
-                  </View>
-                  <Text style={styles.exArrow}>›</Text>
+                <Text style={styles.warmupUnit}>%</Text>
+                <TextInput
+                  style={styles.warmupInput}
+                  value={row.reps}
+                  keyboardType="number-pad"
+                  onChangeText={v => setWarmupRows(rows => rows.map((r, j) => j === i ? { ...r, reps: v.replace(/[^0-9]/g, '') } : r))}
+                  selectTextOnFocus
+                />
+                <Text style={styles.warmupUnit}>회</Text>
+                <Pressable onPress={() => setWarmupRows(rows => rows.filter((_, j) => j !== i))} hitSlop={8} style={styles.warmupDel}>
+                  <Text style={styles.warmupDelText}>✕</Text>
                 </Pressable>
-              )}
-              ListFooterComponent={
-                <Pressable style={styles.customBtn} onPress={() => { setCustomName(''); setSelectStep('custom'); }}>
-                  <Text style={styles.customBtnText}>+ 직접 등록</Text>
-                </Pressable>
-              }
-            />
-          )}
-
-          {selectStep === 'custom' && (
-            <View style={styles.modalContent}>
-              <Text style={styles.customFormLabel}>운동 이름</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="예: 케이블 크런치"
-                placeholderTextColor="#48484A"
-                value={customName}
-                onChangeText={setCustomName}
-                autoFocus
-              />
-              <Text style={styles.customFormSub}>
-                부위: {selectedMuscle}  |  장비: {selectedEquipment}{selectedBrand ? `  |  브랜드: ${selectedBrand}` : ''}
-              </Text>
-              <Pressable
-                style={[styles.saveBtn, !customName.trim() && { opacity: 0.4 }]}
-                onPress={saveCustomExercise}
-                disabled={!customName.trim()}
-              >
-                <Text style={styles.saveBtnText}>저장하고 추가</Text>
+              </View>
+            ))}
+            <Pressable style={styles.warmupAddRow} onPress={() => setWarmupRows(rows => [...rows, { percent: '50', reps: '8' }])}>
+              <Text style={styles.warmupAddRowText}>+ 단계 추가</Text>
+            </Pressable>
+            <View style={styles.warmupActions}>
+              <Pressable style={styles.warmupCancel} onPress={() => setWarmupExIdx(null)}>
+                <Text style={styles.warmupCancelText}>취소</Text>
+              </Pressable>
+              <Pressable style={styles.warmupApply} onPress={applyWarmup}>
+                <Text style={styles.warmupApplyText}>추가</Text>
               </Pressable>
             </View>
-          )}
-        </SafeAreaView>
+          </Pressable>
+        </Pressable>
       </Modal>
+
+      {renderExerciseModal()}
 
     </SafeAreaView>
     </GestureHandlerRootView>
@@ -1569,7 +1696,15 @@ const styles = StyleSheet.create({
   templateStartText: { color: '#000000', fontSize: 14, fontWeight: '700' },
   templateDelBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' },
   templateDelText: { color: '#8E8E93', fontSize: 13, fontWeight: '700' },
-  saveTemplateBtn: {
+  detailSaveBtn: {
+    backgroundColor: '#30D158',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  detailSaveText: { color: '#000000', fontSize: 16, fontWeight: '700' },
+  detailTemplateBtn: {
     borderWidth: 1,
     borderColor: '#FF9F0A',
     borderRadius: 12,
@@ -1577,7 +1712,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
-  saveTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
+  detailTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
   exerciseCardSuperset: { borderLeftWidth: 3, borderLeftColor: '#5E5CE6' },
   supersetLabel: { color: '#9D9BF5', fontSize: 12, fontWeight: '700', marginBottom: 6 },
   supersetBtn: {
@@ -1597,6 +1732,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   warmupBtnText: { color: '#FF9F0A', fontSize: 14, fontWeight: '600' },
+  warmupSheet: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
+  warmupTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  warmupHint: { color: '#8E8E93', fontSize: 13, marginTop: 4, marginBottom: 14 },
+  warmupRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  warmupInput: {
+    backgroundColor: '#2C2C2E', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10,
+    color: '#FFFFFF', fontSize: 16, minWidth: 70, textAlign: 'center', fontVariant: ['tabular-nums'],
+  },
+  warmupUnit: { color: '#8E8E93', fontSize: 15 },
+  warmupDel: { marginLeft: 'auto', width: 28, height: 28, borderRadius: 14, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' },
+  warmupDelText: { color: '#8E8E93', fontSize: 13, fontWeight: '700' },
+  warmupAddRow: { paddingVertical: 10, alignItems: 'center' },
+  warmupAddRowText: { color: '#FF9F0A', fontSize: 14, fontWeight: '600' },
+  warmupActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  warmupCancel: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  warmupCancelText: { color: '#8E8E93', fontSize: 16, fontWeight: '600' },
+  warmupApply: { flex: 1, backgroundColor: '#FF9F0A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  warmupApplyText: { color: '#000000', fontSize: 16, fontWeight: '700' },
   historyBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
   repeatBtn: {
     backgroundColor: '#1A3D27',
