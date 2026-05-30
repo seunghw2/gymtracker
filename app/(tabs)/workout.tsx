@@ -129,6 +129,7 @@ export default function WorkoutScreen() {
     moveExercise,
     linkSupersetWithNext,
     unlinkSuperset,
+    toggleTimeBased,
     removeSet,
     removeExercise,
     startRestTimer,
@@ -591,10 +592,13 @@ export default function WorkoutScreen() {
     if (!activeSessionId) return;
     const ex = exercises[exIdx];
     const s = ex.sets[setIdx];
-    const orm = epley(s.weight_kg, s.reps);
-    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm, s.setType ?? 'NORMAL', ex.supersetGroup ?? null);
-    // PR: 워밍업이 아니고 종목 역대 최고 1RM을 넘으면
-    const isPR = (s.setType ?? 'NORMAL') !== 'WARMUP'
+    const timed = !!ex.timeBased;
+    const repsVal = timed ? 0 : s.reps;
+    const orm = timed ? 0 : epley(s.weight_kg, s.reps);
+    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, repsVal, orm, s.setType ?? 'NORMAL', ex.supersetGroup ?? null, timed ? (s.durationSec ?? 0) : null);
+    // PR: 시간기반/워밍업 제외, 종목 역대 최고 1RM을 넘으면
+    const isPR = !timed
+      && (s.setType ?? 'NORMAL') !== 'WARMUP'
       && (ex.prevBest1rm ?? 0) > 0
       && orm > (ex.prevBest1rm ?? 0);
     markSetDone(exIdx, setIdx, orm, setId, isPR);
@@ -1107,14 +1111,18 @@ export default function WorkoutScreen() {
                           />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <TextInput
-                            style={styles.setInput}
-                            value={String(s.reps)}
-                            keyboardType="number-pad"
-                            selectTextOnFocus
-                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                            onChangeText={v => handleEditDetailSet(s.id, s.weight_kg, parseInt(v) || 0)}
-                          />
+                          {s.duration_sec != null ? (
+                            <Text style={[styles.setInput, { color: '#FFFFFF' }]}>{s.duration_sec}초</Text>
+                          ) : (
+                            <TextInput
+                              style={styles.setInput}
+                              value={String(s.reps)}
+                              keyboardType="number-pad"
+                              selectTextOnFocus
+                              inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
+                              onChangeText={v => handleEditDetailSet(s.id, s.weight_kg, parseInt(v) || 0)}
+                            />
+                          )}
                         </View>
                         <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
                           {s.estimated_1rm ? `${toDisplay(s.estimated_1rm, unitKg)}${u}` : '-'}
@@ -1291,6 +1299,12 @@ export default function WorkoutScreen() {
                 </Pressable>
               ) : null}
 
+              <Pressable style={styles.timeBasedToggle} onPress={() => toggleTimeBased(exIdx)}>
+                <Text style={[styles.timeBasedText, ex.timeBased && styles.timeBasedTextOn]}>
+                  ⏱ 시간 기반 {ex.timeBased ? 'ON' : 'OFF'}
+                </Text>
+              </Pressable>
+
               {/* 종목 영구 메모 (모든 세션 공통) */}
               <TextInput
                 style={styles.exNoteInput}
@@ -1315,7 +1329,7 @@ export default function WorkoutScreen() {
               <View style={styles.setHeader}>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
                 <Text style={[styles.setCol, { flex: 1.4 }]}>무게({u})</Text>
-                <Text style={styles.setCol}>횟수</Text>
+                <Text style={styles.setCol}>{ex.timeBased ? '시간(초)' : '횟수'}</Text>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>✓</Text>
               </View>
 
@@ -1373,16 +1387,27 @@ export default function WorkoutScreen() {
                         {prev && <Text style={styles.prevHint}>이전 {toDisplay(prev.weight_kg, unitKg)}</Text>}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <TextInput
-                          style={styles.setInput}
-                          value={String(s.reps)}
-                          keyboardType="number-pad"
-                          inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                          onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
-                          onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
-                          selectTextOnFocus
-                        />
-                        {prev && <Text style={styles.prevHint}>×{prev.reps}</Text>}
+                        {ex.timeBased ? (
+                          <TextInput
+                            style={styles.setInput}
+                            value={String(s.durationSec ?? 0)}
+                            keyboardType="number-pad"
+                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
+                            onChangeText={v => updateSet(exIdx, setIdx, { durationSec: parseInt(v) || 0 })}
+                            selectTextOnFocus
+                          />
+                        ) : (
+                          <TextInput
+                            style={styles.setInput}
+                            value={String(s.reps)}
+                            keyboardType="number-pad"
+                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
+                            onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
+                            onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
+                            selectTextOnFocus
+                          />
+                        )}
+                        {prev && !ex.timeBased && <Text style={styles.prevHint}>×{prev.reps}</Text>}
                       </View>
                       <Pressable
                         style={[styles.checkBtn, { flex: 0.5 }]}
@@ -1844,6 +1869,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   supersetBtnText: { color: '#9D9BF5', fontSize: 13, fontWeight: '600' },
+  timeBasedToggle: { alignSelf: 'flex-start', paddingVertical: 6, marginBottom: 6 },
+  timeBasedText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  timeBasedTextOn: { color: '#30D158' },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',

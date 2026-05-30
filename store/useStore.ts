@@ -20,6 +20,8 @@ export type SetEntry = {
   setType?: SetType;
   /** 이 세트가 종목 역대 최고 1RM을 갱신했는지 */
   isPR?: boolean;
+  /** 시간 기반 세트의 지속 시간(초). undefined=횟수 기반 */
+  durationSec?: number;
 };
 
 export type ExerciseEntry = {
@@ -37,6 +39,8 @@ export type ExerciseEntry = {
   prevBest1rm?: number;
   /** 슈퍼세트 그룹 번호 (같은 번호 = 한 슈퍼세트). null=일반 */
   supersetGroup?: number | null;
+  /** 시간 기반 종목(횟수 대신 시간 입력) */
+  timeBased?: boolean;
 };
 
 type WorkoutState = {
@@ -67,6 +71,7 @@ type WorkoutState = {
   moveExercise: (exIdx: number, dir: -1 | 1) => void;
   linkSupersetWithNext: (exIdx: number) => void;
   unlinkSuperset: (exIdx: number) => void;
+  toggleTimeBased: (exIdx: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
   removeExercise: (exIdx: number) => void;
   startRestTimer: (durationSec: number, info?: { nextLabel?: string }) => void;
@@ -223,6 +228,20 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       const exercises = state.exercises.map(ex =>
         ex.supersetGroup === group ? { ...ex, supersetGroup: null } : ex
       );
+      return { exercises };
+    }),
+
+  toggleTimeBased: (exIdx) =>
+    set((state) => {
+      const exercises = state.exercises.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        const timeBased = !ex.timeBased;
+        // 시간 기반으로 켜면 각 세트에 기본 시간(초) 부여
+        const sets = ex.sets.map(s => timeBased
+          ? { ...s, durationSec: s.durationSec ?? 30 }
+          : s);
+        return { ...ex, timeBased, sets };
+      });
       return { exercises };
     }),
 
