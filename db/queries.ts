@@ -1,6 +1,8 @@
 import { apiRequest } from '../lib/api';
 import type { SetType } from '../store/useStore';
 
+export type TrackingType = 'REPS' | 'TIME';
+
 export type Exercise = {
   id: number;
   name: string;
@@ -8,6 +10,7 @@ export type Exercise = {
   equipment_type: string;
   brand: string | null;
   note: string | null;
+  tracking_type: TrackingType;
   is_system: number;
   is_custom: number;
 };
@@ -29,6 +32,7 @@ export type WorkoutSet = {
   reps: number;
   estimated_1rm: number | null;
   set_type: SetType;
+  duration_sec: number | null;
   created_at: string;
 };
 
@@ -82,6 +86,7 @@ type ApiExercise = {
   id: number; name: string;
   muscleGroup: string; equipmentType: string;
   brand: string | null; note: string | null;
+  trackingType: string | null;
   isSystem: boolean; isCustom: boolean;
 };
 
@@ -121,6 +126,7 @@ function mapExercise(e: ApiExercise): Exercise {
     id: e.id, name: e.name,
     muscle_group: e.muscleGroup, equipment_type: e.equipmentType,
     brand: e.brand, note: e.note,
+    tracking_type: e.trackingType === 'TIME' ? 'TIME' : 'REPS',
     is_system: e.isSystem ? 1 : 0, is_custom: e.isCustom ? 1 : 0,
   };
 }
@@ -134,7 +140,8 @@ function mapSetDtoToWorkoutSet(s: ApiSetDto): WorkoutSet {
   return {
     id: s.id, session_id: 0, exercise_id: s.exerciseId,
     set_order: s.setOrder, weight_kg: s.weightKg, reps: s.reps,
-    estimated_1rm: s.estimated1rm, set_type: normSetType(s.setType), created_at: '',
+    estimated_1rm: s.estimated1rm, set_type: normSetType(s.setType),
+    duration_sec: s.durationSec ?? null, created_at: '',
   };
 }
 
@@ -172,10 +179,10 @@ export async function getExercises(muscle_group?: string, equipment_type?: strin
   return list.map(mapExercise);
 }
 
-export async function addCustomExercise(name: string, muscle_group: string, equipment_type: string, brand?: string): Promise<number> {
+export async function addCustomExercise(name: string, muscle_group: string, equipment_type: string, brand?: string, tracking_type: TrackingType = 'REPS'): Promise<number> {
   const result = await apiRequest<ApiExercise>('/api/v1/exercises', {
     method: 'POST',
-    body: { name, muscleGroup: muscle_group, equipmentType: equipment_type, brand: brand ?? null },
+    body: { name, muscleGroup: muscle_group, equipmentType: equipment_type, brand: brand ?? null, trackingType: tracking_type },
   });
   return result.id;
 }
@@ -189,6 +196,15 @@ export async function updateExerciseNote(id: number, note: string): Promise<Exer
   const result = await apiRequest<ApiExercise>(`/api/v1/exercises/${id}`, {
     method: 'PATCH',
     body: { note },
+  });
+  return mapExercise(result);
+}
+
+/** 종목 측정 방식(REPS/TIME) 변경. */
+export async function setExerciseTrackingType(id: number, tracking_type: TrackingType): Promise<Exercise> {
+  const result = await apiRequest<ApiExercise>(`/api/v1/exercises/${id}`, {
+    method: 'PATCH',
+    body: { trackingType: tracking_type },
   });
   return mapExercise(result);
 }
@@ -344,13 +360,14 @@ export type TrainedExercise = {
   name: string;
   brand: string | null;
   note: string | null;
+  tracking_type: TrackingType;
 };
 
 export async function getTrainedExercises(): Promise<TrainedExercise[]> {
-  const list = await apiRequest<{ id: number; name: string; brand: string | null; note: string | null }[]>(
+  const list = await apiRequest<{ id: number; name: string; brand: string | null; note: string | null; trackingType: string | null }[]>(
     '/api/v1/stats/trained-exercises'
   );
-  return list.map(e => ({ id: e.id, name: e.name, brand: e.brand, note: e.note ?? null }));
+  return list.map(e => ({ id: e.id, name: e.name, brand: e.brand, note: e.note ?? null, tracking_type: e.trackingType === 'TIME' ? 'TIME' : 'REPS' }));
 }
 
 export type VolumeStats = {

@@ -20,6 +20,7 @@ import {
   getSetting,
   setSetting,
   setExerciseRest,
+  setExerciseTrackingType,
   Gym,
   Exercise,
 } from '../../db/queries';
@@ -80,6 +81,12 @@ export default function SettingsScreen() {
     setGoalFatInput(gf);
     setRestInput(rd);
   }, []);
+
+  const toggleTracking = async (ex: Exercise) => {
+    const next = ex.tracking_type === 'TIME' ? 'REPS' : 'TIME';
+    setAllExercises(prev => prev.map(e => e.id === ex.id ? { ...e, tracking_type: next } : e));
+    await setExerciseTrackingType(ex.id, next).catch(() => {});
+  };
 
   const saveExerciseRest = async (exId: number) => {
     const raw = restByEx[exId];
@@ -266,6 +273,11 @@ export default function SettingsScreen() {
                 <Text style={styles.listItemName}>{ex.name}</Text>
                 {ex.brand && <Text style={styles.listItemSub}>{ex.brand}</Text>}
               </View>
+              <Pressable onPress={() => toggleTracking(ex)} style={[styles.trackChip, ex.tracking_type === 'TIME' && styles.trackChipOn]} hitSlop={6}>
+                <Text style={[styles.trackChipText, ex.tracking_type === 'TIME' && styles.trackChipTextOn]}>
+                  {ex.tracking_type === 'TIME' ? '⏱ 시간' : '횟수'}
+                </Text>
+              </Pressable>
               <TextInput
                 style={styles.restInput}
                 value={restByEx[ex.id] ?? ''}
@@ -379,6 +391,10 @@ const styles = StyleSheet.create({
     minWidth: 70,
     fontVariant: ['tabular-nums'],
   },
+  trackChip: { backgroundColor: '#2C2C2E', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginRight: 8 },
+  trackChipOn: { backgroundColor: '#0A3D62' },
+  trackChipText: { color: '#8E8E93', fontSize: 12, fontWeight: '600' },
+  trackChipTextOn: { color: '#5AB0FF' },
   restInput: {
     color: '#30D158',
     fontSize: 16,

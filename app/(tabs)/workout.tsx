@@ -14,6 +14,7 @@ import {
   Keyboard,
   InputAccessoryView,
   ActivityIndicator,
+  findNodeHandle,
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -46,6 +47,7 @@ import {
   SessionSetRow,
   TrainedExercise,
   TemplateSummary,
+  TrackingType,
   Gym,
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
@@ -147,6 +149,7 @@ export default function WorkoutScreen() {
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
   const [customName, setCustomName] = useState('');
+  const [customTracking, setCustomTracking] = useState<'REPS' | 'TIME'>('REPS');
   const [customBrandInput, setCustomBrandInput] = useState('');
   const [extraBrands, setExtraBrands] = useState<string[]>([]);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
@@ -171,6 +174,7 @@ export default function WorkoutScreen() {
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
+  const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
@@ -179,6 +183,7 @@ export default function WorkoutScreen() {
   const [editValue, setEditValue] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const cardY = useRef<Map<number, number>>(new Map());
+  const rowRefs = useRef<Map<string, View>>(new Map());
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -243,6 +248,7 @@ export default function WorkoutScreen() {
         return;
       }
       const noteMap = new Map(trained.map(t => [t.id, t.note]));
+      const typeMap = new Map(trained.map(t => [t.id, t.tracking_type]));
       const order: number[] = [];
       const groups: Record<number, ExerciseEntry> = {};
       for (const s of sets) {
@@ -251,10 +257,11 @@ export default function WorkoutScreen() {
           groups[s.exercise_id] = {
             exerciseId: s.exercise_id, exerciseName: s.exercise_name, brand: s.brand,
             sets: [], lastSets: [], note: noteMap.get(s.exercise_id) ?? null, sessionNote: '',
+            timeBased: typeMap.get(s.exercise_id) === 'TIME',
           };
         }
         const g = groups[s.exercise_id];
-        g.sets.push({ setOrder: g.sets.length + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: s.set_type });
+        g.sets.push({ setOrder: g.sets.length + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: s.set_type, durationSec: s.duration_sec ?? undefined });
         g.lastSets!.push({ weight_kg: s.weight_kg, reps: s.reps });
       }
       const date = startDate;
@@ -287,6 +294,7 @@ export default function WorkoutScreen() {
         getTrainedExercises().catch(() => [] as TrainedExercise[]),
       ]);
       const noteMap = new Map(trained.map(t => [t.id, t.note]));
+      const typeMap = new Map(trained.map(t => [t.id, t.tracking_type]));
       const date = startDate;
       const name = startName.trim() || tpl.name;
       const newId = await createWorkoutSession(date, startGymId, name);
@@ -294,12 +302,14 @@ export default function WorkoutScreen() {
       setSessionNote('');
       setStartName('');
       const entries: ExerciseEntry[] = detail.exercises.map(te => {
+        const timeBased = typeMap.get(te.exercise_id) === 'TIME';
         const sets: SetEntry[] = Array.from({ length: te.default_sets }, (_, i) => ({
           setOrder: i + 1, weight_kg: te.default_weight_kg, reps: te.default_reps, done: false, setType: 'NORMAL',
+          durationSec: timeBased ? 30 : undefined,
         }));
         return {
           exerciseId: te.exercise_id, exerciseName: te.name, brand: te.brand,
-          sets, lastSets: [], note: noteMap.get(te.exercise_id) ?? null, sessionNote: '',
+          sets, lastSets: [], note: noteMap.get(te.exercise_id) ?? null, sessionNote: '', timeBased,
         };
       });
       addExercises(entries);
@@ -431,16 +441,13 @@ export default function WorkoutScreen() {
     }
   };
 
-  // 워밍업 설정 모달 열기 (퍼센트/횟수 사용자화)
+  // 워밍업 설정 모달 열기 (기준 무게 + 단계별 %/횟수)
   const handleAddWarmup = (exIdx: number) => {
     const ex = exercises[exIdx];
     if (!ex) return;
     const working = ex.sets.find(s => (s.setType ?? 'NORMAL') !== 'WARMUP' && s.weight_kg > 0);
-    const base = working?.weight_kg ?? ex.sets[0]?.weight_kg ?? 0;
-    if (base <= 0) {
-      Alert.alert('워밍업 추가', '본세트 무게를 먼저 입력하세요.');
-      return;
-    }
+    const base = working?.weight_kg ?? ex.sets.find(s => s.weight_kg > 0)?.weight_kg ?? 0;
+    setWarmupBase(base);
     setWarmupExIdx(exIdx);
     setWarmupRows([
       { percent: '40', reps: '10' },
@@ -449,16 +456,14 @@ export default function WorkoutScreen() {
     ]);
   };
 
+  const warmupRound = (kg: number) => Math.max(0, Math.round(kg / 2.5) * 2.5);
+
   const applyWarmup = () => {
     if (warmupExIdx == null) return;
-    const ex = exercises[warmupExIdx];
-    const working = ex?.sets.find(s => (s.setType ?? 'NORMAL') !== 'WARMUP' && s.weight_kg > 0);
-    const base = working?.weight_kg ?? ex?.sets[0]?.weight_kg ?? 0;
-    const round = (w: number) => Math.max(0, Math.round(w / 2.5) * 2.5);
     const warmups = warmupRows
       .map(r => ({ pct: parseFloat(r.percent) || 0, reps: parseInt(r.reps) || 0 }))
       .filter(r => r.pct > 0 && r.reps > 0)
-      .map(r => ({ weight_kg: round(base * r.pct / 100), reps: r.reps }));
+      .map(r => ({ weight_kg: warmupRound(warmupBase * r.pct / 100), reps: r.reps }));
     if (warmups.length > 0) prependWarmupSets(warmupExIdx, warmups);
     setWarmupExIdx(null);
     Haptics.selectionAsync();
@@ -489,9 +494,21 @@ export default function WorkoutScreen() {
     setEdit({ exIdx, setIdx, kind });
     setEditValue(fieldValueStr(s, kind));
     Haptics.selectionAsync();
-    // 활성 종목 카드를 숫자패드 위로 스크롤
-    const y = cardY.current.get(exIdx);
-    if (y != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - 70), animated: true }), 50);
+    // 활성 세트 행을 숫자패드 바로 위로 스크롤
+    setTimeout(() => {
+      const row = rowRefs.current.get(`${exIdx}-${setIdx}`);
+      const scrollNode = findNodeHandle(scrollRef.current);
+      if (row && scrollNode) {
+        row.measureLayout(
+          scrollNode,
+          (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 90), animated: true }),
+          () => {
+            const cy = cardY.current.get(exIdx);
+            if (cy != null) scrollRef.current?.scrollTo({ y: Math.max(0, cy - 70), animated: true });
+          },
+        );
+      }
+    }, 60);
   };
 
   const commitEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration', valStr: string) => {
@@ -587,16 +604,17 @@ export default function WorkoutScreen() {
     setShowExerciseModal(true);
   };
 
-  const addExerciseToWorkout = async (ex: { id: number; name: string; brand: string | null; note: string | null }) => {
+  const addExerciseToWorkout = async (ex: { id: number; name: string; brand: string | null; note: string | null; tracking_type?: TrackingType }) => {
     setShowExerciseModal(false);
+    const timeBased = ex.tracking_type === 'TIME';
     const [prev, rmHist] = await Promise.all([
       getLastSessionSets(ex.id),
       get1RMHistory(ex.id).catch(() => []),
     ]);
     // 지난 세션 값으로 입력칸 프리필 + 원본은 힌트용으로 보존
     const initSets: SetEntry[] = prev.length > 0
-      ? prev.map((s, i) => ({ setOrder: i + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: 'NORMAL' }))
-      : [{ setOrder: 1, weight_kg: 60, reps: 10, done: false, setType: 'NORMAL' }];
+      ? prev.map((s, i) => ({ setOrder: i + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: 'NORMAL', durationSec: timeBased ? (s.duration_sec ?? 30) : undefined }))
+      : [{ setOrder: 1, weight_kg: timeBased ? 0 : 60, reps: timeBased ? 0 : 10, done: false, setType: 'NORMAL', durationSec: timeBased ? 30 : undefined }];
     const lastSets = prev.map(s => ({ weight_kg: s.weight_kg, reps: s.reps }));
     // PR 판정 기준: 종목 추가 시점까지의 역대 최고 1RM
     const prevBest1rm = rmHist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
@@ -610,23 +628,25 @@ export default function WorkoutScreen() {
       note: ex.note ?? null,
       sessionNote: '',
       prevBest1rm,
+      timeBased,
     };
     addExercise(entry);
   };
 
   const handleSelectExercise = (ex: Exercise) =>
-    selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout(ex);
+    selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout({ ...ex, tracking_type: ex.tracking_type });
   const handleQuickAdd = (ex: TrainedExercise) =>
     selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout(ex);
 
   // 과거 세션에 종목 추가 (기본 1세트, 지난 기록 있으면 그 값으로)
-  const addExerciseToDetail = async (ex: { id: number; name: string; brand: string | null }) => {
+  const addExerciseToDetail = async (ex: { id: number; name: string; brand: string | null; tracking_type?: TrackingType }) => {
     setShowExerciseModal(false);
     if (!detailSession) return;
+    const timeBased = ex.tracking_type === 'TIME';
     const prev = await getLastSessionSets(ex.id).catch(() => []);
-    const w = prev[0]?.weight_kg ?? 60;
-    const r = prev[0]?.reps ?? 10;
-    await addWorkoutSet(detailSession.id, ex.id, 1, w, r, epley(w, r), 'NORMAL').catch(() => {});
+    const w = timeBased ? 0 : (prev[0]?.weight_kg ?? 60);
+    const r = timeBased ? 0 : (prev[0]?.reps ?? 10);
+    await addWorkoutSet(detailSession.id, ex.id, 1, w, r, epley(w, r), 'NORMAL', null, timeBased ? (prev[0]?.duration_sec ?? 30) : null).catch(() => {});
     const sets = await getSessionSets(detailSession.id);
     setDetailSets(sets);
     getSessionHistory().then(setHistory);
@@ -695,8 +715,9 @@ export default function WorkoutScreen() {
 
   const saveCustomExercise = async () => {
     if (!customName.trim() || !selectedMuscle || !selectedEquipment) return;
-    await addCustomExercise(customName.trim(), selectedMuscle, selectedEquipment, selectedBrand ?? undefined);
+    await addCustomExercise(customName.trim(), selectedMuscle, selectedEquipment, selectedBrand ?? undefined, customTracking);
     setCustomName('');
+    setCustomTracking('REPS');
     setSelectStep('list');
     loadExercises();
   };
@@ -966,6 +987,20 @@ export default function WorkoutScreen() {
             <Text style={styles.customFormSub}>
               부위: {selectedMuscle}  |  장비: {selectedEquipment}{selectedBrand ? `  |  브랜드: ${selectedBrand}` : ''}
             </Text>
+            <Text style={styles.customFormLabel}>측정 방식</Text>
+            <View style={styles.trackingRow}>
+              {(['REPS', 'TIME'] as const).map(t => (
+                <Pressable
+                  key={t}
+                  style={[styles.trackingBtn, customTracking === t && styles.trackingBtnOn]}
+                  onPress={() => setCustomTracking(t)}
+                >
+                  <Text style={[styles.trackingText, customTracking === t && styles.trackingTextOn]}>
+                    {t === 'REPS' ? '횟수·무게' : '시간(초)'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <Pressable
               style={[styles.saveBtn, !customName.trim() && { opacity: 0.4 }]}
               onPress={saveCustomExercise}
@@ -1382,11 +1417,9 @@ export default function WorkoutScreen() {
                 </Pressable>
               ) : null}
 
-              <Pressable style={styles.timeBasedToggle} onPress={() => toggleTimeBased(exIdx)}>
-                <Text style={[styles.timeBasedText, ex.timeBased && styles.timeBasedTextOn]}>
-                  ⏱ 시간 기반 {ex.timeBased ? 'ON' : 'OFF'}
-                </Text>
-              </Pressable>
+              {ex.timeBased && (
+                <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
+              )}
 
               {/* 종목 영구 메모 (모든 세션 공통) */}
               <TextInput
@@ -1433,7 +1466,10 @@ export default function WorkoutScreen() {
                     rightThreshold={40}
                     overshootRight={false}
                   >
-                    <View style={[styles.setRow, s.done && styles.setRowDone, isWarmup && styles.setRowWarmup]}>
+                    <View
+                      ref={r => { const k = `${exIdx}-${setIdx}`; if (r) rowRefs.current.set(k, r); else rowRefs.current.delete(k); }}
+                      style={[styles.setRow, s.done && styles.setRowDone, isWarmup && styles.setRowWarmup]}
+                    >
                       {/* 세트 번호/타입 — 탭: 순환 / 길게: 직접 선택 */}
                       <Pressable
                         style={[styles.setNum, { flex: 0.5 }]}
@@ -1532,7 +1568,6 @@ export default function WorkoutScreen() {
           label={edit.kind === 'weight' ? `무게 (${u})` : edit.kind === 'duration' ? '시간 (초)' : '횟수'}
           onKey={handleNumKey}
           onBackspace={handleNumBackspace}
-          onNext={handleNumNext}
           onDone={() => setEdit(null)}
         />
       )}
@@ -1590,8 +1625,18 @@ export default function WorkoutScreen() {
         <Pressable style={styles.gymBackdrop} onPress={() => setWarmupExIdx(null)}>
           <Pressable style={styles.warmupSheet} onPress={() => {}}>
             <Text style={styles.warmupTitle}>워밍업 설정</Text>
-            <Text style={styles.warmupHint}>본세트 무게 대비 % · 횟수</Text>
+            <View style={styles.warmupBaseRow}>
+              <Text style={styles.warmupBaseLabel}>기준 무게</Text>
+              <View style={styles.warmupStepper}>
+                <Pressable style={styles.stepBtn} onPress={() => setWarmupBase(b => Math.max(0, fromInput(toDisplay(b, unitKg) - weightStep, unitKg)))} hitSlop={4}><Text style={styles.stepText}>−</Text></Pressable>
+                <Text style={styles.warmupValue}>{toDisplay(warmupBase, unitKg)}{u}</Text>
+                <Pressable style={styles.stepBtn} onPress={() => setWarmupBase(b => fromInput(toDisplay(b, unitKg) + weightStep, unitKg))} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
+              </View>
+            </View>
+            <Text style={styles.warmupHint}>기준 무게 대비 % · 횟수 (아래 미리보기 적용 무게)</Text>
             {warmupRows.map((row, i) => {
+              const pct = parseFloat(row.percent) || 0;
+              const applied = toDisplay(warmupRound(warmupBase * pct / 100), unitKg);
               const adj = (field: 'percent' | 'reps', delta: number, min: number, max: number) =>
                 setWarmupRows(rows => rows.map((r, j) => {
                   if (j !== i) return r;
@@ -1610,6 +1655,7 @@ export default function WorkoutScreen() {
                     <Text style={styles.warmupValue}>{row.reps}회</Text>
                     <Pressable style={styles.stepBtn} onPress={() => adj('reps', 1, 1, 30)} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
                   </View>
+                  <Text style={styles.warmupApplied}>≈{applied}{u}</Text>
                   <Pressable onPress={() => setWarmupRows(rows => rows.filter((_, j) => j !== i))} hitSlop={8} style={styles.warmupDel}>
                     <Text style={styles.warmupDelText}>✕</Text>
                   </Pressable>
@@ -1773,7 +1819,7 @@ const styles = StyleSheet.create({
 
   scrollContent: { padding: 16, paddingBottom: 60 },
   scrollContentRest: { paddingBottom: 220 },
-  scrollContentEditing: { paddingBottom: 380 },
+  scrollContentEditing: { paddingBottom: 300 },
   restDock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 
   emptyHint: { alignItems: 'center', paddingVertical: 40 },
@@ -1977,9 +2023,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   supersetBtnText: { color: '#9D9BF5', fontSize: 13, fontWeight: '600' },
-  timeBasedToggle: { alignSelf: 'flex-start', paddingVertical: 6, marginBottom: 6 },
-  timeBasedText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-  timeBasedTextOn: { color: '#30D158' },
+  timeBadge: { color: '#0A84FF', fontSize: 12, fontWeight: '700', marginBottom: 6 },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',
@@ -2009,6 +2053,9 @@ const styles = StyleSheet.create({
   warmupUnit: { color: '#8E8E93', fontSize: 15 },
   warmupStepper: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4 },
   warmupValue: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  warmupBaseRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, marginBottom: 6 },
+  warmupBaseLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  warmupApplied: { color: '#30D158', fontSize: 13, fontWeight: '600', minWidth: 52, textAlign: 'right', fontVariant: ['tabular-nums'] },
   warmupDel: { marginLeft: 'auto', width: 28, height: 28, borderRadius: 14, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' },
   warmupDelText: { color: '#8E8E93', fontSize: 13, fontWeight: '700' },
   warmupAddRow: { paddingVertical: 10, alignItems: 'center' },
@@ -2082,6 +2129,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
   },
+  trackingRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 8 },
+  trackingBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#2C2C2E', alignItems: 'center' },
+  trackingBtnOn: { backgroundColor: '#0A84FF' },
+  trackingText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
+  trackingTextOn: { color: '#FFFFFF' },
   quickAddTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
