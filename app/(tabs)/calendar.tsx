@@ -65,6 +65,7 @@ export default function CalendarScreen() {
   const [stats, setStats] = useState({ count: 0, totalSec: 0 });
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
 
   const today = now.toISOString().slice(0, 10);
   const week = getWeekRangeStr();
@@ -124,12 +125,20 @@ export default function CalendarScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.header}>캘린더</Text>
 
-        {/* 스트릭 뱃지 */}
-        <View style={styles.streakBadge}>
-          <Text style={styles.streakEmoji}>🔥</Text>
-          <Text style={styles.streakText}>{streak}일 연속</Text>
+        {/* 보기 토글 */}
+        <View style={styles.segment}>
+          {([['month', '월별'], ['week', '이번주']] as const).map(([key, label]) => (
+            <Pressable
+              key={key}
+              style={[styles.segmentBtn, viewMode === key && styles.segmentBtnOn]}
+              onPress={() => setViewMode(key)}
+            >
+              <Text style={[styles.segmentText, viewMode === key && styles.segmentTextOn]}>{label}</Text>
+            </Pressable>
+          ))}
         </View>
 
+        {viewMode === 'month' && (<>
         {/* 월 선택 */}
         <View style={styles.monthNav}>
           <Pressable onPress={prevMonth} style={styles.navBtn}>
@@ -203,19 +212,21 @@ export default function CalendarScreen() {
               : <Text style={styles.emptyText}>이 날은 운동 기록이 없습니다</Text>}
           </View>
         )}
+        </>)}
 
-        {/* 이번 주 운동 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>이번 주 운동</Text>
-          {(() => {
-            const wk = sessions
-              .filter(s => s.date >= week.start && s.date <= week.end)
-              .sort((a, b) => b.date.localeCompare(a.date));
-            return wk.length > 0
-              ? wk.map(renderSessionCard)
-              : <Text style={styles.emptyText}>이번 주 운동이 없습니다</Text>;
-          })()}
-        </View>
+        {viewMode === 'week' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>이번 주 운동</Text>
+            {(() => {
+              const wk = sessions
+                .filter(s => s.date >= week.start && s.date <= week.end)
+                .sort((a, b) => a.date.localeCompare(b.date));
+              return wk.length > 0
+                ? wk.map(renderSessionCard)
+                : <Text style={styles.emptyText}>이번 주 운동이 없습니다</Text>;
+            })()}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -225,6 +236,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
   content: { padding: 20, paddingBottom: 40 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 16 },
+
+  segment: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, marginBottom: 20 },
+  segmentBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
+  segmentBtnOn: { backgroundColor: '#30D158' },
+  segmentText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
+  segmentTextOn: { color: '#000000' },
 
   streakBadge: {
     flexDirection: 'row',
