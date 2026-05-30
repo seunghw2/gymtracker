@@ -14,8 +14,9 @@ import { LineChart, BarChart } from 'react-native-chart-kit';
 import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, TrainedExercise, BodyLog, VolumeStats } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
+import { toDisplay, unitLabel } from '../../lib/units';
 
-type Chip = '1RM 성장' | '체중' | '볼륨';
+type Chip = '1RM 성장' | '체중' | '체지방' | '볼륨';
 
 const WIDTH = Dimensions.get('window').width - 40;
 
@@ -45,7 +46,8 @@ export default function StatsScreen() {
   const [ormData, setOrmData] = useState<{ date: string; estimated_1rm: number }[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
   const [volume, setVolume] = useState<VolumeStats | null>(null);
-  const { goalWeightKg } = useSettingsStore();
+  const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();
+  const u = unitLabel(unitKg);
 
   const load = useCallback(async () => {
     const logs = await getBodyLogs(30);
@@ -74,7 +76,7 @@ export default function StatsScreen() {
     }
   }, [selectedEx]);
 
-  const chips: Chip[] = ['1RM 성장', '체중', '볼륨'];
+  const chips: Chip[] = ['1RM 성장', '체중', '체지방', '볼륨'];
 
   const currentWeight = bodyLogs.length > 0 ? bodyLogs[bodyLogs.length - 1].weight_kg ?? 0 : 0;
   const goalProgress = goalWeightKg > 0
@@ -83,6 +85,9 @@ export default function StatsScreen() {
 
   const bodyChartData = bodyLogs.slice(-14).filter(l => l.weight_kg);
   const hasBodyData = bodyChartData.length >= 2;
+  const fatChartData = bodyLogs.slice(-14).filter(l => l.body_fat_pct != null);
+  const hasFatData = fatChartData.length >= 2;
+  const currentFat = fatChartData.length > 0 ? fatChartData[fatChartData.length - 1].body_fat_pct ?? 0 : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -120,7 +125,7 @@ export default function StatsScreen() {
                 </Pressable>
 
                 {selectedEx ? (
-                  <OneRMChart data={ormData} title={`${selectedEx.name} 추정 1RM`} />
+                  <OneRMChart data={ormData} title={`${selectedEx.name} 추정 1RM`} unitKg={unitKg} />
                 ) : (
                   <View style={styles.placeholder}>
                     <Text style={styles.placeholderText}>종목을 선택하면 그래프가 표시됩니다</Text>
@@ -196,7 +201,7 @@ export default function StatsScreen() {
             {/* 목표 진도 */}
             <View style={styles.goalCard}>
               <View style={styles.goalRow}>
-                <Text style={styles.goalLabel}>현재</Text>
+                <Text style={styles.goalLabel}>현재 {currentWeight > 0 ? `${currentWeight.toFixed(1)}kg` : '미입력'}</Text>
                 <Text style={styles.goalLabel}>목표 {goalWeightKg}kg</Text>
               </View>
               <View style={styles.progressBar}>
@@ -208,6 +213,51 @@ export default function StatsScreen() {
                     ? `${(currentWeight - goalWeightKg).toFixed(1)} kg 남음`
                     : '목표 달성!'
                   : '체중 미입력'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {activeChip === '체지방' && (
+          <View>
+            {hasFatData ? (
+              <LineChart
+                data={{
+                  labels: fatChartData.map(l => l.date.slice(5)),
+                  datasets: [{ data: fatChartData.map(l => l.body_fat_pct ?? 0) }],
+                }}
+                width={WIDTH}
+                height={220}
+                yAxisSuffix="%"
+                chartConfig={{
+                  backgroundColor: '#1C1C1E',
+                  backgroundGradientFrom: '#1C1C1E',
+                  backgroundGradientTo: '#1C1C1E',
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(255, 159, 10, ${opacity})`,
+                  labelColor: () => '#8E8E93',
+                  style: { borderRadius: 12 },
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#FF9F0A' },
+                }}
+                bezier
+                style={{ borderRadius: 12, marginBottom: 16 }}
+              />
+            ) : (
+              <View style={styles.placeholder}>
+                <Text style={styles.placeholderText}>체지방 기록이 부족합니다 (최소 2개)</Text>
+              </View>
+            )}
+            <View style={styles.goalCard}>
+              <View style={styles.goalRow}>
+                <Text style={styles.goalLabel}>현재 {currentFat > 0 ? `${currentFat.toFixed(1)}%` : '미입력'}</Text>
+                <Text style={styles.goalLabel}>목표 {goalBodyFatPct}%</Text>
+              </View>
+              <Text style={styles.goalValue}>
+                {currentFat > 0
+                  ? currentFat > goalBodyFatPct
+                    ? `${(currentFat - goalBodyFatPct).toFixed(1)}% 남음`
+                    : '목표 달성!'
+                  : '홈에서 체지방을 입력하세요'}
               </Text>
             </View>
           </View>
@@ -225,11 +275,11 @@ export default function StatsScreen() {
               </View>
             ) : (
               <>
-                <Text style={styles.sectionTitle}>일자별 총볼륨 (최근 8회)</Text>
+                <Text style={styles.sectionTitle}>일자별 총볼륨 ({u}, 최근 8회)</Text>
                 <BarChart
                   data={{
                     labels: volume.daily.slice(-8).map(d => d.date.slice(5)),
-                    datasets: [{ data: volume.daily.slice(-8).map(d => Math.round(d.volume)) }],
+                    datasets: [{ data: volume.daily.slice(-8).map(d => Math.round(toDisplay(d.volume, unitKg))) }],
                   }}
                   width={WIDTH}
                   height={220}
@@ -243,11 +293,11 @@ export default function StatsScreen() {
 
                 {volume.byMuscle.length > 0 && (
                   <>
-                    <Text style={styles.sectionTitle}>부위별 볼륨</Text>
+                    <Text style={styles.sectionTitle}>부위별 볼륨 ({u})</Text>
                     <BarChart
                       data={{
                         labels: volume.byMuscle.map(m => m.muscleGroup),
-                        datasets: [{ data: volume.byMuscle.map(m => Math.round(m.volume)) }],
+                        datasets: [{ data: volume.byMuscle.map(m => Math.round(toDisplay(m.volume, unitKg))) }],
                       }}
                       width={WIDTH}
                       height={220}

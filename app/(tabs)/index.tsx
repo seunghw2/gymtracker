@@ -7,6 +7,7 @@ import {
   Pressable,
   Modal,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -58,12 +59,14 @@ function calcStreak(dates: string[]): number {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { goalWeightKg } = useSettingsStore();
+  const { goalWeightKg, goalBodyFatPct } = useSettingsStore();
   const [weekCount, setWeekCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [dialValue, setDialValue] = useState(70);
+  const [bodyFatInput, setBodyFatInput] = useState('');
+  const [todayBodyFat, setTodayBodyFat] = useState<number | null>(null);
   const [weekDots, setWeekDots] = useState<boolean[]>(Array(7).fill(false));
 
   const load = useCallback(async () => {
@@ -87,9 +90,11 @@ export default function HomeScreen() {
 
     if (todayLog?.weight_kg) {
       setTodayWeight(todayLog.weight_kg);
+      setTodayBodyFat(todayLog.body_fat_pct ?? null);
     } else {
       setShowWeightModal(true);
       setDialValue(latestLog?.weight_kg ?? 70);
+      setBodyFatInput(latestLog?.body_fat_pct ? String(latestLog.body_fat_pct) : '');
     }
 
     const dots = Array(7).fill(false);
@@ -105,12 +110,15 @@ export default function HomeScreen() {
   useEffect(() => { load(); }, [load]);
 
   const handleSaveWeight = async () => {
+    const fat = parseFloat(bodyFatInput);
+    const fatVal = Number.isFinite(fat) && fat > 0 ? fat : undefined;
     try {
-      await upsertBodyLog(getTodayStr(), dialValue);
+      await upsertBodyLog(getTodayStr(), dialValue, fatVal);
     } catch {
       // 저장 실패해도 모달은 닫아 화면 멈춤 방지
     }
     setTodayWeight(dialValue);
+    setTodayBodyFat(fatVal ?? null);
     setShowWeightModal(false);
   };
 
@@ -157,6 +165,11 @@ export default function HomeScreen() {
               ? `목표까지 ${(todayWeight - goalWeightKg).toFixed(1)} kg 남음`
               : '목표 달성!'}
           </Text>
+          {todayBodyFat != null && (
+            <Text style={styles.fatHint}>
+              체지방 {todayBodyFat.toFixed(1)}% · 목표 {goalBodyFatPct}%
+            </Text>
+          )}
         </View>
 
         {/* 이번주 스트릭 도트 */}
@@ -188,6 +201,19 @@ export default function HomeScreen() {
             <Text style={styles.modalTitle}>오늘의 체중 입력</Text>
             <Text style={styles.modalSub}>드래그하여 체중을 입력하세요</Text>
             <WeightDial value={dialValue} onChange={setDialValue} />
+            <View style={styles.fatRow}>
+              <Text style={styles.fatLabel}>체지방률</Text>
+              <TextInput
+                style={styles.fatInput}
+                value={bodyFatInput}
+                onChangeText={t => setBodyFatInput(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder="선택"
+                placeholderTextColor="#48484A"
+                selectTextOnFocus
+              />
+              <Text style={styles.fatUnit}>%</Text>
+            </View>
             <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
               <Text style={styles.saveBtnText}>저장</Text>
             </Pressable>
@@ -238,6 +264,7 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', backgroundColor: '#30D158', borderRadius: 4 },
   progressHint: { color: '#8E8E93', fontSize: 12, marginTop: 6 },
+  fatHint: { color: '#30D158', fontSize: 12, marginTop: 4 },
 
   weekCard: {
     backgroundColor: '#1C1C1E',
@@ -274,6 +301,19 @@ const styles = StyleSheet.create({
   },
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginBottom: 4 },
   modalSub: { color: '#8E8E93', fontSize: 14, marginBottom: 8 },
+  fatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
+  fatLabel: { color: '#8E8E93', fontSize: 15 },
+  fatInput: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 16,
+    minWidth: 90,
+    textAlign: 'center',
+  },
+  fatUnit: { color: '#8E8E93', fontSize: 15 },
   saveBtn: {
     backgroundColor: '#30D158',
     borderRadius: 14,

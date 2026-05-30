@@ -45,6 +45,7 @@ import {
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
 import { formatDateWithDay } from '../../lib/date';
+import { toDisplay, fromInput, unitLabel } from '../../lib/units';
 import {
   MUSCLE_GROUPS,
   EQUIPMENT_TYPES,
@@ -117,6 +118,7 @@ export default function WorkoutScreen() {
     setExerciseSessionNote,
     setExercisePrevBest,
     addSetToExercise,
+    prependWarmupSets,
     markSetDone,
     moveExercise,
     removeSet,
@@ -124,7 +126,8 @@ export default function WorkoutScreen() {
     startRestTimer,
     restTimerActive,
   } = useWorkoutStore();
-  const { restDurationSec } = useSettingsStore();
+  const { restDurationSec, unitKg } = useSettingsStore();
+  const u = unitLabel(unitKg);
   const elapsed = useElapsedTime(sessionStartTime);
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -303,6 +306,26 @@ export default function WorkoutScreen() {
     }
   };
 
+  // 첫 본세트 무게 기준 40/60/80% 워밍업 자동 생성
+  const handleAddWarmup = (exIdx: number) => {
+    const ex = exercises[exIdx];
+    if (!ex) return;
+    const working = ex.sets.find(s => (s.setType ?? 'NORMAL') !== 'WARMUP' && s.weight_kg > 0);
+    const base = working?.weight_kg ?? ex.sets[0]?.weight_kg ?? 0;
+    if (base <= 0) {
+      Alert.alert('워밍업 추가', '본세트 무게를 먼저 입력하세요.');
+      return;
+    }
+    const round = (w: number) => Math.max(0, Math.round((w) / 2.5) * 2.5);
+    const warmups = [
+      { weight_kg: round(base * 0.4), reps: 10 },
+      { weight_kg: round(base * 0.6), reps: 6 },
+      { weight_kg: round(base * 0.8), reps: 3 },
+    ];
+    prependWarmupSets(exIdx, warmups);
+    Haptics.selectionAsync();
+  };
+
   // 종목 영구 메모 저장
   const handleExerciseNoteBlur = async (exIdx: number) => {
     const ex = exercises[exIdx];
@@ -374,7 +397,7 @@ export default function WorkoutScreen() {
     }
 
     const nextSet = ex.sets[setIdx + 1];
-    const nextLabel = nextSet ? `${nextSet.weight_kg}kg × ${nextSet.reps}회` : undefined;
+    const nextLabel = nextSet ? `${toDisplay(nextSet.weight_kg, unitKg)}${u} × ${nextSet.reps}회` : undefined;
     const restSec = await getExerciseRest(ex.exerciseId, restDurationSec);
     startRestTimer(restSec, { nextLabel });
   };
@@ -621,7 +644,7 @@ export default function WorkoutScreen() {
                   ) : null}
                   <View style={styles.setHeader}>
                     <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
-                    <Text style={styles.setCol}>무게(kg)</Text>
+                    <Text style={styles.setCol}>무게({u})</Text>
                     <Text style={styles.setCol}>횟수</Text>
                     <Text style={styles.setCol}>추정 1RM</Text>
                   </View>
@@ -662,10 +685,10 @@ export default function WorkoutScreen() {
                         <View style={{ flex: 1 }}>
                           <TextInput
                             style={styles.setInput}
-                            value={String(s.weight_kg)}
+                            value={String(toDisplay(s.weight_kg, unitKg))}
                             keyboardType="decimal-pad"
                             selectTextOnFocus
-                            onChangeText={v => handleEditDetailSet(s.id, parseFloat(v) || 0, s.reps)}
+                            onChangeText={v => handleEditDetailSet(s.id, fromInput(parseFloat(v) || 0, unitKg), s.reps)}
                             onEndEditing={() => handleEditDetailSetBlur(s.id)}
                           />
                         </View>
@@ -680,7 +703,7 @@ export default function WorkoutScreen() {
                           />
                         </View>
                         <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
-                          {s.estimated_1rm ? `${s.estimated_1rm}kg` : '-'}
+                          {s.estimated_1rm ? `${toDisplay(s.estimated_1rm, unitKg)}${u}` : '-'}
                         </Text>
                       </View>
                     </Swipeable>
@@ -790,13 +813,13 @@ export default function WorkoutScreen() {
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
                   {(volume > 0 || doneSets.length > 0) && (
                     <Text style={styles.exVolume}>
-                      볼륨 {Math.round(volume).toLocaleString()}kg · {doneSets.length}세트
+                      볼륨 {Math.round(toDisplay(volume, unitKg)).toLocaleString()}{u} · {doneSets.length}세트
                     </Text>
                   )}
                 </View>
                 <View style={styles.exerciseHeaderRight}>
                   {bestORM > 0 && (
-                    <Text style={styles.ormBadge}>1RM {bestORM}kg</Text>
+                    <Text style={styles.ormBadge}>1RM {toDisplay(bestORM, unitKg)}{u}</Text>
                   )}
                   <Pressable
                     onPress={() => moveExercise(exIdx, -1)}
@@ -843,7 +866,7 @@ export default function WorkoutScreen() {
 
               <View style={styles.setHeader}>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
-                <Text style={styles.setCol}>무게(kg)</Text>
+                <Text style={styles.setCol}>무게({u})</Text>
                 <Text style={styles.setCol}>횟수</Text>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>✓</Text>
               </View>
@@ -882,14 +905,14 @@ export default function WorkoutScreen() {
                       <View style={{ flex: 1 }}>
                         <TextInput
                           style={styles.setInput}
-                          value={String(s.weight_kg)}
+                          value={String(toDisplay(s.weight_kg, unitKg))}
                           keyboardType="decimal-pad"
                           inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                          onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: parseFloat(v) || 0 })}
+                          onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: fromInput(parseFloat(v) || 0, unitKg) })}
                           onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
                           selectTextOnFocus
                         />
-                        {prev && <Text style={styles.prevHint}>이전 {prev.weight_kg}</Text>}
+                        {prev && <Text style={styles.prevHint}>이전 {toDisplay(prev.weight_kg, unitKg)}</Text>}
                       </View>
                       <View style={{ flex: 1 }}>
                         <TextInput
@@ -916,9 +939,14 @@ export default function WorkoutScreen() {
                 );
               })}
 
-              <Pressable style={styles.addSetBtn} onPress={() => addSetToExercise(exIdx)}>
-                <Text style={styles.addSetText}>+ 세트 추가</Text>
-              </Pressable>
+              <View style={styles.setActionsRow}>
+                <Pressable style={[styles.addSetBtn, { flex: 1 }]} onPress={() => addSetToExercise(exIdx)}>
+                  <Text style={styles.addSetText}>+ 세트 추가</Text>
+                </Pressable>
+                <Pressable style={styles.warmupBtn} onPress={() => handleAddWarmup(exIdx)}>
+                  <Text style={styles.warmupBtnText}>🔥 워밍업</Text>
+                </Pressable>
+              </View>
             </View>
           );
         })}
@@ -1391,6 +1419,15 @@ const styles = StyleSheet.create({
   },
   kbAccessoryText: { color: '#30D158', fontSize: 16, fontWeight: '700' },
 
+  setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  warmupBtn: {
+    backgroundColor: '#2A2620',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  warmupBtnText: { color: '#FF9F0A', fontSize: 14, fontWeight: '600' },
   historyBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
   repeatBtn: {
     backgroundColor: '#1A3D27',

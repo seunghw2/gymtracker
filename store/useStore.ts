@@ -60,6 +60,7 @@ type WorkoutState = {
   setExerciseSessionNote: (exIdx: number, note: string) => void;
   setExercisePrevBest: (exIdx: number, best: number) => void;
   addSetToExercise: (exIdx: number) => void;
+  prependWarmupSets: (exIdx: number, warmups: { weight_kg: number; reps: number }[]) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number, isPR?: boolean) => void;
   moveExercise: (exIdx: number, dir: -1 | 1) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
@@ -116,6 +117,19 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
         if (i !== exIdx) return ex;
         const sets = ex.sets.map((s, j) => j === setIdx ? { ...s, ...data } : s);
         return { ...ex, sets };
+      });
+      return { exercises };
+    }),
+
+  prependWarmupSets: (exIdx, warmups) =>
+    set((state) => {
+      const exercises = state.exercises.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        const warmupSets: SetEntry[] = warmups.map(w => ({
+          setOrder: 0, weight_kg: w.weight_kg, reps: w.reps, done: false, setType: 'WARMUP' as SetType,
+        }));
+        const merged = [...warmupSets, ...ex.sets].map((s, j) => ({ ...s, setOrder: j + 1 }));
+        return { ...ex, sets: merged };
       });
       return { exercises };
     }),

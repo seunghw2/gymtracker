@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
+import { toDisplay, unitLabel } from '../lib/units';
 
 type DataPoint = {
   date: string;
@@ -10,11 +11,12 @@ type DataPoint = {
 type Props = {
   data: DataPoint[];
   title?: string;
+  unitKg?: boolean;
 };
 
 const WIDTH = Dimensions.get('window').width - 40;
 
-export default function OneRMChart({ data, title }: Props) {
+export default function OneRMChart({ data, title, unitKg = true }: Props) {
   if (data.length === 0) {
     return (
       <View style={styles.empty}>
@@ -25,7 +27,7 @@ export default function OneRMChart({ data, title }: Props) {
 
   const recent = data.slice(-8);
   const labels = recent.map(d => d.date.slice(5));
-  const values = recent.map(d => Math.round(d.estimated_1rm));
+  const values = recent.map(d => Math.round(toDisplay(d.estimated_1rm, unitKg)));
 
   return (
     <View style={styles.container}>
@@ -38,7 +40,7 @@ export default function OneRMChart({ data, title }: Props) {
         width={WIDTH}
         height={200}
         yAxisLabel=""
-        yAxisSuffix="kg"
+        yAxisSuffix={unitLabel(unitKg)}
         fromZero
         chartConfig={{
           backgroundColor: '#1C1C1E',
