@@ -10,6 +10,10 @@ import {
   SafeAreaView,
   Modal,
   ScrollView,
+  Platform,
+  Keyboard,
+  InputAccessoryView,
+  ActivityIndicator,
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -29,7 +33,9 @@ import {
   updateWorkoutSet,
   updateExerciseNote,
   upsertExerciseSessionNote,
+  getSessionExerciseNotes,
   getTrainedExercises,
+  get1RMHistory,
   getGyms,
   Exercise,
   SessionSummary,
@@ -38,6 +44,7 @@ import {
   Gym,
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
+import { formatDateWithDay } from '../../lib/date';
 import {
   MUSCLE_GROUPS,
   EQUIPMENT_TYPES,
@@ -67,9 +74,10 @@ function getTodayStr() {
 }
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  return formatDateWithDay(dateStr);
 }
+
+const KB_ACCESSORY_ID = 'setInputDone';
 
 function formatDuration(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -102,12 +110,15 @@ export default function WorkoutScreen() {
     setSessionTitle,
     finishSession,
     addExercise,
+    addExercises,
     updateSet,
     cycleSetType,
     setExerciseNote,
     setExerciseSessionNote,
+    setExercisePrevBest,
     addSetToExercise,
     markSetDone,
+    moveExercise,
     removeSet,
     removeExercise,
     startRestTimer,
@@ -142,6 +153,8 @@ export default function WorkoutScreen() {
   const [detailTitle, setDetailTitle] = useState('');
   const [detailNote, setDetailNote] = useState('');
   const [recents, setRecents] = useState<TrainedExercise[]>([]);
+  const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
+  const [repeatLoading, setRepeatLoading] = useState(false);
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -181,6 +194,54 @@ export default function WorkoutScreen() {
     setStartName('');
     setStartGymId(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  // 지난 세션을 그대로 새 운동으로 불러와 시작
+  const handleRepeatSession = async (session: SessionSummary) => {
+    if (repeatLoading) return;
+    setRepeatLoading(true);
+    try {
+      const [sets, trained] = await Promise.all([
+        getSessionSets(session.id),
+        getTrainedExercises().catch(() => [] as TrainedExercise[]),
+      ]);
+      if (sets.length === 0) {
+        Alert.alert('불러올 수 없음', '이 운동에는 기록된 세트가 없습니다.');
+        return;
+      }
+      const noteMap = new Map(trained.map(t => [t.id, t.note]));
+      const order: number[] = [];
+      const groups: Record<number, ExerciseEntry> = {};
+      for (const s of sets) {
+        if (!groups[s.exercise_id]) {
+          order.push(s.exercise_id);
+          groups[s.exercise_id] = {
+            exerciseId: s.exercise_id, exerciseName: s.exercise_name, brand: s.brand,
+            sets: [], lastSets: [], note: noteMap.get(s.exercise_id) ?? null, sessionNote: '',
+          };
+        }
+        const g = groups[s.exercise_id];
+        g.sets.push({ setOrder: g.sets.length + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: s.set_type });
+        g.lastSets!.push({ weight_kg: s.weight_kg, reps: s.reps });
+      }
+      const date = startDate;
+      const name = startName.trim() || session.title || '';
+      const newId = await createWorkoutSession(date, startGymId, name);
+      startSession(newId, date, name || null, startGymId);
+      setSessionNote('');
+      setStartName('');
+      const entries = order.map(id => groups[id]);
+      addExercises(entries);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // PR 기준이 되는 역대 최고 1RM을 비동기로 채움
+      const bests = await Promise.all(order.map(id => get1RMHistory(id).catch(() => [])));
+      bests.forEach((hist, idx) => {
+        const best = hist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
+        if (best > 0) setExercisePrevBest(idx, best);
+      });
+    } finally {
+      setRepeatLoading(false);
+    }
   };
 
   const handleFinishWorkout = () => {
@@ -267,12 +328,17 @@ export default function WorkoutScreen() {
 
   const addExerciseToWorkout = async (ex: { id: number; name: string; brand: string | null; note: string | null }) => {
     setShowExerciseModal(false);
-    const prev = await getLastSessionSets(ex.id);
+    const [prev, rmHist] = await Promise.all([
+      getLastSessionSets(ex.id),
+      get1RMHistory(ex.id).catch(() => []),
+    ]);
     // 지난 세션 값으로 입력칸 프리필 + 원본은 힌트용으로 보존
     const initSets: SetEntry[] = prev.length > 0
       ? prev.map((s, i) => ({ setOrder: i + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: 'NORMAL' }))
       : [{ setOrder: 1, weight_kg: 60, reps: 10, done: false, setType: 'NORMAL' }];
     const lastSets = prev.map(s => ({ weight_kg: s.weight_kg, reps: s.reps }));
+    // PR 판정 기준: 종목 추가 시점까지의 역대 최고 1RM
+    const prevBest1rm = rmHist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
 
     const entry: ExerciseEntry = {
       exerciseId: ex.id,
@@ -282,6 +348,7 @@ export default function WorkoutScreen() {
       lastSets,
       note: ex.note ?? null,
       sessionNote: '',
+      prevBest1rm,
     };
     addExercise(entry);
   };
@@ -295,8 +362,16 @@ export default function WorkoutScreen() {
     const s = ex.sets[setIdx];
     const orm = epley(s.weight_kg, s.reps);
     const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, s.reps, orm, s.setType ?? 'NORMAL');
-    markSetDone(exIdx, setIdx, orm, setId);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // PR: 워밍업이 아니고 종목 역대 최고 1RM을 넘으면
+    const isPR = (s.setType ?? 'NORMAL') !== 'WARMUP'
+      && (ex.prevBest1rm ?? 0) > 0
+      && orm > (ex.prevBest1rm ?? 0);
+    markSetDone(exIdx, setIdx, orm, setId, isPR);
+    if (isPR) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
 
     const nextSet = ex.sets[setIdx + 1];
     const nextLabel = nextSet ? `${nextSet.weight_kg}kg × ${nextSet.reps}회` : undefined;
@@ -313,11 +388,22 @@ export default function WorkoutScreen() {
   };
 
   const openDetail = async (session: SessionSummary) => {
-    const sets = await getSessionSets(session.id);
+    const [sets, notes] = await Promise.all([
+      getSessionSets(session.id),
+      getSessionExerciseNotes(session.id).catch(() => []),
+    ]);
     setDetailSets(sets);
+    const noteMap: Record<number, string> = {};
+    for (const n of notes) if (n.note) noteMap[n.exercise_id] = n.note;
+    setDetailExNotes(noteMap);
     setDetailSession(session);
     setDetailTitle(session.title ?? '');
     setDetailNote(session.note ?? '');
+  };
+
+  const closeDetail = () => {
+    setDetailSession(null);
+    setDetailExNotes({});
   };
 
   const handleRemoveExercise = (exIdx: number) => {
@@ -396,9 +482,9 @@ export default function WorkoutScreen() {
     getSessionHistory().then(setHistory);
   };
 
-  const groupedDetailSets = detailSets.reduce<Record<number, { name: string; brand: string | null; sets: SessionSetRow[] }>>(
+  const groupedDetailSets = detailSets.reduce<Record<number, { exerciseId: number; name: string; brand: string | null; sets: SessionSetRow[] }>>(
     (acc, row) => {
-      if (!acc[row.exercise_id]) acc[row.exercise_id] = { name: row.exercise_name, brand: row.brand, sets: [] };
+      if (!acc[row.exercise_id]) acc[row.exercise_id] = { exerciseId: row.exercise_id, name: row.exercise_name, brand: row.brand, sets: [] };
       acc[row.exercise_id].sets.push(row);
       return acc;
     },
@@ -456,9 +542,21 @@ export default function WorkoutScreen() {
                   <Text style={styles.historyExercises} numberOfLines={1}>
                     {session.exercise_names || '운동 없음'}
                   </Text>
-                  <Text style={styles.historyMeta}>
-                    {session.exercise_count}가지 운동 · {session.set_count}세트
-                  </Text>
+                  <View style={styles.historyBottom}>
+                    <Text style={styles.historyMeta}>
+                      {session.exercise_count}가지 운동 · {session.set_count}세트
+                    </Text>
+                    {session.set_count > 0 && (
+                      <Pressable
+                        style={styles.repeatBtn}
+                        onPress={() => handleRepeatSession(session)}
+                        disabled={repeatLoading}
+                        hitSlop={6}
+                      >
+                        <Text style={styles.repeatBtnText}>🔁 이대로 시작</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 </Pressable>
               ))}
             </>
@@ -469,7 +567,7 @@ export default function WorkoutScreen() {
         <Modal visible={!!detailSession} animationType="slide">
           <SafeAreaView style={styles.safe}>
             <View style={styles.detailHeader}>
-              <Pressable onPress={() => setDetailSession(null)}>
+              <Pressable onPress={closeDetail}>
                 <Text style={styles.modalBack}>✕ 닫기</Text>
               </Pressable>
               <Pressable onPress={() => setShowDetailPicker(true)}>
@@ -516,6 +614,11 @@ export default function WorkoutScreen() {
                       {group.brand && <Text style={styles.exerciseBrand}>{group.brand}</Text>}
                     </View>
                   </View>
+                  {detailExNotes[group.exerciseId] ? (
+                    <View style={styles.detailNoteChip}>
+                      <Text style={styles.detailNoteChipText}>📝 {detailExNotes[group.exerciseId]}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.setHeader}>
                     <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
                     <Text style={styles.setCol}>무게(kg)</Text>
@@ -695,6 +798,22 @@ export default function WorkoutScreen() {
                   {bestORM > 0 && (
                     <Text style={styles.ormBadge}>1RM {bestORM}kg</Text>
                   )}
+                  <Pressable
+                    onPress={() => moveExercise(exIdx, -1)}
+                    disabled={exIdx === 0}
+                    hitSlop={6}
+                    style={[styles.moveBtn, exIdx === 0 && styles.moveBtnDisabled]}
+                  >
+                    <Text style={styles.moveBtnText}>↑</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => moveExercise(exIdx, 1)}
+                    disabled={exIdx === exercises.length - 1}
+                    hitSlop={6}
+                    style={[styles.moveBtn, exIdx === exercises.length - 1 && styles.moveBtnDisabled]}
+                  >
+                    <Text style={styles.moveBtnText}>↓</Text>
+                  </Pressable>
                   <Pressable onPress={() => handleRemoveExercise(exIdx)} hitSlop={8} style={styles.exDeleteBtn}>
                     <Text style={styles.exDeleteText}>✕</Text>
                   </Pressable>
@@ -765,6 +884,7 @@ export default function WorkoutScreen() {
                           style={styles.setInput}
                           value={String(s.weight_kg)}
                           keyboardType="decimal-pad"
+                          inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
                           onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: parseFloat(v) || 0 })}
                           onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
                           selectTextOnFocus
@@ -776,6 +896,7 @@ export default function WorkoutScreen() {
                           style={styles.setInput}
                           value={String(s.reps)}
                           keyboardType="number-pad"
+                          inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
                           onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
                           onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
                           selectTextOnFocus
@@ -786,8 +907,8 @@ export default function WorkoutScreen() {
                         style={[styles.checkBtn, { flex: 0.5 }]}
                         onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
                       >
-                        <Text style={[styles.checkText, s.done && styles.checkDone]}>
-                          {s.done ? '✓' : '○'}
+                        <Text style={[styles.checkText, s.done && styles.checkDone, s.isPR && styles.checkPR]}>
+                          {s.isPR ? '🏆' : s.done ? '✓' : '○'}
                         </Text>
                       </Pressable>
                     </View>
@@ -811,6 +932,17 @@ export default function WorkoutScreen() {
       <View style={styles.restDock} pointerEvents="box-none">
         <RestTimer />
       </View>
+
+      {/* 숫자 키보드 위 완료 버튼 (iOS) */}
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={KB_ACCESSORY_ID}>
+          <View style={styles.kbAccessory}>
+            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8}>
+              <Text style={styles.kbAccessoryText}>완료</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      )}
 
       {/* 운동 선택 모달 */}
       <Modal visible={showExerciseModal} animationType="slide">
@@ -1227,6 +1359,46 @@ const styles = StyleSheet.create({
   checkBtn: { flex: 1, alignItems: 'center', paddingVertical: 10 },
   checkText: { color: '#48484A', fontSize: 20 },
   checkDone: { color: '#30D158' },
+  checkPR: { fontSize: 18 },
+
+  moveBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#2C2C2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moveBtnDisabled: { opacity: 0.3 },
+  moveBtnText: { color: '#8E8E93', fontSize: 15, fontWeight: '700' },
+
+  detailNoteChip: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  detailNoteChipText: { color: '#E5E5EA', fontSize: 13 },
+
+  kbAccessory: {
+    backgroundColor: '#1C1C1E',
+    borderTopWidth: 1,
+    borderTopColor: '#2C2C2E',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    alignItems: 'flex-end',
+  },
+  kbAccessoryText: { color: '#30D158', fontSize: 16, fontWeight: '700' },
+
+  historyBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  repeatBtn: {
+    backgroundColor: '#1A3D27',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  repeatBtnText: { color: '#30D158', fontSize: 13, fontWeight: '600' },
 
   deleteAction: {
     backgroundColor: '#FF453A',

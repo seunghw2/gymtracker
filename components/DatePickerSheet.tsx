@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { weekdayKo } from '../lib/date';
 
 type Props = {
   visible: boolean;
@@ -29,6 +30,9 @@ export default function DatePickerSheet({ visible, value, onConfirm, onClose }: 
               <Text style={styles.confirm}>확인</Text>
             </Pressable>
           </View>
+          <Text style={styles.selectedLabel}>
+            {`${temp.getMonth() + 1}월 ${temp.getDate()}일 (${weekdayKo(temp)})`}
+          </Text>
           <DateTimePicker
             value={temp}
             mode="date"
@@ -57,6 +61,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2C2C2E',
   },
   title: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  selectedLabel: { color: '#30D158', fontSize: 15, fontWeight: '600', textAlign: 'center', paddingTop: 12 },
   cancel: { color: '#8E8E93', fontSize: 16 },
   confirm: { color: '#30D158', fontSize: 16, fontWeight: '700' },
   picker: { alignSelf: 'center' },

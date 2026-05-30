@@ -18,6 +18,8 @@ export type SetEntry = {
   estimated_1rm?: number;
   setId?: number;
   setType?: SetType;
+  /** 이 세트가 종목 역대 최고 1RM을 갱신했는지 */
+  isPR?: boolean;
 };
 
 export type ExerciseEntry = {
@@ -31,6 +33,8 @@ export type ExerciseEntry = {
   note?: string | null;
   /** 이번 세션의 그 종목 메모 */
   sessionNote?: string;
+  /** 종목 추가 시점의 역대 최고 1RM (PR 판정 기준, 세션 내 갱신됨) */
+  prevBest1rm?: number;
 };
 
 type WorkoutState = {
@@ -49,12 +53,15 @@ type WorkoutState = {
   setSessionTitle: (title: string) => void;
   finishSession: () => void;
   addExercise: (entry: ExerciseEntry) => void;
+  addExercises: (entries: ExerciseEntry[]) => void;
   updateSet: (exIdx: number, setIdx: number, data: Partial<SetEntry>) => void;
   cycleSetType: (exIdx: number, setIdx: number) => void;
   setExerciseNote: (exIdx: number, note: string) => void;
   setExerciseSessionNote: (exIdx: number, note: string) => void;
+  setExercisePrevBest: (exIdx: number, best: number) => void;
   addSetToExercise: (exIdx: number) => void;
-  markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number) => void;
+  markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number, isPR?: boolean) => void;
+  moveExercise: (exIdx: number, dir: -1 | 1) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
   removeExercise: (exIdx: number) => void;
   startRestTimer: (durationSec: number, info?: { nextLabel?: string }) => void;
@@ -100,6 +107,9 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   addExercise: (entry) =>
     set((state) => ({ exercises: [...state.exercises, entry] })),
 
+  addExercises: (entries) =>
+    set((state) => ({ exercises: [...state.exercises, ...entries] })),
+
   updateSet: (exIdx, setIdx, data) =>
     set((state) => {
       const exercises = state.exercises.map((ex, i) => {
@@ -132,6 +142,20 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       exercises: state.exercises.map((ex, i) => i === exIdx ? { ...ex, sessionNote: note } : ex),
     })),
 
+  setExercisePrevBest: (exIdx, best) =>
+    set((state) => ({
+      exercises: state.exercises.map((ex, i) => i === exIdx ? { ...ex, prevBest1rm: best } : ex),
+    })),
+
+  moveExercise: (exIdx, dir) =>
+    set((state) => {
+      const target = exIdx + dir;
+      if (target < 0 || target >= state.exercises.length) return state;
+      const exercises = [...state.exercises];
+      [exercises[exIdx], exercises[target]] = [exercises[target], exercises[exIdx]];
+      return { exercises };
+    }),
+
   addSetToExercise: (exIdx) =>
     set((state) => {
       const exercises = state.exercises.map((ex, i) => {
@@ -149,12 +173,14 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       return { exercises };
     }),
 
-  markSetDone: (exIdx, setIdx, estimated_1rm, setId) =>
+  markSetDone: (exIdx, setIdx, estimated_1rm, setId, isPR) =>
     set((state) => {
       const exercises = state.exercises.map((ex, i) => {
         if (i !== exIdx) return ex;
-        const sets = ex.sets.map((s, j) => j === setIdx ? { ...s, done: true, estimated_1rm, setId } : s);
-        return { ...ex, sets };
+        const sets = ex.sets.map((s, j) => j === setIdx ? { ...s, done: true, estimated_1rm, setId, isPR: !!isPR } : s);
+        // PR이면 종목 기준 최고치도 갱신
+        const prevBest1rm = isPR ? estimated_1rm : ex.prevBest1rm;
+        return { ...ex, sets, prevBest1rm };
       });
       return { exercises };
     }),
