@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
   getAllWorkoutDates,
 } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
-import WeightDial from '../../components/WeightDial';
+import RulerPicker from '../../components/RulerPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
@@ -120,16 +120,26 @@ export default function HomeScreen() {
     setShowWeightModal(true);
   };
 
-  const handleSaveWeight = async () => {
-    const fat = parseFloat(bodyFatInput);
-    const fatVal = Number.isFinite(fat) && fat > 0 ? fat : undefined;
-    try {
-      await upsertBodyLog(getTodayStr(), dialValue, fatVal);
-    } catch {
-      // 저장 실패해도 모달은 닫아 화면 멈춤 방지
-    }
-    setTodayWeight(dialValue);
-    setTodayBodyFat(fatVal ?? null);
+  // 체중·체지방 변경 시 디바운스 자동 저장 (별도 저장 버튼 없음)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleSave = useCallback((weight: number, fatStr: string) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const fat = parseFloat(fatStr);
+      const fatVal = Number.isFinite(fat) && fat > 0 ? fat : undefined;
+      try {
+        await upsertBodyLog(getTodayStr(), weight, fatVal);
+      } catch {
+        // 저장 실패는 무시 (다음 변경 시 재시도)
+      }
+      setTodayWeight(weight);
+      setTodayBodyFat(fatVal ?? null);
+    }, 400);
+  }, []);
+
+  // 바깥 화면 탭으로 닫기 (오늘은 자동 팝업 재등장 방지)
+  const closeWeightModal = () => {
+    AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {});
     setShowWeightModal(false);
   };
 
@@ -209,19 +219,26 @@ export default function HomeScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* 체중 입력 모달 */}
-      <Modal visible={showWeightModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>오늘의 체중 입력</Text>
-            <Text style={styles.modalSub}>드래그하여 체중을 입력하세요</Text>
-            <WeightDial value={dialValue} onChange={setDialValue} />
+      {/* 체중 입력 모달 — 눈금자 + 자동 저장, 바깥 탭하면 닫힘 */}
+      <Modal visible={showWeightModal} transparent animationType="slide" onRequestClose={closeWeightModal}>
+        <Pressable style={styles.modalOverlay} onPress={closeWeightModal}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>오늘의 체중</Text>
+            <Text style={styles.weightReadout}>{dialValue.toFixed(1)}<Text style={styles.weightUnit}>kg</Text></Text>
+            <RulerPicker
+              initial={dialValue}
+              onChange={v => { setDialValue(v); scheduleSave(v, bodyFatInput); }}
+            />
             <View style={styles.fatRow}>
               <Text style={styles.fatLabel}>체지방률</Text>
               <TextInput
                 style={styles.fatInput}
                 value={bodyFatInput}
-                onChangeText={t => setBodyFatInput(t.replace(/[^0-9.]/g, ''))}
+                onChangeText={t => {
+                  const c = t.replace(/[^0-9.]/g, '');
+                  setBodyFatInput(c);
+                  scheduleSave(dialValue, c);
+                }}
                 keyboardType="decimal-pad"
                 placeholder="선택"
                 placeholderTextColor="#48484A"
@@ -229,14 +246,8 @@ export default function HomeScreen() {
               />
               <Text style={styles.fatUnit}>%</Text>
             </View>
-            <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
-              <Text style={styles.saveBtnText}>저장</Text>
-            </Pressable>
-            <Pressable onPress={() => { AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {}); setShowWeightModal(false); }}>
-              <Text style={styles.skipText}>나중에</Text>
-            </Pressable>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
@@ -313,10 +324,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 28,
+    paddingBottom: 44,
     alignItems: 'center',
   },
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  modalSub: { color: '#8E8E93', fontSize: 14, marginBottom: 8 },
+  weightReadout: { color: '#FFFFFF', fontSize: 56, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
+  weightUnit: { color: '#8E8E93', fontSize: 24, fontWeight: '600' },
   fatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   fatLabel: { color: '#8E8E93', fontSize: 15 },
   fatInput: {
@@ -330,14 +343,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   fatUnit: { color: '#8E8E93', fontSize: 15 },
-  saveBtn: {
-    backgroundColor: '#30D158',
-    borderRadius: 14,
-    paddingHorizontal: 48,
-    paddingVertical: 14,
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  saveBtnText: { color: '#000000', fontSize: 17, fontWeight: '700' },
-  skipText: { color: '#8E8E93', fontSize: 14 },
 });

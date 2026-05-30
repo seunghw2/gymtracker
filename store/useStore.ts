@@ -74,8 +74,6 @@ type WorkoutState = {
   prependWarmupSets: (exIdx: number, warmups: { weight_kg: number; reps: number }[]) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number, isPR?: boolean) => void;
   moveExercise: (exIdx: number, dir: -1 | 1) => void;
-  linkSupersetWithNext: (exIdx: number) => void;
-  unlinkSuperset: (exIdx: number) => void;
   toggleTimeBased: (exIdx: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
   removeExercise: (exIdx: number) => void;
@@ -213,29 +211,6 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
         const prevBest1rm = isPR ? estimated_1rm : ex.prevBest1rm;
         return { ...ex, sets, prevBest1rm };
       });
-      return { exercises };
-    }),
-
-  linkSupersetWithNext: (exIdx) =>
-    set((state) => {
-      if (exIdx < 0 || exIdx + 1 >= state.exercises.length) return state;
-      const cur = state.exercises[exIdx];
-      const maxG = state.exercises.reduce((m, e) => Math.max(m, e.supersetGroup ?? 0), 0);
-      const group = cur.supersetGroup ?? state.exercises[exIdx + 1].supersetGroup ?? maxG + 1;
-      const exercises = state.exercises.map((ex, i) =>
-        (i === exIdx || i === exIdx + 1) ? { ...ex, supersetGroup: group } : ex
-      );
-      return { exercises };
-    }),
-
-  unlinkSuperset: (exIdx) =>
-    set((state) => {
-      const group = state.exercises[exIdx]?.supersetGroup;
-      if (group == null) return state;
-      // 같은 그룹 전체 해제
-      const exercises = state.exercises.map(ex =>
-        ex.supersetGroup === group ? { ...ex, supersetGroup: null } : ex
-      );
       return { exercises };
     }),
 

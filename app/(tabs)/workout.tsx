@@ -58,6 +58,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LAST_GYM_KEY = 'last_gym_id';
 const BODY_TAGS = ['가슴', '등', '어깨', '하체', '팔', '코어', '유산소'];
+
+// 운동 추가 모달에서 선택 가능한 종목(목록·최근 종목 공통)
+type SelectableExercise = {
+  id: number;
+  name: string;
+  brand: string | null;
+  note?: string | null;
+  tracking_type?: TrackingType;
+};
 import {
   MUSCLE_GROUPS,
   EQUIPMENT_TYPES,
@@ -126,7 +135,6 @@ export default function WorkoutScreen() {
     setSessionGym,
     setSessionTags,
     finishSession,
-    addExercise,
     addExercises,
     updateSet,
     cycleSetType,
@@ -137,8 +145,6 @@ export default function WorkoutScreen() {
     prependWarmupSets,
     markSetDone,
     moveExercise,
-    linkSupersetWithNext,
-    unlinkSuperset,
     toggleTimeBased,
     removeSet,
     removeExercise,
@@ -184,6 +190,7 @@ export default function WorkoutScreen() {
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
+  const [selectedToAdd, setSelectedToAdd] = useState<Record<number, SelectableExercise>>({});
   const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
   // 앱 자체 숫자패드 편집 상태
@@ -626,13 +633,22 @@ export default function WorkoutScreen() {
     setSelectedEquipment(null);
     setSelectedBrand(null);
     setSearchText('');
+    setSelectedToAdd({});
     setShowExerciseModal(true);
   };
 
-  const addExerciseToWorkout = async (ex: { id: number; name: string; brand: string | null; note: string | null; tracking_type?: TrackingType }) => {
-    // 연속 추가: 모달을 닫지 않고 첫 단계로 되돌림(뒤로로 닫기)
-    setSelectStep('muscle');
-    setSearchText('');
+  // 다중 선택: 종목을 탭하면 선택 토글(체크 표시), 하단 '추가(N)' 버튼으로 일괄 추가
+  const toggleSelect = (ex: SelectableExercise) => {
+    setSelectedToAdd(prev => {
+      const next = { ...prev };
+      if (next[ex.id]) delete next[ex.id];
+      else next[ex.id] = ex;
+      return next;
+    });
+    Haptics.selectionAsync();
+  };
+
+  const buildExerciseEntry = async (ex: SelectableExercise): Promise<ExerciseEntry> => {
     const timeBased = ex.tracking_type === 'TIME';
     const [prev, rmHist] = await Promise.all([
       getLastSessionSets(ex.id),
@@ -645,8 +661,7 @@ export default function WorkoutScreen() {
     const lastSets = prev.map(s => ({ weight_kg: s.weight_kg, reps: s.reps }));
     // PR 판정 기준: 종목 추가 시점까지의 역대 최고 1RM
     const prevBest1rm = rmHist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
-
-    const entry: ExerciseEntry = {
+    return {
       exerciseId: ex.id,
       exerciseName: ex.name,
       brand: ex.brand,
@@ -657,26 +672,31 @@ export default function WorkoutScreen() {
       prevBest1rm,
       timeBased,
     };
-    addExercise(entry);
   };
 
-  const handleSelectExercise = (ex: Exercise) =>
-    selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout({ ...ex, tracking_type: ex.tracking_type });
-  const handleQuickAdd = (ex: TrainedExercise) =>
-    selectTarget === 'detail' ? addExerciseToDetail(ex) : addExerciseToWorkout(ex);
-
-  // 과거 세션에 종목 추가 (기본 1세트, 지난 기록 있으면 그 값으로)
-  const addExerciseToDetail = async (ex: { id: number; name: string; brand: string | null; tracking_type?: TrackingType }) => {
+  const confirmAddExercises = async () => {
+    const list = Object.values(selectedToAdd);
+    if (list.length === 0) return;
+    if (selectTarget === 'detail') {
+      if (detailSession) {
+        for (const ex of list) {
+          const timeBased = ex.tracking_type === 'TIME';
+          const prev = await getLastSessionSets(ex.id).catch(() => []);
+          const w = timeBased ? 0 : (prev[0]?.weight_kg ?? 60);
+          const r = timeBased ? 0 : (prev[0]?.reps ?? 10);
+          await addWorkoutSet(detailSession.id, ex.id, 1, w, r, epley(w, r), 'NORMAL', null, timeBased ? (prev[0]?.duration_sec ?? 30) : null).catch(() => {});
+        }
+        const sets = await getSessionSets(detailSession.id);
+        setDetailSets(sets);
+        getSessionHistory().then(setHistory);
+      }
+    } else {
+      const entries = await Promise.all(list.map(buildExerciseEntry));
+      addExercises(entries);
+    }
+    setSelectedToAdd({});
     setShowExerciseModal(false);
-    if (!detailSession) return;
-    const timeBased = ex.tracking_type === 'TIME';
-    const prev = await getLastSessionSets(ex.id).catch(() => []);
-    const w = timeBased ? 0 : (prev[0]?.weight_kg ?? 60);
-    const r = timeBased ? 0 : (prev[0]?.reps ?? 10);
-    await addWorkoutSet(detailSession.id, ex.id, 1, w, r, epley(w, r), 'NORMAL', null, timeBased ? (prev[0]?.duration_sec ?? 30) : null).catch(() => {});
-    const sets = await getSessionSets(detailSession.id);
-    setDetailSets(sets);
-    getSessionHistory().then(setHistory);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   // 과거 세션에 세트 추가 (해당 종목 마지막 세트 복사)
@@ -721,7 +741,7 @@ export default function WorkoutScreen() {
     }
     const repsVal = timed ? 0 : s.reps;
     const orm = timed ? 0 : epley(s.weight_kg, s.reps);
-    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, repsVal, orm, s.setType ?? 'NORMAL', ex.supersetGroup ?? null, timed ? (s.durationSec ?? 0) : null);
+    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, repsVal, orm, s.setType ?? 'NORMAL', null, timed ? (s.durationSec ?? 0) : null);
     // PR: 시간기반/워밍업 제외, 종목 역대 최고 1RM을 넘으면
     const isPR = !timed
       && (s.setType ?? 'NORMAL') !== 'WARMUP'
@@ -740,11 +760,6 @@ export default function WorkoutScreen() {
       const cy = cardY.current.get(exIdx);
       if (cy != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, cy - 16), animated: true }), 80);
     }
-
-    // 슈퍼세트: 같은 그룹의 다음 종목이 있으면 휴식 없이 바로 다음 종목으로
-    const nextExSameGroup = ex.supersetGroup != null
-      && exercises[exIdx + 1]?.supersetGroup === ex.supersetGroup;
-    if (nextExSameGroup) return;
 
     const nextSet = ex.sets[setIdx + 1];
     const nextLabel = nextSet ? `${toDisplay(nextSet.weight_kg, unitKg)}${u} × ${nextSet.reps}회` : undefined;
@@ -921,12 +936,15 @@ export default function WorkoutScreen() {
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
                 <View style={styles.chipWrap}>
-                  {recents.slice(0, 8).map(r => (
-                    <Pressable key={r.id} style={styles.chip} onPress={() => handleQuickAdd(r)}>
-                      <Text style={styles.chipText} numberOfLines={1}>{r.name}</Text>
-                      {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
-                    </Pressable>
-                  ))}
+                  {recents.slice(0, 8).map(r => {
+                    const on = !!selectedToAdd[r.id];
+                    return (
+                      <Pressable key={r.id} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleSelect(r)}>
+                        <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>{on ? '✓ ' : ''}{r.name}</Text>
+                        {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -1008,7 +1026,7 @@ export default function WorkoutScreen() {
               e.name.toLowerCase().includes(searchText.trim().toLowerCase())
             )}
             keyExtractor={item => String(item.id)}
-            contentContainerStyle={styles.modalContent}
+            contentContainerStyle={[styles.modalContent, Object.keys(selectedToAdd).length > 0 && { paddingBottom: 110 }]}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <TextInput
@@ -1020,15 +1038,18 @@ export default function WorkoutScreen() {
                 clearButtonMode="while-editing"
               />
             }
-            renderItem={({ item }) => (
-              <Pressable style={styles.exItem} onPress={() => handleSelectExercise(item)}>
-                <View>
-                  <Text style={styles.exName}>{item.name}</Text>
-                  {item.brand && <Text style={styles.exBrand}>{item.brand}</Text>}
-                </View>
-                <Text style={styles.exArrow}>›</Text>
-              </Pressable>
-            )}
+            renderItem={({ item }) => {
+              const on = !!selectedToAdd[item.id];
+              return (
+                <Pressable style={[styles.exItem, on && styles.exItemOn]} onPress={() => toggleSelect(item)}>
+                  <View>
+                    <Text style={styles.exName}>{item.name}</Text>
+                    {item.brand && <Text style={styles.exBrand}>{item.brand}</Text>}
+                  </View>
+                  <Text style={[styles.exArrow, on && styles.exCheck]}>{on ? '✓' : '＋'}</Text>
+                </Pressable>
+              );
+            }}
             ListFooterComponent={
               <Pressable style={styles.customBtn} onPress={() => { setCustomName(''); setSelectStep('custom'); }}>
                 <Text style={styles.customBtnText}>+ 직접 등록</Text>
@@ -1071,6 +1092,15 @@ export default function WorkoutScreen() {
               disabled={!customName.trim()}
             >
               <Text style={styles.saveBtnText}>저장하고 추가</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* 다중 선택 일괄 추가 바 */}
+        {Object.keys(selectedToAdd).length > 0 && (
+          <View style={styles.addBar}>
+            <Pressable style={styles.addBarBtn} onPress={confirmAddExercises}>
+              <Text style={styles.addBarBtnText}>추가 ({Object.keys(selectedToAdd).length}개)</Text>
             </Pressable>
           </View>
         )}
@@ -1405,18 +1435,12 @@ export default function WorkoutScreen() {
             .filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP')
             .reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
 
-          const inSuperset = ex.supersetGroup != null;
-          const hasNext = exIdx < exercises.length - 1;
-
           return (
             <View
               key={exIdx}
-              style={[styles.exerciseCard, inSuperset && styles.exerciseCardSuperset]}
+              style={styles.exerciseCard}
               onLayout={e => cardY.current.set(exIdx, e.nativeEvent.layout.y)}
             >
-              {inSuperset && (
-                <Text style={styles.supersetLabel}>🔗 슈퍼세트</Text>
-              )}
               <View style={styles.exerciseCardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
@@ -1452,17 +1476,6 @@ export default function WorkoutScreen() {
                   </Pressable>
                 </View>
               </View>
-
-              {/* 슈퍼세트 묶기/해제 */}
-              {inSuperset ? (
-                <Pressable style={styles.supersetBtn} onPress={() => unlinkSuperset(exIdx)}>
-                  <Text style={styles.supersetBtnText}>슈퍼세트 해제</Text>
-                </Pressable>
-              ) : hasNext ? (
-                <Pressable style={styles.supersetBtn} onPress={() => linkSupersetWithNext(exIdx)}>
-                  <Text style={styles.supersetBtnText}>🔗 다음 종목과 슈퍼세트로 묶기</Text>
-                </Pressable>
-              ) : null}
 
               {ex.timeBased && (
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
@@ -2081,16 +2094,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   detailTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
-  exerciseCardSuperset: { borderLeftWidth: 3, borderLeftColor: '#5E5CE6' },
-  supersetLabel: { color: '#9D9BF5', fontSize: 12, fontWeight: '700', marginBottom: 6 },
-  supersetBtn: {
-    backgroundColor: '#26263A',
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  supersetBtnText: { color: '#9D9BF5', fontSize: 13, fontWeight: '600' },
   timeBadge: { color: '#0A84FF', fontSize: 12, fontWeight: '700', marginBottom: 6 },
   memoToggle: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2, marginBottom: 6 },
   memoToggleText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
@@ -2213,7 +2216,9 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     maxWidth: '48%',
   },
+  chipOn: { backgroundColor: '#30D158' },
   chipText: { color: '#30D158', fontSize: 14, fontWeight: '600' },
+  chipTextOn: { color: '#0A1F12' },
   chipBrand: { color: '#6E9E7E', fontSize: 11, marginTop: 1 },
   muscleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   muscleBtn: {
@@ -2245,9 +2250,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  exItemOn: { backgroundColor: '#16301F', borderWidth: 1, borderColor: '#30D158' },
   exName: { color: '#FFFFFF', fontSize: 16 },
   exBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
   exArrow: { color: '#8E8E93', fontSize: 24 },
+  exCheck: { color: '#30D158', fontWeight: '800' },
+  addBar: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    padding: 16,
+    paddingBottom: 28,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    borderTopWidth: 1,
+    borderTopColor: '#2C2C2E',
+  },
+  addBarBtn: {
+    backgroundColor: '#30D158',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  addBarBtnText: { color: '#0A1F12', fontSize: 17, fontWeight: '800' },
   customBtn: {
     borderWidth: 1,
     borderColor: '#30D158',
