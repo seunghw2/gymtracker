@@ -537,6 +537,24 @@ export default function WorkoutScreen() {
     commitEdit(edit.exIdx, edit.setIdx, edit.kind, next);
   };
 
+  const handleNumStep = (delta: 1 | -1) => {
+    if (!edit) return;
+    const s = exercises[edit.exIdx]?.sets[edit.setIdx];
+    if (!s) return;
+    let nv: string;
+    if (edit.kind === 'weight') {
+      const cur = parseFloat(editValue);
+      const base = Number.isFinite(cur) ? cur : toDisplay(s.weight_kg, unitKg);
+      nv = String(Math.max(0, Math.round((base + delta * weightStep) * 100) / 100));
+    } else {
+      const cur = parseInt(editValue);
+      const base = Number.isFinite(cur) ? cur : (edit.kind === 'duration' ? (s.durationSec ?? 0) : s.reps);
+      nv = String(Math.max(0, base + delta));
+    }
+    setEditValue(nv);
+    commitEdit(edit.exIdx, edit.setIdx, edit.kind, nv);
+  };
+
   const handleNumNext = () => {
     if (!edit) return;
     const ex = exercises[edit.exIdx];
@@ -1474,22 +1492,15 @@ export default function WorkoutScreen() {
                         )}
                       </Pressable>
                       <View style={{ flex: 1.4 }}>
-                        <View style={styles.stepRow}>
-                          <Pressable style={styles.stepBtn} onPress={() => handleAdjustWeight(exIdx, setIdx, -weightStep)} hitSlop={4}>
-                            <Text style={styles.stepText}>−</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[styles.fieldBtn, activeKind === 'weight' && styles.fieldActive]}
-                            onPress={() => beginEdit(exIdx, setIdx, 'weight')}
-                          >
-                            <Text style={styles.fieldText}>
-                              {activeKind === 'weight' ? (editValue || '0') : String(toDisplay(s.weight_kg, unitKg))}
-                            </Text>
-                          </Pressable>
-                          <Pressable style={styles.stepBtn} onPress={() => handleAdjustWeight(exIdx, setIdx, weightStep)} hitSlop={4}>
-                            <Text style={styles.stepText}>+</Text>
-                          </Pressable>
-                        </View>
+                        <Pressable
+                          style={[styles.fieldBtn, activeKind === 'weight' && styles.fieldActive]}
+                          onPress={() => beginEdit(exIdx, setIdx, 'weight')}
+                        >
+                          <Text style={styles.fieldText}>
+                            {activeKind === 'weight' ? (editValue || '0') : String(toDisplay(s.weight_kg, unitKg))}
+                          </Text>
+                          {activeKind === 'weight' && <View style={styles.caret} />}
+                        </Pressable>
                         {prev && <Text style={styles.prevHint}>이전 {toDisplay(prev.weight_kg, unitKg)}</Text>}
                       </View>
                       <View style={{ flex: 1 }}>
@@ -1501,6 +1512,7 @@ export default function WorkoutScreen() {
                             <Text style={styles.fieldText}>
                               {activeKind === 'duration' ? (editValue || '0') : String(s.durationSec ?? 0)}
                             </Text>
+                            {activeKind === 'duration' && <View style={styles.caret} />}
                           </Pressable>
                         ) : (
                           <Pressable
@@ -1510,6 +1522,7 @@ export default function WorkoutScreen() {
                             <Text style={styles.fieldText}>
                               {activeKind === 'reps' ? (editValue || '0') : String(s.reps)}
                             </Text>
+                            {activeKind === 'reps' && <View style={styles.caret} />}
                           </Pressable>
                         )}
                         {prev && !ex.timeBased && <Text style={styles.prevHint}>×{prev.reps}</Text>}
@@ -1556,6 +1569,8 @@ export default function WorkoutScreen() {
           label={edit.kind === 'weight' ? `무게 (${u})` : edit.kind === 'duration' ? '시간 (초)' : '횟수'}
           onKey={handleNumKey}
           onBackspace={handleNumBackspace}
+          onStep={handleNumStep}
+          onNext={handleNumNext}
           onDone={() => setEdit(null)}
         />
       )}
@@ -1915,10 +1930,10 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   fieldBtn: {
-    flex: 1,
     paddingVertical: 9,
     marginHorizontal: 2,
     borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -1926,6 +1941,7 @@ const styles = StyleSheet.create({
   },
   fieldActive: { borderColor: '#30D158', backgroundColor: '#14331F' },
   fieldText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  caret: { width: 2, height: 20, backgroundColor: '#30D158', marginLeft: 2, borderRadius: 1 },
   prevHint: {
     color: '#6E6E73',
     fontSize: 10,
