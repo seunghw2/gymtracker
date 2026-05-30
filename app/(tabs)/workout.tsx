@@ -55,7 +55,6 @@ import { formatDateWithDay } from '../../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const LAST_GYM_KEY = 'last_gym_id';
 import {
@@ -145,8 +144,6 @@ export default function WorkoutScreen() {
   const { restDurationSec, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
   const elapsed = useElapsedTime(sessionStartTime);
-  const params = useLocalSearchParams<{ openDate?: string }>();
-  const router = useRouter();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [selectStep, setSelectStep] = useState<SelectStep>('muscle');
@@ -774,15 +771,6 @@ export default function WorkoutScreen() {
     setDetailExNotes({});
   };
 
-  // 캘린더에서 날짜 탭으로 넘어온 경우 해당 날짜 세션 상세 열기
-  useEffect(() => {
-    const d = params.openDate;
-    if (d && !activeSessionId && history.length > 0 && !detailSession) {
-      const sess = history.find(s => s.date === d);
-      if (sess) openDetail(sess);
-      router.setParams({ openDate: undefined });
-    }
-  }, [params.openDate, activeSessionId, history]);
 
   const handleRemoveExercise = (exIdx: number) => {
     const ex = exercises[exIdx];
