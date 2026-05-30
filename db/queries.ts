@@ -59,6 +59,7 @@ export type SessionSummary = {
   title: string | null;
   note: string | null;
   gym_id: number | null;
+  tags: string | null;
 };
 
 export type SessionSetRow = {
@@ -105,7 +106,7 @@ type ApiSessionSummary = {
   durationSec: number | null;
   exerciseCount: number; setCount: number;
   exerciseNames: string[];
-  title: string | null; note: string | null; gymId: number | null;
+  title: string | null; note: string | null; gymId: number | null; tags: string | null;
 };
 
 type ApiBodyLog = {
@@ -230,6 +231,7 @@ export type SessionPatch = {
   gymId?: number | null;
   date?: string;
   durationSec?: number;
+  tags?: string;
 };
 
 export async function updateSession(sessionId: number, patch: SessionPatch): Promise<void> {
@@ -303,6 +305,7 @@ export async function getSessionHistory(limit = 30): Promise<SessionSummary[]> {
     title: s.title ?? null,
     note: s.note ?? null,
     gym_id: s.gymId ?? null,
+    tags: s.tags ?? null,
   }));
 }
 

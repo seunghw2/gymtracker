@@ -122,6 +122,11 @@ export default function CalendarScreen() {
         </Text>
       </View>
       {s.title?.trim() ? <Text style={styles.sessionDate}>{formatShortWithDay(s.date)}</Text> : null}
+      {s.tags ? (
+        <View style={styles.tagBadgeRow}>
+          {s.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{t}</Text>)}
+        </View>
+      ) : null}
       {s.exercise_names ? <Text style={styles.sessionExercises} numberOfLines={1}>{s.exercise_names}</Text> : null}
     </Pressable>
   );
@@ -283,6 +288,11 @@ export default function CalendarScreen() {
                 {detailSession.duration_sec ? ` · ${formatDuration(detailSession.duration_sec)}` : ''}
               </Text>
             )}
+            {detailSession?.tags ? (
+              <View style={styles.tagBadgeRow}>
+                {detailSession.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{t}</Text>)}
+              </View>
+            ) : null}
             {detailSession?.note?.trim() ? (
               <Text style={styles.detailNote}>📝 {detailSession.note}</Text>
             ) : null}
@@ -404,6 +414,8 @@ const styles = StyleSheet.create({
   sessionMeta: { color: '#30D158', fontSize: 12, fontWeight: '600' },
   sessionDate: { color: '#8E8E93', fontSize: 12, marginTop: 3 },
   sessionExercises: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
+  tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  tagBadge: { color: '#5AB0FF', fontSize: 11, fontWeight: '600', backgroundColor: '#0A2A4A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
   navArrowDisabled: { color: '#3A3A3C' },
 
   detailOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },

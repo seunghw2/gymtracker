@@ -57,6 +57,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LAST_GYM_KEY = 'last_gym_id';
+const BODY_TAGS = ['가슴', '등', '어깨', '하체', '팔', '코어', '유산소'];
 import {
   MUSCLE_GROUPS,
   EQUIPMENT_TYPES,
@@ -118,9 +119,12 @@ export default function WorkoutScreen() {
     sessionStartTime,
     sessionTitle,
     sessionGymId,
+    sessionTags,
     exercises,
     startSession,
     setSessionTitle,
+    setSessionGym,
+    setSessionTags,
     finishSession,
     addExercise,
     addExercises,
@@ -211,11 +215,6 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
-    // 마지막 사용 헬스장 기본 선택
-    AsyncStorage.getItem(LAST_GYM_KEY).then(v => {
-      const id = v ? parseInt(v, 10) : NaN;
-      if (Number.isFinite(id)) setStartGymId(prev => prev ?? id);
-    }).catch(() => {});
   }, []);
 
   // 운동 중 화면 꺼짐 방지
@@ -234,13 +233,26 @@ export default function WorkoutScreen() {
   const gymName = (id: number | null | undefined) => gyms.find(g => g.id === id)?.name ?? null;
 
   const handleStartWorkout = async () => {
-    const name = startName.trim();
-    const sessionId = await createWorkoutSession(startDate, startGymId, name);
-    startSession(sessionId, startDate, name || null, startGymId);
-    if (startGymId != null) AsyncStorage.setItem(LAST_GYM_KEY, String(startGymId)).catch(() => {});
+    const date = getTodayStr();
+    const sessionId = await createWorkoutSession(date, null, '');
+    startSession(sessionId, date, null, null);
     setSessionNote('');
-    setStartName('');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  // 진행 중 세션 헬스장 선택
+  const handlePickSessionGym = (gymId: number | null) => {
+    setSessionGym(gymId);
+    setShowGymPicker(false);
+    if (gymId != null) AsyncStorage.setItem(LAST_GYM_KEY, String(gymId)).catch(() => {});
+    if (activeSessionId) updateSession(activeSessionId, { gymId }).catch(() => {});
+  };
+
+  // 진행 중 세션 부위 태그 토글
+  const toggleSessionTag = (tag: string) => {
+    const next = sessionTags.includes(tag) ? sessionTags.filter(t => t !== tag) : [...sessionTags, tag];
+    setSessionTags(next);
+    if (activeSessionId) updateSession(activeSessionId, { tags: next.join(',') }).catch(() => {});
   };
 
   // 지난 세션을 그대로 새 운동으로 불러와 시작
@@ -273,12 +285,11 @@ export default function WorkoutScreen() {
         g.sets.push({ setOrder: g.sets.length + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: s.set_type, durationSec: s.duration_sec ?? undefined });
         g.lastSets!.push({ weight_kg: s.weight_kg, reps: s.reps });
       }
-      const date = startDate;
-      const name = startName.trim() || session.title || '';
-      const newId = await createWorkoutSession(date, startGymId, name);
-      startSession(newId, date, name || null, startGymId);
+      const date = getTodayStr();
+      const name = session.title || '';
+      const newId = await createWorkoutSession(date, null, name);
+      startSession(newId, date, name || null, null);
       setSessionNote('');
-      setStartName('');
       const entries = order.map(id => groups[id]);
       addExercises(entries);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -304,12 +315,11 @@ export default function WorkoutScreen() {
       ]);
       const noteMap = new Map(trained.map(t => [t.id, t.note]));
       const typeMap = new Map(trained.map(t => [t.id, t.tracking_type]));
-      const date = startDate;
-      const name = startName.trim() || tpl.name;
-      const newId = await createWorkoutSession(date, startGymId, name);
-      startSession(newId, date, name || null, startGymId);
+      const date = getTodayStr();
+      const name = tpl.name;
+      const newId = await createWorkoutSession(date, null, name);
+      startSession(newId, date, name || null, null);
       setSessionNote('');
-      setStartName('');
       const entries: ExerciseEntry[] = detail.exercises.map(te => {
         const timeBased = typeMap.get(te.exercise_id) === 'TIME';
         const sets: SetEntry[] = Array.from({ length: te.default_sets }, (_, i) => ({
@@ -857,6 +867,29 @@ export default function WorkoutScreen() {
     {}
   );
 
+  const renderGymPicker = () => (
+    <Modal visible={showGymPicker} transparent animationType="slide" onRequestClose={() => setShowGymPicker(false)}>
+      <Pressable style={styles.gymBackdrop} onPress={() => setShowGymPicker(false)}>
+        <Pressable style={styles.gymSheet} onPress={() => {}}>
+          <Text style={styles.gymSheetTitle}>헬스장 선택</Text>
+          <Pressable style={styles.gymItem} onPress={() => handlePickSessionGym(null)}>
+            <Text style={styles.gymItemText}>없음</Text>
+            {sessionGymId === null && <Text style={styles.gymCheck}>✓</Text>}
+          </Pressable>
+          {gyms.map(g => (
+            <Pressable key={g.id} style={styles.gymItem} onPress={() => handlePickSessionGym(g.id)}>
+              <Text style={styles.gymItemText}>{g.name}</Text>
+              {sessionGymId === g.id && <Text style={styles.gymCheck}>✓</Text>}
+            </Pressable>
+          ))}
+          {gyms.length === 0 && (
+            <Text style={styles.gymEmpty}>설정에서 헬스장을 추가하세요</Text>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
   const renderExerciseModal = () => (
     <Modal visible={showExerciseModal} animationType="slide">
       <SafeAreaView style={styles.modalSafe}>
@@ -1050,33 +1083,10 @@ export default function WorkoutScreen() {
       <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.homeContent}>
-          {/* 시작 */}
-          <View style={styles.startBox}>
-            <TextInput
-              style={styles.startNameInput}
-              placeholder="운동 이름 (예: 어깨 운동)"
-              placeholderTextColor="#48484A"
-              value={startName}
-              onChangeText={setStartName}
-            />
-            <View style={styles.startMetaRow}>
-              <Pressable style={styles.startMetaBtn} onPress={() => setShowStartPicker(true)}>
-                <Text style={styles.startMetaText}>{formatDate(startDate)}</Text>
-              </Pressable>
-              <Pressable style={styles.startMetaBtn} onPress={() => setShowGymPicker(true)}>
-                <Text style={styles.startMetaText}>{gymName(startGymId) ?? '헬스장 선택'}</Text>
-              </Pressable>
-            </View>
-            <Pressable style={styles.startBtn} onPress={handleStartWorkout}>
-              <Text style={styles.startBtnText}>운동 시작</Text>
-            </Pressable>
-          </View>
-          <DatePickerSheet
-            visible={showStartPicker}
-            value={startDate}
-            onConfirm={(d) => { setStartDate(d); setShowStartPicker(false); }}
-            onClose={() => setShowStartPicker(false)}
-          />
+          {/* 시작 — 바로 시작, 이름·헬스장·태그는 진행 중에 */}
+          <Pressable style={styles.startBtnBig} onPress={handleStartWorkout}>
+            <Text style={styles.startBtnText}>운동 시작</Text>
+          </Pressable>
 
           {/* 내 루틴 */}
           {templates.length > 0 && (
@@ -1119,6 +1129,13 @@ export default function WorkoutScreen() {
                   <Text style={styles.historyExercises} numberOfLines={1}>
                     {session.exercise_names || '운동 없음'}
                   </Text>
+                  {session.tags ? (
+                    <View style={styles.tagBadgeRow}>
+                      {session.tags.split(',').filter(Boolean).map(t => (
+                        <Text key={t} style={styles.tagBadge}>{t}</Text>
+                      ))}
+                    </View>
+                  ) : null}
                   <View style={styles.historyBottom}>
                     <Text style={styles.historyMeta}>
                       {session.exercise_count}가지 운동 · {session.set_count}세트
@@ -1172,6 +1189,13 @@ export default function WorkoutScreen() {
               />
               {gymName(detailSession?.gym_id) ? (
                 <Text style={styles.detailGym}>📍 {gymName(detailSession?.gym_id)}</Text>
+              ) : null}
+              {detailSession?.tags ? (
+                <View style={styles.tagBadgeRow}>
+                  {detailSession.tags.split(',').filter(Boolean).map(t => (
+                    <Text key={t} style={styles.tagBadge}>{t}</Text>
+                  ))}
+                </View>
               ) : null}
               <TextInput
                 style={styles.detailNoteInput}
@@ -1298,27 +1322,6 @@ export default function WorkoutScreen() {
         {/* 운동 선택 모달 (과거 세션 종목 추가용) */}
         {renderExerciseModal()}
 
-        {/* 헬스장 선택 모달 */}
-        <Modal visible={showGymPicker} transparent animationType="slide" onRequestClose={() => setShowGymPicker(false)}>
-          <Pressable style={styles.gymBackdrop} onPress={() => setShowGymPicker(false)}>
-            <Pressable style={styles.gymSheet} onPress={() => {}}>
-              <Text style={styles.gymSheetTitle}>헬스장 선택</Text>
-              <Pressable style={styles.gymItem} onPress={() => { setStartGymId(null); setShowGymPicker(false); }}>
-                <Text style={styles.gymItemText}>없음</Text>
-                {startGymId === null && <Text style={styles.gymCheck}>✓</Text>}
-              </Pressable>
-              {gyms.map(g => (
-                <Pressable key={g.id} style={styles.gymItem} onPress={() => { setStartGymId(g.id); setShowGymPicker(false); }}>
-                  <Text style={styles.gymItemText}>{g.name}</Text>
-                  {startGymId === g.id && <Text style={styles.gymCheck}>✓</Text>}
-                </Pressable>
-              ))}
-              {gyms.length === 0 && (
-                <Text style={styles.gymEmpty}>설정에서 헬스장을 추가하세요</Text>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
       </SafeAreaView>
       </GestureHandlerRootView>
     );
@@ -1363,6 +1366,19 @@ export default function WorkoutScreen() {
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}>
+        <Pressable style={styles.gymChip} onPress={() => setShowGymPicker(true)}>
+          <Text style={styles.gymChipText}>📍 {gymName(sessionGymId) ?? '헬스장 선택'}</Text>
+        </Pressable>
+        <View style={styles.tagRow}>
+          {BODY_TAGS.map(t => {
+            const on = sessionTags.includes(t);
+            return (
+              <Pressable key={t} style={[styles.tagChip, on && styles.tagChipOn]} onPress={() => toggleSessionTag(t)}>
+                <Text style={[styles.tagChipText, on && styles.tagChipTextOn]}>{t}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
         <TextInput
           style={styles.sessionNoteInput}
           placeholder="세션 메모 (선택)"
@@ -1713,6 +1729,7 @@ export default function WorkoutScreen() {
       </Modal>
 
       {renderExerciseModal()}
+      {renderGymPicker()}
 
     </SafeAreaView>
     </GestureHandlerRootView>
@@ -1752,6 +1769,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   startBtnText: { color: '#000000', fontSize: 16, fontWeight: '700' },
+  startBtnBig: { backgroundColor: '#30D158', borderRadius: 16, paddingVertical: 18, alignItems: 'center', marginBottom: 28 },
 
   historySubDate: { color: '#8E8E93', fontSize: 12, marginBottom: 4 },
   detailTitleInput: {
@@ -1772,6 +1790,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sessionTitleInput: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', paddingVertical: 2 },
+  gymChip: { alignSelf: 'flex-start', backgroundColor: '#2C2C2E', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 8 },
+  gymChipText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  tagChip: { backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  tagChipOn: { backgroundColor: '#0A84FF' },
+  tagChipText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  tagChipTextOn: { color: '#FFFFFF' },
+  tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  tagBadge: { color: '#5AB0FF', fontSize: 11, fontWeight: '600', backgroundColor: '#0A2A4A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
   sessionNoteInput: {
     backgroundColor: '#1C1C1E',
     borderRadius: 12,
