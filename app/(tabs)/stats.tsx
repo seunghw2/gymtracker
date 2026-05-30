@@ -11,12 +11,19 @@ import {
   FlatList,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, TrainedExercise, BodyLog, VolumeStats } from '../../db/queries';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, VolumeRange } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
 
-type Chip = '1RM 성장' | '체중' | '체지방' | '볼륨';
+type Chip = '1RM 성장' | 'PR' | '체중' | '체지방' | '볼륨';
+
+const RANGE_LABELS: { key: VolumeRange; label: string }[] = [
+  { key: 'recent', label: '최근' },
+  { key: 'week', label: '1주' },
+  { key: 'month', label: '1달' },
+  { key: 'quarter', label: '3달' },
+];
 
 const WIDTH = Dimensions.get('window').width - 40;
 
@@ -46,6 +53,9 @@ export default function StatsScreen() {
   const [ormData, setOrmData] = useState<{ date: string; estimated_1rm: number }[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
   const [volume, setVolume] = useState<VolumeStats | null>(null);
+  const [volumeRange, setVolumeRange] = useState<VolumeRange>('recent');
+  const [records, setRecords] = useState<ExerciseRecord[] | null>(null);
+  const [muscleFreq, setMuscleFreq] = useState<MuscleFrequency[]>([]);
   const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
 
@@ -63,10 +73,14 @@ export default function StatsScreen() {
         })
         .catch(() => setTrainedExercises([]));
     }
-    if (activeChip === '볼륨' && !volume) {
-      getVolumeStats().then(setVolume).catch(() => setVolume({ daily: [], byMuscle: [] }));
+    if (activeChip === '볼륨') {
+      getVolumeStats(volumeRange).then(setVolume).catch(() => setVolume({ daily: [], byMuscle: [] }));
+      getMuscleFrequency(8).then(setMuscleFreq).catch(() => setMuscleFreq([]));
     }
-  }, [activeChip, trainedExercises, volume]);
+    if (activeChip === 'PR' && !records) {
+      getRecords().then(setRecords).catch(() => setRecords([]));
+    }
+  }, [activeChip, trainedExercises, volumeRange, records]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -76,7 +90,7 @@ export default function StatsScreen() {
     }
   }, [selectedEx]);
 
-  const chips: Chip[] = ['1RM 성장', '체중', '체지방', '볼륨'];
+  const chips: Chip[] = ['1RM 성장', 'PR', '체중', '체지방', '볼륨'];
 
   const currentWeight = bodyLogs.length > 0 ? bodyLogs[bodyLogs.length - 1].weight_kg ?? 0 : 0;
   const goalProgress = goalWeightKg > 0
@@ -165,6 +179,31 @@ export default function StatsScreen() {
                 />
               </SafeAreaView>
             </Modal>
+          </View>
+        )}
+
+        {activeChip === 'PR' && (
+          <View>
+            {!records ? (
+              <View style={styles.placeholder}><Text style={styles.placeholderText}>불러오는 중…</Text></View>
+            ) : records.length === 0 ? (
+              <View style={styles.placeholder}><Text style={styles.placeholderText}>기록이 없습니다</Text></View>
+            ) : (
+              records.map(r => (
+                <View key={r.exercise_id} style={styles.recordCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.recordName}>{r.name}</Text>
+                    {r.brand && <Text style={styles.recordBrand}>{r.brand}</Text>}
+                  </View>
+                  <View style={styles.recordStats}>
+                    <Text style={styles.recordStat}>🏆 1RM {r.best_1rm ? `${toDisplay(r.best_1rm, unitKg)}${u}` : '-'}</Text>
+                    <Text style={styles.recordSub}>
+                      최고중량 {r.max_weight ? `${toDisplay(r.max_weight, unitKg)}${u}` : '-'} · 최고볼륨 {r.best_session_volume ? `${Math.round(toDisplay(r.best_session_volume, unitKg)).toLocaleString()}${u}` : '-'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         )}
 
@@ -265,6 +304,17 @@ export default function StatsScreen() {
 
         {activeChip === '볼륨' && (
           <View>
+            <View style={styles.rangeRow}>
+              {RANGE_LABELS.map(r => (
+                <Pressable
+                  key={r.key}
+                  style={[styles.rangeBtn, volumeRange === r.key && styles.rangeBtnActive]}
+                  onPress={() => { setVolumeRange(r.key); setVolume(null); }}
+                >
+                  <Text style={[styles.rangeText, volumeRange === r.key && styles.rangeTextActive]}>{r.label}</Text>
+                </Pressable>
+              ))}
+            </View>
             {!volume ? (
               <View style={styles.placeholder}>
                 <Text style={styles.placeholderText}>불러오는 중…</Text>
@@ -275,7 +325,7 @@ export default function StatsScreen() {
               </View>
             ) : (
               <>
-                <Text style={styles.sectionTitle}>일자별 총볼륨 ({u}, 최근 8회)</Text>
+                <Text style={styles.sectionTitle}>일자별 총볼륨 ({u})</Text>
                 <BarChart
                   data={{
                     labels: volume.daily.slice(-8).map(d => d.date.slice(5)),
@@ -308,6 +358,18 @@ export default function StatsScreen() {
                       style={{ borderRadius: 12 }}
                       showValuesOnTopOfBars
                     />
+                  </>
+                )}
+
+                {muscleFreq.length > 0 && (
+                  <>
+                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>부위별 운동 빈도 (최근 8주)</Text>
+                    {muscleFreq.map(m => (
+                      <View key={m.muscle_group} style={styles.freqRow}>
+                        <Text style={styles.freqMuscle}>{m.muscle_group}</Text>
+                        <Text style={styles.freqValue}>{m.session_count}일 · {m.set_count}세트</Text>
+                      </View>
+                    ))}
                   </>
                 )}
               </>
@@ -396,4 +458,37 @@ const styles = StyleSheet.create({
   progressBar: { height: 8, backgroundColor: '#2C2C2E', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#30D158', borderRadius: 4 },
   goalValue: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', marginTop: 8, textAlign: 'center' },
+
+  recordCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 8,
+  },
+  recordName: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  recordBrand: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
+  recordStats: { alignItems: 'flex-end' },
+  recordStat: { color: '#30D158', fontSize: 15, fontWeight: '700' },
+  recordSub: { color: '#8E8E93', fontSize: 11, marginTop: 3, textAlign: 'right' },
+
+  rangeRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
+  rangeBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: '#1C1C1E', alignItems: 'center' },
+  rangeBtnActive: { backgroundColor: '#30D158' },
+  rangeText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  rangeTextActive: { color: '#000000' },
+
+  freqRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 6,
+  },
+  freqMuscle: { color: '#FFFFFF', fontSize: 15 },
+  freqValue: { color: '#30D158', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

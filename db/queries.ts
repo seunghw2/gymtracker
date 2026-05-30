@@ -350,16 +350,44 @@ export type VolumeStats = {
   byMuscle: { muscleGroup: string; volume: number }[];
 };
 
-export async function getVolumeStats(): Promise<VolumeStats> {
+export type VolumeRange = 'recent' | 'week' | 'month' | 'quarter';
+
+export async function getVolumeStats(range: VolumeRange = 'recent'): Promise<VolumeStats> {
   type ApiVolume = {
     daily: { date: string; volume: number }[];
     byMuscle: { muscleGroup: string; volume: number }[];
   };
-  const res = await apiRequest<ApiVolume>('/api/v1/stats/volume');
+  const res = await apiRequest<ApiVolume>(`/api/v1/stats/volume?range=${range}`);
   return {
     daily: res.daily.map(d => ({ date: String(d.date), volume: d.volume })),
     byMuscle: res.byMuscle.map(m => ({ muscleGroup: m.muscleGroup, volume: m.volume })),
   };
+}
+
+export type ExerciseRecord = {
+  exercise_id: number;
+  name: string;
+  brand: string | null;
+  best_1rm: number | null;
+  max_weight: number | null;
+  best_session_volume: number | null;
+};
+
+export async function getRecords(): Promise<ExerciseRecord[]> {
+  type Api = { exerciseId: number; name: string; brand: string | null; best1rm: number | null; maxWeight: number | null; bestSessionVolume: number | null };
+  const list = await apiRequest<Api[]>('/api/v1/stats/records');
+  return list.map(r => ({
+    exercise_id: r.exerciseId, name: r.name, brand: r.brand,
+    best_1rm: r.best1rm, max_weight: r.maxWeight, best_session_volume: r.bestSessionVolume,
+  }));
+}
+
+export type MuscleFrequency = { muscle_group: string; set_count: number; session_count: number };
+
+export async function getMuscleFrequency(weeks = 4): Promise<MuscleFrequency[]> {
+  type Api = { muscleGroup: string; setCount: number; sessionCount: number };
+  const list = await apiRequest<Api[]>(`/api/v1/stats/muscle-frequency?weeks=${weeks}`);
+  return list.map(m => ({ muscle_group: m.muscleGroup, set_count: m.setCount, session_count: m.sessionCount }));
 }
 
 // ─── 신체 기록 ─────────────────────────────────────────────────────────

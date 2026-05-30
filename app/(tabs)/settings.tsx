@@ -25,6 +25,7 @@ import {
 } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { exportWorkoutsCsv } from '../../lib/export';
 
 export default function SettingsScreen() {
   const {
@@ -139,6 +140,19 @@ export default function SettingsScreen() {
   const toggleSoundOnSilent = async (val: boolean) => {
     setSoundOnSilent(val);
     await setSetting('sound_silent_override', val ? '1' : '0');
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await exportWorkoutsCsv();
+    } catch {
+      Alert.alert('내보내기 실패', '잠시 후 다시 시도해주세요.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -303,6 +317,14 @@ export default function SettingsScreen() {
           {gyms.length === 0 && (
             <Text style={styles.emptyText}>등록된 헬스장이 없습니다</Text>
           )}
+        </View>
+
+        {/* 데이터 */}
+        <Text style={styles.sectionTitle}>데이터</Text>
+        <View style={styles.card}>
+          <Pressable style={styles.addBtn} onPress={handleExport} disabled={exporting}>
+            <Text style={styles.addBtnText}>{exporting ? '내보내는 중…' : '운동 기록 CSV 내보내기'}</Text>
+          </Pressable>
         </View>
 
         {/* 커스텀 운동 관리 */}

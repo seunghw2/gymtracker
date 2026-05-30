@@ -80,6 +80,16 @@ export async function apiRequest<T = unknown>(path: string, opts: RequestOpts = 
   return data as T;
 }
 
+/** 원시 텍스트(예: CSV) 응답용. 인증 헤더 포함. */
+export async function apiText(path: string): Promise<string> {
+  const headers: Record<string, string> = {};
+  const token = await tokenStore.getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_URL}${path}`, { headers });
+  if (!res.ok) throw new ApiException(res.status, { code: 'UNKNOWN', message: '내보내기 실패' });
+  return res.text();
+}
+
 // 도메인별 wrapper
 export const authApi = {
   signup: (email: string, password: string, name: string) =>
