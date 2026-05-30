@@ -36,11 +36,16 @@ import {
   getSessionExerciseNotes,
   getTrainedExercises,
   get1RMHistory,
+  getTemplates,
+  getTemplate,
+  createTemplate,
+  deleteTemplate,
   getGyms,
   Exercise,
   SessionSummary,
   SessionSetRow,
   TrainedExercise,
+  TemplateSummary,
   Gym,
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
@@ -158,6 +163,7 @@ export default function WorkoutScreen() {
   const [recents, setRecents] = useState<TrainedExercise[]>([]);
   const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
   const [repeatLoading, setRepeatLoading] = useState(false);
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -175,6 +181,7 @@ export default function WorkoutScreen() {
   useEffect(() => {
     if (!activeSessionId) {
       getSessionHistory().then(setHistory);
+      getTemplates().then(setTemplates).catch(() => {});
     }
   }, [activeSessionId]);
 
@@ -245,6 +252,81 @@ export default function WorkoutScreen() {
     } finally {
       setRepeatLoading(false);
     }
+  };
+
+  // 루틴(템플릿)으로 새 운동 시작
+  const handleStartTemplate = async (tpl: TemplateSummary) => {
+    if (repeatLoading) return;
+    setRepeatLoading(true);
+    try {
+      const [detail, trained] = await Promise.all([
+        getTemplate(tpl.id),
+        getTrainedExercises().catch(() => [] as TrainedExercise[]),
+      ]);
+      const noteMap = new Map(trained.map(t => [t.id, t.note]));
+      const date = startDate;
+      const name = startName.trim() || tpl.name;
+      const newId = await createWorkoutSession(date, startGymId, name);
+      startSession(newId, date, name || null, startGymId);
+      setSessionNote('');
+      setStartName('');
+      const entries: ExerciseEntry[] = detail.exercises.map(te => {
+        const sets: SetEntry[] = Array.from({ length: te.default_sets }, (_, i) => ({
+          setOrder: i + 1, weight_kg: te.default_weight_kg, reps: te.default_reps, done: false, setType: 'NORMAL',
+        }));
+        return {
+          exerciseId: te.exercise_id, exerciseName: te.name, brand: te.brand,
+          sets, lastSets: [], note: noteMap.get(te.exercise_id) ?? null, sessionNote: '',
+        };
+      });
+      addExercises(entries);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const bests = await Promise.all(detail.exercises.map(te => get1RMHistory(te.exercise_id).catch(() => [])));
+      bests.forEach((hist, idx) => {
+        const best = hist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
+        if (best > 0) setExercisePrevBest(idx, best);
+      });
+    } finally {
+      setRepeatLoading(false);
+    }
+  };
+
+  // 현재 진행 중인 운동을 루틴으로 저장
+  const handleSaveAsTemplate = () => {
+    if (exercises.length === 0) {
+      Alert.alert('루틴 저장', '종목을 먼저 추가하세요.');
+      return;
+    }
+    Alert.prompt?.('루틴 저장', '루틴 이름을 입력하세요', async (name?: string) => {
+      const trimmed = (name ?? '').trim();
+      if (!trimmed) return;
+      const payload = exercises.map(ex => {
+        const working = ex.sets.filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP');
+        const ref = working[0] ?? ex.sets[0];
+        return {
+          exerciseId: ex.exerciseId,
+          sets: Math.max(1, working.length || ex.sets.length),
+          reps: ref?.reps ?? 10,
+          weightKg: ref?.weight_kg ?? 0,
+        };
+      });
+      try {
+        await createTemplate(trimmed, payload);
+        Alert.alert('저장됨', `"${trimmed}" 루틴이 저장되었습니다.`);
+      } catch {
+        Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
+      }
+    }, 'plain-text', sessionTitle ?? '');
+  };
+
+  const handleDeleteTemplate = (tpl: TemplateSummary) => {
+    Alert.alert('루틴 삭제', `"${tpl.name}"을(를) 삭제할까요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: async () => {
+        await deleteTemplate(tpl.id).catch(() => {});
+        getTemplates().then(setTemplates).catch(() => {});
+      } },
+    ]);
   };
 
   const handleFinishWorkout = () => {
@@ -547,10 +629,33 @@ export default function WorkoutScreen() {
             onClose={() => setShowStartPicker(false)}
           />
 
+          {/* 내 루틴 */}
+          {templates.length > 0 && (
+            <>
+              <Text style={styles.historyTitle}>내 루틴</Text>
+              {templates.map(tpl => (
+                <View key={tpl.id} style={styles.templateCard}>
+                  <Pressable style={{ flex: 1 }} onPress={() => handleStartTemplate(tpl)} disabled={repeatLoading}>
+                    <Text style={styles.templateName}>{tpl.name}</Text>
+                    <Text style={styles.templateMeta} numberOfLines={1}>
+                      {tpl.exercise_names.join(', ') || '비어있음'} · {tpl.exercise_count}종목
+                    </Text>
+                  </Pressable>
+                  <Pressable style={styles.templateStartBtn} onPress={() => handleStartTemplate(tpl)} disabled={repeatLoading}>
+                    <Text style={styles.templateStartText}>시작</Text>
+                  </Pressable>
+                  <Pressable onPress={() => handleDeleteTemplate(tpl)} hitSlop={8} style={styles.templateDelBtn}>
+                    <Text style={styles.templateDelText}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </>
+          )}
+
           {/* 히스토리 */}
           {history.length > 0 && (
             <>
-              <Text style={styles.historyTitle}>지난 루틴</Text>
+              <Text style={styles.historyTitle}>지난 운동</Text>
               {history.map(session => (
                 <Pressable key={session.id} style={styles.historyCard} onPress={() => openDetail(session)}>
                   <View style={styles.historyCardTop}>
@@ -954,6 +1059,12 @@ export default function WorkoutScreen() {
         <Pressable style={styles.addExerciseBtn} onPress={openExerciseSelect}>
           <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
         </Pressable>
+
+        {exercises.length > 0 && (
+          <Pressable style={styles.saveTemplateBtn} onPress={handleSaveAsTemplate}>
+            <Text style={styles.saveTemplateText}>⭐ 이 구성을 루틴으로 저장</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
       {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
@@ -1419,6 +1530,30 @@ const styles = StyleSheet.create({
   },
   kbAccessoryText: { color: '#30D158', fontSize: 16, fontWeight: '700' },
 
+  templateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 8,
+  },
+  templateName: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  templateMeta: { color: '#8E8E93', fontSize: 12, marginTop: 3 },
+  templateStartBtn: { backgroundColor: '#30D158', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 8 },
+  templateStartText: { color: '#000000', fontSize: 14, fontWeight: '700' },
+  templateDelBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' },
+  templateDelText: { color: '#8E8E93', fontSize: 13, fontWeight: '700' },
+  saveTemplateBtn: {
+    borderWidth: 1,
+    borderColor: '#FF9F0A',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  saveTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',
