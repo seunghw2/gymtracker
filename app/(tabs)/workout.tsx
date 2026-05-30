@@ -494,21 +494,9 @@ export default function WorkoutScreen() {
     setEdit({ exIdx, setIdx, kind });
     setEditValue(fieldValueStr(s, kind));
     Haptics.selectionAsync();
-    // 활성 세트 행을 숫자패드 바로 위로 스크롤
-    setTimeout(() => {
-      const row = rowRefs.current.get(`${exIdx}-${setIdx}`);
-      const scrollNode = findNodeHandle(scrollRef.current);
-      if (row && scrollNode) {
-        row.measureLayout(
-          scrollNode,
-          (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 90), animated: true }),
-          () => {
-            const cy = cardY.current.get(exIdx);
-            if (cy != null) scrollRef.current?.scrollTo({ y: Math.max(0, cy - 70), animated: true });
-          },
-        );
-      }
-    }, 60);
+    // 활성 종목 카드를 화면 상단 쪽으로 스크롤(숫자패드 가림 방지)
+    const cy = cardY.current.get(exIdx);
+    if (cy != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, cy - 16), animated: true }), 60);
   };
 
   const commitEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration', valStr: string) => {
