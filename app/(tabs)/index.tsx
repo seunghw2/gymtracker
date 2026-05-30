@@ -19,6 +19,9 @@ import {
 } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import WeightDial from '../../components/WeightDial';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -92,7 +95,9 @@ export default function HomeScreen() {
       setTodayWeight(todayLog.weight_kg);
       setTodayBodyFat(todayLog.body_fat_pct ?? null);
     } else {
-      setShowWeightModal(true);
+      // 오늘 이미 "나중에"로 닫았으면 다시 자동으로 띄우지 않음
+      const dismissed = await AsyncStorage.getItem(WEIGHT_PROMPT_KEY).catch(() => null);
+      if (dismissed !== today) setShowWeightModal(true);
       setDialValue(latestLog?.weight_kg ?? 70);
       setBodyFatInput(latestLog?.body_fat_pct ? String(latestLog.body_fat_pct) : '');
     }
@@ -129,9 +134,10 @@ export default function HomeScreen() {
   };
 
   const currentWeight = todayWeight ?? dialValue;
-  const progress = goalWeightKg > 0
-    ? Math.max(0, Math.min(1, (currentWeight - goalWeightKg) / (100 - goalWeightKg)))
-    : 0;
+  const goalDiff = currentWeight - goalWeightKg; // +면 감량 목표, -면 증량 목표
+  const goalReached = Math.abs(goalDiff) < 0.1;
+  // 목표 근접도(방향 무관): 10kg 이내일수록 채워짐
+  const goalFraction = Math.max(0, Math.min(1, 1 - Math.abs(goalDiff) / 10));
 
   const days = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -164,12 +170,14 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${(1 - progress) * 100}%` }]} />
+            <View style={[styles.progressFill, { width: `${goalFraction * 100}%` }]} />
           </View>
           <Text style={styles.progressHint}>
-            {todayWeight && todayWeight > goalWeightKg
-              ? `목표까지 ${(todayWeight - goalWeightKg).toFixed(1)} kg 남음`
-              : '목표 달성!'}
+            {!todayWeight
+              ? '체중을 입력하세요'
+              : goalReached
+                ? '목표 달성! 🎉'
+                : `목표까지 ${Math.abs(goalDiff).toFixed(1)} kg ${goalDiff > 0 ? '감량' : '증량'}`}
           </Text>
           {todayBodyFat != null && (
             <Text style={styles.fatHint}>
@@ -224,7 +232,7 @@ export default function HomeScreen() {
             <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
               <Text style={styles.saveBtnText}>저장</Text>
             </Pressable>
-            <Pressable onPress={() => setShowWeightModal(false)}>
+            <Pressable onPress={() => { AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {}); setShowWeightModal(false); }}>
               <Text style={styles.skipText}>나중에</Text>
             </Pressable>
           </View>

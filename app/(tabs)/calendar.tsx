@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { getWorkoutDates, getMonthStats, getAllWorkoutDates } from '../../db/queries';
 
 function calcStreak(dates: string[]): number {
@@ -45,6 +46,7 @@ function formatDuration(sec: number): string {
 }
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -124,7 +126,12 @@ export default function CalendarScreen() {
             const isToday = dateStr === today;
             const hasWorkout = workoutDates.includes(dateStr);
             return (
-              <View key={idx} style={styles.cell}>
+              <Pressable
+                key={idx}
+                style={styles.cell}
+                disabled={!hasWorkout}
+                onPress={() => router.push({ pathname: '/(tabs)/workout', params: { openDate: dateStr } })}
+              >
                 <View style={[
                   styles.dayCircle,
                   hasWorkout && styles.dayCircleWorkout,
@@ -138,7 +145,7 @@ export default function CalendarScreen() {
                     {day}
                   </Text>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>

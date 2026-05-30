@@ -9,6 +9,7 @@ import {
   Dimensions,
   Modal,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, VolumeRange } from '../../db/queries';
@@ -55,6 +56,8 @@ export default function StatsScreen() {
   const [volume, setVolume] = useState<VolumeStats | null>(null);
   const [volumeRange, setVolumeRange] = useState<VolumeRange>('recent');
   const [records, setRecords] = useState<ExerciseRecord[] | null>(null);
+  const [recordSearch, setRecordSearch] = useState('');
+  const [recordSort, setRecordSort] = useState<'1rm' | 'name'>('1rm');
   const [muscleFreq, setMuscleFreq] = useState<MuscleFrequency[]>([]);
   const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
@@ -184,12 +187,36 @@ export default function StatsScreen() {
 
         {activeChip === 'PR' && (
           <View>
+            {records && records.length > 0 && (
+              <>
+                <TextInput
+                  style={styles.recordSearch}
+                  placeholder="종목 검색"
+                  placeholderTextColor="#48484A"
+                  value={recordSearch}
+                  onChangeText={setRecordSearch}
+                  clearButtonMode="while-editing"
+                />
+                <View style={styles.recordSortRow}>
+                  {([['1rm', '최고 1RM순'], ['name', '이름순']] as const).map(([key, label]) => (
+                    <Pressable key={key} style={[styles.recordSortBtn, recordSort === key && styles.recordSortOn]} onPress={() => setRecordSort(key)}>
+                      <Text style={[styles.recordSortText, recordSort === key && styles.recordSortTextOn]}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
             {!records ? (
               <View style={styles.placeholder}><Text style={styles.placeholderText}>불러오는 중…</Text></View>
             ) : records.length === 0 ? (
               <View style={styles.placeholder}><Text style={styles.placeholderText}>기록이 없습니다</Text></View>
             ) : (
-              records.map(r => (
+              records
+                .filter(r => r.name.toLowerCase().includes(recordSearch.trim().toLowerCase()))
+                .sort((a, b) => recordSort === 'name'
+                  ? a.name.localeCompare(b.name)
+                  : (b.best_1rm ?? 0) - (a.best_1rm ?? 0))
+                .map(r => (
                 <View key={r.exercise_id} style={styles.recordCard}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.recordName}>{r.name}</Text>
@@ -472,6 +499,12 @@ const styles = StyleSheet.create({
   recordStats: { alignItems: 'flex-end' },
   recordStat: { color: '#30D158', fontSize: 15, fontWeight: '700' },
   recordSub: { color: '#8E8E93', fontSize: 11, marginTop: 3, textAlign: 'right' },
+  recordSearch: { backgroundColor: '#1C1C1E', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: '#FFFFFF', fontSize: 15, marginBottom: 10 },
+  recordSortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  recordSortBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, backgroundColor: '#1C1C1E' },
+  recordSortOn: { backgroundColor: '#30D158' },
+  recordSortText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  recordSortTextOn: { color: '#000000' },
 
   rangeRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   rangeBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: '#1C1C1E', alignItems: 'center' },

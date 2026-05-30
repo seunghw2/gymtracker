@@ -54,6 +54,10 @@ import DatePickerSheet from '../../components/DatePickerSheet';
 import { formatDateWithDay } from '../../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+
+const LAST_GYM_KEY = 'last_gym_id';
 import {
   MUSCLE_GROUPS,
   EQUIPMENT_TYPES,
@@ -141,6 +145,8 @@ export default function WorkoutScreen() {
   const { restDurationSec, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
   const elapsed = useElapsedTime(sessionStartTime);
+  const params = useLocalSearchParams<{ openDate?: string }>();
+  const router = useRouter();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [selectStep, setSelectStep] = useState<SelectStep>('muscle');
@@ -175,6 +181,7 @@ export default function WorkoutScreen() {
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
+  const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
@@ -207,6 +214,11 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
+    // 마지막 사용 헬스장 기본 선택
+    AsyncStorage.getItem(LAST_GYM_KEY).then(v => {
+      const id = v ? parseInt(v, 10) : NaN;
+      if (Number.isFinite(id)) setStartGymId(prev => prev ?? id);
+    }).catch(() => {});
   }, []);
 
   // 운동 중 화면 꺼짐 방지
@@ -228,9 +240,9 @@ export default function WorkoutScreen() {
     const name = startName.trim();
     const sessionId = await createWorkoutSession(startDate, startGymId, name);
     startSession(sessionId, startDate, name || null, startGymId);
+    if (startGymId != null) AsyncStorage.setItem(LAST_GYM_KEY, String(startGymId)).catch(() => {});
     setSessionNote('');
     setStartName('');
-    setStartGymId(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -611,7 +623,9 @@ export default function WorkoutScreen() {
   };
 
   const addExerciseToWorkout = async (ex: { id: number; name: string; brand: string | null; note: string | null; tracking_type?: TrackingType }) => {
-    setShowExerciseModal(false);
+    // 연속 추가: 모달을 닫지 않고 첫 단계로 되돌림(뒤로로 닫기)
+    setSelectStep('muscle');
+    setSearchText('');
     const timeBased = ex.tracking_type === 'TIME';
     const [prev, rmHist] = await Promise.all([
       getLastSessionSets(ex.id),
@@ -693,6 +707,11 @@ export default function WorkoutScreen() {
     const ex = exercises[exIdx];
     const s = ex.sets[setIdx];
     const timed = !!ex.timeBased;
+    // 빈 세트 방지: 시간기반은 시간, 그 외는 횟수 필요(무게 0은 맨몸운동 허용)
+    if (timed ? (s.durationSec ?? 0) <= 0 : s.reps <= 0) {
+      Alert.alert('입력 확인', timed ? '시간(초)을 입력하세요.' : '횟수를 입력하세요.');
+      return;
+    }
     const repsVal = timed ? 0 : s.reps;
     const orm = timed ? 0 : epley(s.weight_kg, s.reps);
     const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, repsVal, orm, s.setType ?? 'NORMAL', ex.supersetGroup ?? null, timed ? (s.durationSec ?? 0) : null);
@@ -708,6 +727,13 @@ export default function WorkoutScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
+    // 같은 종목에 남은 미완료 세트가 있으면 해당 카드를 보기 좋게 스크롤(키보드는 안 띄움)
+    const hasMore = ex.sets.some((st, j) => j !== setIdx && !st.done);
+    if (hasMore) {
+      const cy = cardY.current.get(exIdx);
+      if (cy != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, cy - 16), animated: true }), 80);
+    }
+
     // 슈퍼세트: 같은 그룹의 다음 종목이 있으면 휴식 없이 바로 다음 종목으로
     const nextExSameGroup = ex.supersetGroup != null
       && exercises[exIdx + 1]?.supersetGroup === ex.supersetGroup;
@@ -715,7 +741,8 @@ export default function WorkoutScreen() {
 
     const nextSet = ex.sets[setIdx + 1];
     const nextLabel = nextSet ? `${toDisplay(nextSet.weight_kg, unitKg)}${u} × ${nextSet.reps}회` : undefined;
-    const restSec = await getExerciseRest(ex.exerciseId, restDurationSec);
+    // 워밍업 세트는 짧은 휴식(30초), 그 외는 종목 기본값
+    const restSec = (s.setType ?? 'NORMAL') === 'WARMUP' ? 30 : await getExerciseRest(ex.exerciseId, restDurationSec);
     startRestTimer(restSec, { nextLabel });
   };
 
@@ -746,6 +773,16 @@ export default function WorkoutScreen() {
     setDetailSession(null);
     setDetailExNotes({});
   };
+
+  // 캘린더에서 날짜 탭으로 넘어온 경우 해당 날짜 세션 상세 열기
+  useEffect(() => {
+    const d = params.openDate;
+    if (d && !activeSessionId && history.length > 0 && !detailSession) {
+      const sess = history.find(s => s.date === d);
+      if (sess) openDetail(sess);
+      router.setParams({ openDate: undefined });
+    }
+  }, [params.openDate, activeSessionId, history]);
 
   const handleRemoveExercise = (exIdx: number) => {
     const ex = exercises[exIdx];
@@ -1427,26 +1464,33 @@ export default function WorkoutScreen() {
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
-              {/* 종목 영구 메모 (모든 세션 공통) */}
-              <TextInput
-                style={styles.exNoteInput}
-                placeholder="📌 종목 메모 (예: 손목 각도 주의 — 항상 표시)"
-                placeholderTextColor="#48484A"
-                value={ex.note ?? ''}
-                onChangeText={t => setExerciseNote(exIdx, t)}
-                onEndEditing={() => handleExerciseNoteBlur(exIdx)}
-                multiline
-              />
-              {/* 이번 세션의 종목 메모 */}
-              <TextInput
-                style={styles.exSessionNoteInput}
-                placeholder="📝 오늘 메모 (이 세션만)"
-                placeholderTextColor="#48484A"
-                value={ex.sessionNote ?? ''}
-                onChangeText={t => setExerciseSessionNote(exIdx, t)}
-                onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
-                multiline
-              />
+              {/* 메모 (기본 접힘 — 내용 있으면 자동 펼침) */}
+              {(memoOpen[exIdx] || ex.note || ex.sessionNote) ? (
+                <>
+                  <TextInput
+                    style={styles.exNoteInput}
+                    placeholder="📌 종목 메모 (항상 표시)"
+                    placeholderTextColor="#48484A"
+                    value={ex.note ?? ''}
+                    onChangeText={t => setExerciseNote(exIdx, t)}
+                    onEndEditing={() => handleExerciseNoteBlur(exIdx)}
+                    multiline
+                  />
+                  <TextInput
+                    style={styles.exSessionNoteInput}
+                    placeholder="📝 오늘 메모 (이 세션만)"
+                    placeholderTextColor="#48484A"
+                    value={ex.sessionNote ?? ''}
+                    onChangeText={t => setExerciseSessionNote(exIdx, t)}
+                    onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
+                    multiline
+                  />
+                </>
+              ) : (
+                <Pressable style={styles.memoToggle} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: true }))}>
+                  <Text style={styles.memoToggleText}>＋ 메모</Text>
+                </Pressable>
+              )}
 
               <View style={styles.setHeader}>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
@@ -1558,7 +1602,7 @@ export default function WorkoutScreen() {
       </ScrollView>
 
       {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
-      <View style={styles.restDock} pointerEvents="box-none">
+      <View style={[styles.restDock, edit && styles.restDockEditing]} pointerEvents="box-none">
         <RestTimer />
       </View>
 
@@ -1824,6 +1868,7 @@ const styles = StyleSheet.create({
   scrollContentRest: { paddingBottom: 220 },
   scrollContentEditing: { paddingBottom: 300 },
   restDock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  restDockEditing: { bottom: 252 },
 
   emptyHint: { alignItems: 'center', paddingVertical: 40 },
   emptyHintText: { color: '#48484A', fontSize: 15 },
@@ -1894,7 +1939,11 @@ const styles = StyleSheet.create({
   setRowDone: { opacity: 0.45 },
   setRowWarmup: { backgroundColor: '#2A2620' },
   setNum: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
-  setNumText: { color: '#8E8E93', textAlign: 'center', fontSize: 14 },
+  setNumText: {
+    color: '#AEAEB2', textAlign: 'center', fontSize: 13, fontWeight: '600',
+    minWidth: 26, paddingVertical: 3,
+    borderWidth: 1, borderColor: '#48484A', borderRadius: 6, overflow: 'hidden',
+  },
   setTypeBadge: {
     fontSize: 13,
     fontWeight: '800',
@@ -2028,6 +2077,8 @@ const styles = StyleSheet.create({
   },
   supersetBtnText: { color: '#9D9BF5', fontSize: 13, fontWeight: '600' },
   timeBadge: { color: '#0A84FF', fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  memoToggle: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2, marginBottom: 6 },
+  memoToggleText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',

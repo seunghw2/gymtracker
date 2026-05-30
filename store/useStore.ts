@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type SetType = 'NORMAL' | 'WARMUP' | 'DROP' | 'FAILURE';
 
@@ -94,7 +96,7 @@ type SettingsState = {
   setSoundOnSilent: (on: boolean) => void;
 };
 
-export const useWorkoutStore = create<WorkoutState>((set) => ({
+export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
   activeSessionId: null,
   sessionDate: null,
   sessionStartTime: null,
@@ -284,6 +286,18 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
     }),
 
   stopRestTimer: () => set({ restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
+}), {
+  name: 'workout-session',
+  storage: createJSONStorage(() => AsyncStorage),
+  // 진행 중 세션만 복구(휴식 타이머 상태는 제외 — 재시작 시 과거 시각 발화 방지)
+  partialize: (s) => ({
+    activeSessionId: s.activeSessionId,
+    sessionDate: s.sessionDate,
+    sessionStartTime: s.sessionStartTime,
+    sessionTitle: s.sessionTitle,
+    sessionGymId: s.sessionGymId,
+    exercises: s.exercises,
+  }),
 }));
 
 export const useSettingsStore = create<SettingsState>((set) => ({
