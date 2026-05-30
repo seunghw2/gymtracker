@@ -61,6 +61,7 @@ import {
 } from '../../constants/exercises';
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
 import RestTimer from '../../components/RestTimer';
+import NumPad from '../../components/NumPad';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
 
@@ -173,7 +174,11 @@ export default function WorkoutScreen() {
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
-  const weightInputRefs = useRef<Map<string, TextInput>>(new Map());
+  // 앱 자체 숫자패드 편집 상태
+  const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const cardY = useRef<Map<number, number>>(new Map());
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -471,6 +476,75 @@ export default function WorkoutScreen() {
     if (s.done && s.setId) updateWorkoutSet(s.setId, newKg, s.reps, s.setType ?? 'NORMAL').catch(() => {});
   };
 
+  // ── 앱 자체 숫자패드 ──────────────────────────────────────────
+  const fieldValueStr = (s: SetEntry, kind: 'weight' | 'reps' | 'duration') => {
+    if (kind === 'weight') return String(toDisplay(s.weight_kg, unitKg));
+    if (kind === 'duration') return String(s.durationSec ?? 0);
+    return String(s.reps);
+  };
+
+  const beginEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration') => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (!s) return;
+    setEdit({ exIdx, setIdx, kind });
+    setEditValue(fieldValueStr(s, kind));
+    Haptics.selectionAsync();
+    // 활성 종목 카드를 숫자패드 위로 스크롤
+    const y = cardY.current.get(exIdx);
+    if (y != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - 70), animated: true }), 50);
+  };
+
+  const commitEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration', valStr: string) => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (!s) return;
+    if (kind === 'weight') {
+      const kg = fromInput(parseFloat(valStr) || 0, unitKg);
+      updateSet(exIdx, setIdx, { weight_kg: kg, estimated_1rm: epley(kg, s.reps) });
+      if (s.done && s.setId) updateWorkoutSet(s.setId, kg, s.reps, s.setType ?? 'NORMAL').catch(() => {});
+    } else if (kind === 'reps') {
+      const reps = parseInt(valStr) || 0;
+      updateSet(exIdx, setIdx, { reps, estimated_1rm: epley(s.weight_kg, reps) });
+      if (s.done && s.setId) updateWorkoutSet(s.setId, s.weight_kg, reps, s.setType ?? 'NORMAL').catch(() => {});
+    } else {
+      updateSet(exIdx, setIdx, { durationSec: parseInt(valStr) || 0 });
+    }
+  };
+
+  const handleNumKey = (d: string) => {
+    if (!edit) return;
+    const allowDecimal = edit.kind === 'weight';
+    let next = editValue;
+    if (d === '.') {
+      if (!allowDecimal || next.includes('.')) return;
+      next = next === '' ? '0.' : next + '.';
+    } else {
+      next = (next === '0' ? '' : next) + d;
+    }
+    if (next.replace('.', '').length > 5) return;
+    setEditValue(next);
+    commitEdit(edit.exIdx, edit.setIdx, edit.kind, next);
+  };
+
+  const handleNumBackspace = () => {
+    if (!edit) return;
+    const next = editValue.slice(0, -1);
+    setEditValue(next);
+    commitEdit(edit.exIdx, edit.setIdx, edit.kind, next);
+  };
+
+  const handleNumNext = () => {
+    if (!edit) return;
+    const ex = exercises[edit.exIdx];
+    const repsKind: 'reps' | 'duration' = ex?.timeBased ? 'duration' : 'reps';
+    if (edit.kind === 'weight') {
+      beginEdit(edit.exIdx, edit.setIdx, repsKind);
+    } else {
+      // 다음 세트의 무게로
+      if (ex && edit.setIdx + 1 < ex.sets.length) beginEdit(edit.exIdx, edit.setIdx + 1, 'weight');
+      else setEdit(null);
+    }
+  };
+
   // 세트번호 길게눌러 타입 직접 선택
   const handleSetTypeLongPress = (exIdx: number, setIdx: number) => {
     const s = exercises[exIdx]?.sets[setIdx];
@@ -606,12 +680,6 @@ export default function WorkoutScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-
-    // 같은 종목의 다음 미완료 세트 입력으로 포커스 이동
-    const nextIdx = ex.sets.findIndex((st, j) => j > setIdx && !st.done);
-    if (nextIdx >= 0) {
-      setTimeout(() => weightInputRefs.current.get(`${exIdx}-${nextIdx}`)?.focus(), 60);
     }
 
     // 슈퍼세트: 같은 그룹의 다음 종목이 있으면 휴식 없이 바로 다음 종목으로
@@ -1150,6 +1218,17 @@ export default function WorkoutScreen() {
           </SafeAreaView>
         </Modal>
 
+        {/* 과거 세션 입력 키보드 완료 버튼 */}
+        {Platform.OS === 'ios' && (
+          <InputAccessoryView nativeID={KB_ACCESSORY_ID}>
+            <View style={styles.kbAccessory}>
+              <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8}>
+                <Text style={styles.kbAccessoryText}>완료</Text>
+              </Pressable>
+            </View>
+          </InputAccessoryView>
+        )}
+
         {/* 운동 선택 모달 (과거 세션 종목 추가용) */}
         {renderExerciseModal()}
 
@@ -1217,7 +1296,7 @@ export default function WorkoutScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest]}>
+      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}>
         <TextInput
           style={styles.sessionNoteInput}
           placeholder="세션 메모 (선택)"
@@ -1248,7 +1327,11 @@ export default function WorkoutScreen() {
           const hasNext = exIdx < exercises.length - 1;
 
           return (
-            <View key={exIdx} style={[styles.exerciseCard, inSuperset && styles.exerciseCardSuperset]}>
+            <View
+              key={exIdx}
+              style={[styles.exerciseCard, inSuperset && styles.exerciseCardSuperset]}
+              onLayout={e => cardY.current.set(exIdx, e.nativeEvent.layout.y)}
+            >
               {inSuperset && (
                 <Text style={styles.supersetLabel}>🔗 슈퍼세트</Text>
               )}
@@ -1337,6 +1420,7 @@ export default function WorkoutScreen() {
                 const meta = SET_TYPE_META[s.setType ?? 'NORMAL'];
                 const isWarmup = (s.setType ?? 'NORMAL') === 'WARMUP';
                 const prev = ex.lastSets?.[setIdx];
+                const activeKind = edit && edit.exIdx === exIdx && edit.setIdx === setIdx ? edit.kind : null;
                 return (
                   <Swipeable
                     key={setIdx}
@@ -1370,16 +1454,14 @@ export default function WorkoutScreen() {
                           <Pressable style={styles.stepBtn} onPress={() => handleAdjustWeight(exIdx, setIdx, -weightStep)} hitSlop={4}>
                             <Text style={styles.stepText}>−</Text>
                           </Pressable>
-                          <TextInput
-                            ref={r => { const k = `${exIdx}-${setIdx}`; if (r) weightInputRefs.current.set(k, r); else weightInputRefs.current.delete(k); }}
-                            style={styles.setInputStep}
-                            value={String(toDisplay(s.weight_kg, unitKg))}
-                            keyboardType="decimal-pad"
-                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                            onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: fromInput(parseFloat(v) || 0, unitKg) })}
-                            onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
-                            selectTextOnFocus
-                          />
+                          <Pressable
+                            style={[styles.fieldBtn, activeKind === 'weight' && styles.fieldActive]}
+                            onPress={() => beginEdit(exIdx, setIdx, 'weight')}
+                          >
+                            <Text style={styles.fieldText}>
+                              {activeKind === 'weight' ? (editValue || '0') : String(toDisplay(s.weight_kg, unitKg))}
+                            </Text>
+                          </Pressable>
                           <Pressable style={styles.stepBtn} onPress={() => handleAdjustWeight(exIdx, setIdx, weightStep)} hitSlop={4}>
                             <Text style={styles.stepText}>+</Text>
                           </Pressable>
@@ -1388,24 +1470,23 @@ export default function WorkoutScreen() {
                       </View>
                       <View style={{ flex: 1 }}>
                         {ex.timeBased ? (
-                          <TextInput
-                            style={styles.setInput}
-                            value={String(s.durationSec ?? 0)}
-                            keyboardType="number-pad"
-                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                            onChangeText={v => updateSet(exIdx, setIdx, { durationSec: parseInt(v) || 0 })}
-                            selectTextOnFocus
-                          />
+                          <Pressable
+                            style={[styles.fieldBtn, activeKind === 'duration' && styles.fieldActive]}
+                            onPress={() => beginEdit(exIdx, setIdx, 'duration')}
+                          >
+                            <Text style={styles.fieldText}>
+                              {activeKind === 'duration' ? (editValue || '0') : String(s.durationSec ?? 0)}
+                            </Text>
+                          </Pressable>
                         ) : (
-                          <TextInput
-                            style={styles.setInput}
-                            value={String(s.reps)}
-                            keyboardType="number-pad"
-                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                            onChangeText={v => updateSet(exIdx, setIdx, { reps: parseInt(v) || 0 })}
-                            onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
-                            selectTextOnFocus
-                          />
+                          <Pressable
+                            style={[styles.fieldBtn, activeKind === 'reps' && styles.fieldActive]}
+                            onPress={() => beginEdit(exIdx, setIdx, 'reps')}
+                          >
+                            <Text style={styles.fieldText}>
+                              {activeKind === 'reps' ? (editValue || '0') : String(s.reps)}
+                            </Text>
+                          </Pressable>
                         )}
                         {prev && !ex.timeBased && <Text style={styles.prevHint}>×{prev.reps}</Text>}
                       </View>
@@ -1443,6 +1524,18 @@ export default function WorkoutScreen() {
       <View style={styles.restDock} pointerEvents="box-none">
         <RestTimer />
       </View>
+
+      {/* 앱 자체 숫자패드 */}
+      {edit && (
+        <NumPad
+          allowDecimal={edit.kind === 'weight'}
+          label={edit.kind === 'weight' ? `무게 (${u})` : edit.kind === 'duration' ? '시간 (초)' : '횟수'}
+          onKey={handleNumKey}
+          onBackspace={handleNumBackspace}
+          onNext={handleNumNext}
+          onDone={() => setEdit(null)}
+        />
+      )}
 
       {/* 숫자 키보드 위 완료 버튼 (iOS) */}
       {Platform.OS === 'ios' && (
@@ -1498,29 +1591,31 @@ export default function WorkoutScreen() {
           <Pressable style={styles.warmupSheet} onPress={() => {}}>
             <Text style={styles.warmupTitle}>워밍업 설정</Text>
             <Text style={styles.warmupHint}>본세트 무게 대비 % · 횟수</Text>
-            {warmupRows.map((row, i) => (
-              <View key={i} style={styles.warmupRow}>
-                <TextInput
-                  style={styles.warmupInput}
-                  value={row.percent}
-                  keyboardType="number-pad"
-                  onChangeText={v => setWarmupRows(rows => rows.map((r, j) => j === i ? { ...r, percent: v.replace(/[^0-9]/g, '') } : r))}
-                  selectTextOnFocus
-                />
-                <Text style={styles.warmupUnit}>%</Text>
-                <TextInput
-                  style={styles.warmupInput}
-                  value={row.reps}
-                  keyboardType="number-pad"
-                  onChangeText={v => setWarmupRows(rows => rows.map((r, j) => j === i ? { ...r, reps: v.replace(/[^0-9]/g, '') } : r))}
-                  selectTextOnFocus
-                />
-                <Text style={styles.warmupUnit}>회</Text>
-                <Pressable onPress={() => setWarmupRows(rows => rows.filter((_, j) => j !== i))} hitSlop={8} style={styles.warmupDel}>
-                  <Text style={styles.warmupDelText}>✕</Text>
-                </Pressable>
-              </View>
-            ))}
+            {warmupRows.map((row, i) => {
+              const adj = (field: 'percent' | 'reps', delta: number, min: number, max: number) =>
+                setWarmupRows(rows => rows.map((r, j) => {
+                  if (j !== i) return r;
+                  const cur = parseInt(r[field]) || 0;
+                  return { ...r, [field]: String(Math.min(max, Math.max(min, cur + delta))) };
+                }));
+              return (
+                <View key={i} style={styles.warmupRow}>
+                  <View style={styles.warmupStepper}>
+                    <Pressable style={styles.stepBtn} onPress={() => adj('percent', -5, 5, 100)} hitSlop={4}><Text style={styles.stepText}>−</Text></Pressable>
+                    <Text style={styles.warmupValue}>{row.percent}%</Text>
+                    <Pressable style={styles.stepBtn} onPress={() => adj('percent', 5, 5, 100)} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
+                  </View>
+                  <View style={styles.warmupStepper}>
+                    <Pressable style={styles.stepBtn} onPress={() => adj('reps', -1, 1, 30)} hitSlop={4}><Text style={styles.stepText}>−</Text></Pressable>
+                    <Text style={styles.warmupValue}>{row.reps}회</Text>
+                    <Pressable style={styles.stepBtn} onPress={() => adj('reps', 1, 1, 30)} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
+                  </View>
+                  <Pressable onPress={() => setWarmupRows(rows => rows.filter((_, j) => j !== i))} hitSlop={8} style={styles.warmupDel}>
+                    <Text style={styles.warmupDelText}>✕</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
             <Pressable style={styles.warmupAddRow} onPress={() => setWarmupRows(rows => [...rows, { percent: '50', reps: '8' }])}>
               <Text style={styles.warmupAddRowText}>+ 단계 추가</Text>
             </Pressable>
@@ -1678,6 +1773,7 @@ const styles = StyleSheet.create({
 
   scrollContent: { padding: 16, paddingBottom: 60 },
   scrollContentRest: { paddingBottom: 220 },
+  scrollContentEditing: { paddingBottom: 380 },
   restDock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 
   emptyHint: { alignItems: 'center', paddingVertical: 40 },
@@ -1784,6 +1880,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontVariant: ['tabular-nums'],
   },
+  fieldBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    marginHorizontal: 2,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  fieldActive: { borderColor: '#30D158', backgroundColor: '#14331F' },
+  fieldText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
   prevHint: {
     color: '#6E6E73',
     fontSize: 10,
@@ -1899,6 +2007,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF', fontSize: 16, minWidth: 70, textAlign: 'center', fontVariant: ['tabular-nums'],
   },
   warmupUnit: { color: '#8E8E93', fontSize: 15 },
+  warmupStepper: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4 },
+  warmupValue: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
   warmupDel: { marginLeft: 'auto', width: 28, height: 28, borderRadius: 14, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' },
   warmupDelText: { color: '#8E8E93', fontSize: 13, fontWeight: '700' },
   warmupAddRow: { paddingVertical: 10, alignItems: 'center' },
