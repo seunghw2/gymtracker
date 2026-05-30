@@ -51,6 +51,7 @@ import {
 import DatePickerSheet from '../../components/DatePickerSheet';
 import { formatDateWithDay } from '../../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../../lib/units';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import {
   MUSCLE_GROUPS,
   EQUIPMENT_TYPES,
@@ -170,6 +171,8 @@ export default function WorkoutScreen() {
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [detailSaving, setDetailSaving] = useState(false);
+  const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
+  const weightInputRefs = useRef<Map<string, TextInput>>(new Map());
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -194,6 +197,14 @@ export default function WorkoutScreen() {
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
   }, []);
+
+  // 운동 중 화면 꺼짐 방지
+  useEffect(() => {
+    if (activeSessionId) {
+      activateKeepAwakeAsync('workout').catch(() => {});
+      return () => { deactivateKeepAwake('workout').catch(() => {}); };
+    }
+  }, [activeSessionId]);
 
   // 운동 추가 모달 열릴 때 최근 종목 로드(빠른 추가용)
   useEffect(() => {
@@ -348,14 +359,26 @@ export default function WorkoutScreen() {
       { text: '취소', style: 'cancel' },
       {
         text: '완료', onPress: async () => {
+          const durationSec = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
           if (activeSessionId && sessionStartTime) {
-            const sec = Math.floor((Date.now() - sessionStartTime) / 1000);
-            await updateSessionDuration(activeSessionId, sec);
+            await updateSessionDuration(activeSessionId, durationSec).catch(() => {});
           }
-          finishSession();
+          // 종료 전 요약 계산
+          const doneSets = exercises.flatMap(e => e.sets.filter(s => s.done));
+          const volume = doneSets
+            .filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP')
+            .reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
+          const prs = doneSets.filter(s => s.isPR).length;
+          const exCount = exercises.filter(e => e.sets.some(s => s.done)).length;
+          setSummary({ volume, sets: doneSets.length, exercises: exCount, prs, durationSec });
         },
       },
     ]);
+  };
+
+  const closeSummary = () => {
+    setSummary(null);
+    finishSession();
   };
 
   const handleCancelWorkout = () => {
@@ -433,6 +456,36 @@ export default function WorkoutScreen() {
     if (warmups.length > 0) prependWarmupSets(warmupExIdx, warmups);
     setWarmupExIdx(null);
     Haptics.selectionAsync();
+  };
+
+  // 무게 ±버튼 (표시단위 기준 kg=2.5 / lb=5)
+  const weightStep = unitKg ? 2.5 : 5;
+  const handleAdjustWeight = (exIdx: number, setIdx: number, deltaDisplay: number) => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (!s) return;
+    const next = Math.max(0, toDisplay(s.weight_kg, unitKg) + deltaDisplay);
+    const newKg = fromInput(next, unitKg);
+    updateSet(exIdx, setIdx, { weight_kg: newKg, estimated_1rm: epley(newKg, s.reps) });
+    Haptics.selectionAsync();
+    if (s.done && s.setId) updateWorkoutSet(s.setId, newKg, s.reps, s.setType ?? 'NORMAL').catch(() => {});
+  };
+
+  // 세트번호 길게눌러 타입 직접 선택
+  const handleSetTypeLongPress = (exIdx: number, setIdx: number) => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (!s) return;
+    const setType = (t: SetType) => {
+      updateSet(exIdx, setIdx, { setType: t });
+      Haptics.selectionAsync();
+      if (s.done && s.setId) updateWorkoutSet(s.setId, s.weight_kg, s.reps, t).catch(() => {});
+    };
+    Alert.alert('세트 타입 선택', undefined, [
+      { text: '일반', onPress: () => setType('NORMAL') },
+      { text: '워밍업 (W)', onPress: () => setType('WARMUP') },
+      { text: '드롭세트 (D)', onPress: () => setType('DROP') },
+      { text: '실패세트 (F)', onPress: () => setType('FAILURE') },
+      { text: '취소', style: 'cancel' },
+    ]);
   };
 
   // 종목 영구 메모 저장
@@ -549,6 +602,12 @@ export default function WorkoutScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+
+    // 같은 종목의 다음 미완료 세트 입력으로 포커스 이동
+    const nextIdx = ex.sets.findIndex((st, j) => j > setIdx && !st.done);
+    if (nextIdx >= 0) {
+      setTimeout(() => weightInputRefs.current.get(`${exIdx}-${nextIdx}`)?.focus(), 60);
     }
 
     // 슈퍼세트: 같은 그룹의 다음 종목이 있으면 휴식 없이 바로 다음 종목으로
@@ -1255,7 +1314,7 @@ export default function WorkoutScreen() {
 
               <View style={styles.setHeader}>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
-                <Text style={styles.setCol}>무게({u})</Text>
+                <Text style={[styles.setCol, { flex: 1.4 }]}>무게({u})</Text>
                 <Text style={styles.setCol}>횟수</Text>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>✓</Text>
               </View>
@@ -1277,10 +1336,11 @@ export default function WorkoutScreen() {
                     overshootRight={false}
                   >
                     <View style={[styles.setRow, s.done && styles.setRowDone, isWarmup && styles.setRowWarmup]}>
-                      {/* 세트 번호/타입 — 탭하면 일반→W→D→F 순환 */}
+                      {/* 세트 번호/타입 — 탭: 순환 / 길게: 직접 선택 */}
                       <Pressable
                         style={[styles.setNum, { flex: 0.5 }]}
                         onPress={() => handleCycleSetType(exIdx, setIdx)}
+                        onLongPress={() => handleSetTypeLongPress(exIdx, setIdx)}
                         hitSlop={6}
                       >
                         {meta ? (
@@ -1291,16 +1351,25 @@ export default function WorkoutScreen() {
                           <Text style={styles.setNumText}>{s.setOrder}</Text>
                         )}
                       </Pressable>
-                      <View style={{ flex: 1 }}>
-                        <TextInput
-                          style={styles.setInput}
-                          value={String(toDisplay(s.weight_kg, unitKg))}
-                          keyboardType="decimal-pad"
-                          inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                          onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: fromInput(parseFloat(v) || 0, unitKg) })}
-                          onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
-                          selectTextOnFocus
-                        />
+                      <View style={{ flex: 1.4 }}>
+                        <View style={styles.stepRow}>
+                          <Pressable style={styles.stepBtn} onPress={() => handleAdjustWeight(exIdx, setIdx, -weightStep)} hitSlop={4}>
+                            <Text style={styles.stepText}>−</Text>
+                          </Pressable>
+                          <TextInput
+                            ref={r => { const k = `${exIdx}-${setIdx}`; if (r) weightInputRefs.current.set(k, r); else weightInputRefs.current.delete(k); }}
+                            style={styles.setInputStep}
+                            value={String(toDisplay(s.weight_kg, unitKg))}
+                            keyboardType="decimal-pad"
+                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
+                            onChangeText={v => updateSet(exIdx, setIdx, { weight_kg: fromInput(parseFloat(v) || 0, unitKg) })}
+                            onEndEditing={() => s.done && handleEditDoneSet(exIdx, setIdx)}
+                            selectTextOnFocus
+                          />
+                          <Pressable style={styles.stepBtn} onPress={() => handleAdjustWeight(exIdx, setIdx, weightStep)} hitSlop={4}>
+                            <Text style={styles.stepText}>+</Text>
+                          </Pressable>
+                        </View>
                         {prev && <Text style={styles.prevHint}>이전 {toDisplay(prev.weight_kg, unitKg)}</Text>}
                       </View>
                       <View style={{ flex: 1 }}>
@@ -1360,6 +1429,43 @@ export default function WorkoutScreen() {
           </View>
         </InputAccessoryView>
       )}
+
+      {/* 운동 완료 요약 모달 */}
+      <Modal visible={summary !== null} transparent animationType="fade">
+        <View style={styles.summaryOverlay}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>운동 완료! 💪</Text>
+            {summary && (
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{Math.round(toDisplay(summary.volume, unitKg)).toLocaleString()}</Text>
+                  <Text style={styles.summaryLabel}>총 볼륨({u})</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{summary.sets}</Text>
+                  <Text style={styles.summaryLabel}>세트</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{summary.exercises}</Text>
+                  <Text style={styles.summaryLabel}>종목</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{formatDuration(summary.durationSec)}</Text>
+                  <Text style={styles.summaryLabel}>시간</Text>
+                </View>
+                {summary.prs > 0 && (
+                  <View style={[styles.summaryItem, { width: '100%' }]}>
+                    <Text style={[styles.summaryValue, { color: '#FF9F0A' }]}>🏆 개인기록 {summary.prs}개</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            <Pressable style={styles.summaryBtn} onPress={closeSummary}>
+              <Text style={styles.summaryBtnText}>확인</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* 워밍업 설정 모달 */}
       <Modal visible={warmupExIdx !== null} transparent animationType="slide" onRequestClose={() => setWarmupExIdx(null)}>
@@ -1638,6 +1744,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontVariant: ['tabular-nums'],
   },
+  stepRow: { flexDirection: 'row', alignItems: 'center' },
+  stepBtn: {
+    width: 30, height: 34, borderRadius: 8, backgroundColor: '#3A3A3C',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  setInputStep: {
+    flex: 1,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    paddingVertical: 10,
+    fontVariant: ['tabular-nums'],
+  },
   prevHint: {
     color: '#6E6E73',
     fontSize: 10,
@@ -1732,6 +1853,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   warmupBtnText: { color: '#FF9F0A', fontSize: 14, fontWeight: '600' },
+  summaryOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 28 },
+  summaryCard: { backgroundColor: '#1C1C1E', borderRadius: 24, padding: 28 },
+  summaryTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  summaryItem: { width: '50%', alignItems: 'center', paddingVertical: 12 },
+  summaryValue: { color: '#30D158', fontSize: 26, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  summaryLabel: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
+  summaryBtn: { backgroundColor: '#30D158', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 16 },
+  summaryBtnText: { color: '#000000', fontSize: 16, fontWeight: '700' },
   warmupSheet: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
   warmupTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   warmupHint: { color: '#8E8E93', fontSize: 13, marginTop: 4, marginBottom: 14 },
