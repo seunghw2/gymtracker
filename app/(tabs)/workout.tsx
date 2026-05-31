@@ -1522,6 +1522,15 @@ export default function WorkoutScreen() {
           return (
             <View style={[styles.exerciseCard, isActive && styles.exerciseCardDragging]}>
               <View style={styles.exerciseCardHeader}>
+                <Pressable
+                  onPressIn={onDragStart}
+                  onPressOut={onDragEnd}
+                  delayLongPress={120}
+                  hitSlop={8}
+                  style={[styles.dragHandle, { marginRight: 10 }]}
+                >
+                  <Text style={styles.dragHandleText}>≡</Text>
+                </Pressable>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
@@ -1535,15 +1544,6 @@ export default function WorkoutScreen() {
                   {bestORM > 0 && (
                     <Text style={styles.ormBadge}>1RM {toDisplay(bestORM, unitKg)}{u}</Text>
                   )}
-                  <Pressable
-                    onPressIn={onDragStart}
-                    onPressOut={onDragEnd}
-                    delayLongPress={120}
-                    hitSlop={8}
-                    style={styles.dragHandle}
-                  >
-                    <Text style={styles.dragHandleText}>≡</Text>
-                  </Pressable>
                   <Pressable onPress={() => setCardMenuIdx(exIdx)} hitSlop={8} style={styles.exMenuBtn}>
                     <Text style={styles.exMenuText}>⋯</Text>
                   </Pressable>
