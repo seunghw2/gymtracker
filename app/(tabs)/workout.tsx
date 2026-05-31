@@ -196,6 +196,7 @@ export default function WorkoutScreen() {
   const [showGymPicker, setShowGymPicker] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showNote, setShowNote] = useState(true);
+  const [showNoteModal, setShowNoteModal] = useState(false);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
   const [bodyTags, setBodyTagsState] = useState<string[]>([]);
   const [tagEdit, setTagEdit] = useState(false);
@@ -1484,18 +1485,14 @@ export default function WorkoutScreen() {
           <Pressable style={styles.metaChip} onPress={() => setShowGymPicker(true)}>
             <Text style={styles.metaChipText} numberOfLines={1}>📍 {gymName(sessionGymId) ?? '헬스장'}</Text>
           </Pressable>
+          {showNote && (
+            <Pressable style={styles.metaChip} onPress={() => setShowNoteModal(true)}>
+              <Text style={[styles.metaChipText, !sessionNote.trim() && styles.tagButtonPlaceholder]} numberOfLines={1}>
+                📝 {sessionNote.trim() ? sessionNote.trim() : '메모'}
+              </Text>
+            </Pressable>
+          )}
         </View>
-        {showNote && (
-          <TextInput
-            style={styles.sessionNoteInput}
-            placeholder="세션 메모 (선택)"
-            placeholderTextColor="#48484A"
-            value={sessionNote}
-            onChangeText={setSessionNote}
-            onEndEditing={handleSessionNoteBlur}
-            multiline
-          />
-        )}
 
         {exercises.length === 0 && (
           <View style={styles.emptyHint}>
@@ -1586,7 +1583,7 @@ export default function WorkoutScreen() {
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
                 <Text style={[styles.setCol, { flex: 1.4 }]}>무게({u})</Text>
                 <Text style={styles.setCol}>{ex.timeBased ? '시간(초)' : '횟수'}</Text>
-                <Text style={[styles.setCol, { flex: 0.5 }]}>✓</Text>
+                <Text style={[styles.setCol, { flex: 0.6 }]}>✓</Text>
               </View>
 
               {ex.sets.map((s, setIdx) => {
@@ -1662,12 +1659,12 @@ export default function WorkoutScreen() {
                         {prev && !ex.timeBased && <Text style={styles.prevHint}>×{prev.reps}</Text>}
                       </View>
                       <Pressable
-                        style={[styles.checkBtn, { flex: 0.5 }]}
+                        style={[styles.checkBtn, { flex: 0.6 }]}
                         onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
                       >
-                        <Text style={[styles.checkText, s.done && styles.checkDone, s.isPR && styles.checkPR]}>
-                          {s.isPR ? '🏆' : s.done ? '✓' : '○'}
-                        </Text>
+                        <View style={[styles.checkCircle, s.done && styles.checkCircleDone, s.isPR && styles.checkCirclePR]}>
+                          {s.isPR ? <Text style={styles.checkTrophy}>🏆</Text> : s.done ? <Text style={styles.checkMark}>✓</Text> : null}
+                        </View>
                       </Pressable>
                     </View>
                   </Swipeable>
@@ -1723,6 +1720,27 @@ export default function WorkoutScreen() {
             )}
             <Pressable style={styles.tagDoneBtn} onPress={() => { setShowTags(false); setTagEdit(false); }}>
               <Text style={styles.tagDoneText}>{sessionTags.length > 0 ? '완료' : '건너뛰기'}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 세션 메모 입력 */}
+      <Modal visible={showNoteModal} transparent animationType="fade" onRequestClose={() => { handleSessionNoteBlur(); setShowNoteModal(false); }}>
+        <Pressable style={styles.centerBackdrop} onPress={() => { handleSessionNoteBlur(); setShowNoteModal(false); }}>
+          <Pressable style={styles.centerCard} onPress={() => {}}>
+            <Text style={styles.gymSheetTitle}>세션 메모</Text>
+            <TextInput
+              style={styles.noteModalInput}
+              placeholder="이 운동에 대한 메모 (선택)"
+              placeholderTextColor="#48484A"
+              value={sessionNote}
+              onChangeText={setSessionNote}
+              multiline
+              autoFocus
+            />
+            <Pressable style={styles.tagDoneBtn} onPress={() => { handleSessionNoteBlur(); setShowNoteModal(false); }}>
+              <Text style={styles.tagDoneText}>완료</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -1999,6 +2017,10 @@ const styles = StyleSheet.create({
   metaChipText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
   centerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   centerCard: { backgroundColor: '#1C1C1E', borderRadius: 20, padding: 20, alignSelf: 'stretch' },
+  noteModalInput: {
+    backgroundColor: '#2C2C2E', borderRadius: 12, padding: 14, color: '#FFFFFF',
+    fontSize: 16, minHeight: 100, textAlignVertical: 'top', marginTop: 12, marginBottom: 14,
+  },
   tagButton: { alignSelf: 'flex-start', backgroundColor: '#2C2C2E', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 8 },
   tagButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
   tagButtonPlaceholder: { color: '#8E8E93' },
@@ -2191,17 +2213,17 @@ const styles = StyleSheet.create({
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-    borderRadius: 8,
-    backgroundColor: '#2C2C2E',
+    marginBottom: 8,
+    borderRadius: 14,
+    backgroundColor: '#262628',
+    paddingVertical: 4,
   },
-  setRowDone: { opacity: 0.45 },
+  setRowDone: { backgroundColor: '#15351F' },
   setRowWarmup: { backgroundColor: '#2A2620' },
-  setNum: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  setNum: { flex: 0.5, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   setNumText: {
-    color: '#AEAEB2', textAlign: 'center', fontSize: 13, fontWeight: '600',
-    minWidth: 26, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#48484A', borderRadius: 6, overflow: 'hidden',
+    color: '#FFFFFF', textAlign: 'center', fontSize: 17, fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   setTypeBadge: {
     fontSize: 13,
@@ -2238,7 +2260,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   fieldBtn: {
-    paddingVertical: 9,
+    paddingVertical: 13,
     marginHorizontal: 2,
     borderRadius: 8,
     flexDirection: 'row',
@@ -2248,8 +2270,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   fieldActive: { borderColor: '#30D158', backgroundColor: '#14331F' },
-  fieldText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  caret: { width: 2, height: 20, backgroundColor: '#30D158', marginLeft: 2, borderRadius: 1 },
+  fieldText: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  caret: { width: 2, height: 22, backgroundColor: '#30D158', marginLeft: 2, borderRadius: 1 },
   prevHint: {
     color: '#6E6E73',
     fontSize: 10,
@@ -2258,10 +2280,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontVariant: ['tabular-nums'],
   },
-  checkBtn: { flex: 1, alignItems: 'center', paddingVertical: 10 },
-  checkText: { color: '#48484A', fontSize: 20 },
-  checkDone: { color: '#30D158' },
-  checkPR: { fontSize: 18 },
+  checkBtn: { flex: 0.6, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  checkCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#48484A',
+  },
+  checkCircleDone: { backgroundColor: '#30D158', borderColor: '#30D158' },
+  checkCirclePR: { backgroundColor: '#FFD60A', borderColor: '#FFD60A' },
+  checkMark: { color: '#0A1F12', fontSize: 22, fontWeight: '900' },
+  checkTrophy: { fontSize: 20 },
 
   dragHandle: {
     width: 34,
