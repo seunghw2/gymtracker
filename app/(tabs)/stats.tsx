@@ -111,7 +111,7 @@ export default function StatsScreen() {
   const [recordSort, setRecordSort] = useState<'1rm' | 'name'>('1rm');
   const [muscleFreq, setMuscleFreq] = useState<MuscleFrequency[]>([]);
   const [fatInput, setFatInput] = useState('');
-  const [rmBasis, setRmBasis] = useState(1);
+  const [rmBasis, setRmBasis] = useState(10);
   const [rmMode, setRmMode] = useState<'est' | 'actual'>('est');
   const [actualData, setActualData] = useState<{ date: string; estimated_1rm: number }[]>([]);
   const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();

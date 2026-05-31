@@ -53,6 +53,8 @@ import {
   setBodyTags,
   getExerciseRmBasis,
   setExerciseRmBasis,
+  getExerciseRmMode,
+  setExerciseRmMode,
   convertRm,
   Exercise,
   SessionSummary,
@@ -90,6 +92,7 @@ import {
 } from '../../constants/exercises';
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
 import RestTimer from '../../components/RestTimer';
+import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
@@ -238,6 +241,7 @@ export default function WorkoutScreen() {
   const rowRefs = useRef<Map<string, View>>(new Map());
   const scrollY = useRef(0);
   const [rmBasisMap, setRmBasisMap] = useState<Record<number, number>>({});
+  const [rmModeMap, setRmModeMap] = useState<Record<number, RmMode>>({});
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -276,11 +280,12 @@ export default function WorkoutScreen() {
     getBodyTags().then(setBodyTagsState).catch(() => {});
   }, []);
 
-  // 세션 운동들의 종목별 기준 RM 로드
+  // 세션 운동들의 종목별 기준 RM(반복수·모드) 로드
   useEffect(() => {
     Array.from(new Set(exercises.map(e => e.exerciseId))).forEach(id => {
       if (rmBasisMap[id] === undefined) {
         getExerciseRmBasis(id).then(n => setRmBasisMap(m => ({ ...m, [id]: n }))).catch(() => {});
+        getExerciseRmMode(id).then(mo => setRmModeMap(m => ({ ...m, [id]: mo }))).catch(() => {});
       }
     });
   }, [exercises]);
@@ -331,13 +336,14 @@ export default function WorkoutScreen() {
 
   const gymName = (id: number | null | undefined) => gyms.find(g => g.id === id)?.name ?? null;
 
-  const RM_OPTIONS = [1, 3, 5, 8, 10, 12];
-  const changeExerciseRm = (exIdx: number, n: number) => {
+  const confirmRmBasis = (exIdx: number, reps: number, mode: RmMode) => {
     const ex = exercises[exIdx];
     if (!ex) return;
-    setRmBasisMap(m => ({ ...m, [ex.exerciseId]: n }));
-    setExerciseRmBasis(ex.exerciseId, n).catch(() => {});
-    setRmPickerIdx(null);
+    setRmBasisMap(m => ({ ...m, [ex.exerciseId]: reps }));
+    setRmModeMap(m => ({ ...m, [ex.exerciseId]: mode }));
+    setExerciseRmBasis(ex.exerciseId, reps).catch(() => {});
+    setExerciseRmMode(ex.exerciseId, mode).catch(() => {});
+    // TODO: 'estimated' 모드의 환산 표시를 뱃지/통계에 실제 연결
   };
 
   const handleStartWorkout = async () => {
@@ -1577,7 +1583,7 @@ export default function WorkoutScreen() {
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
                   {(() => {
-                    const basisN = rmBasisMap[ex.exerciseId] ?? 1;
+                    const basisN = rmBasisMap[ex.exerciseId] ?? 10;
                     const hasPrev = (ex.prevBest1rm ?? 0) > 0;
                     const curD = toDisplay(convertRm(bestORM, basisN), unitKg);
                     const prevD = toDisplay(convertRm(ex.prevBest1rm ?? 0, basisN), unitKg);
@@ -1814,31 +1820,15 @@ export default function WorkoutScreen() {
         </Pressable>
       </Modal>
 
-      {/* 기준 RM 선택 */}
-      <Modal visible={rmPickerIdx != null} transparent animationType="fade" onRequestClose={() => setRmPickerIdx(null)}>
-        <Pressable style={styles.menuOverlay} onPress={() => setRmPickerIdx(null)}>
-          <Pressable style={styles.menuSheet} onPress={() => {}}>
-            <Text style={styles.menuHeader}>기준 RM</Text>
-            <View style={styles.rmPickRow}>
-              {RM_OPTIONS.map(n => {
-                const cur = rmPickerIdx != null ? (rmBasisMap[exercises[rmPickerIdx]?.exerciseId] ?? 1) : 1;
-                return (
-                  <Pressable
-                    key={n}
-                    style={[styles.rmPickChip, cur === n && styles.rmPickChipOn]}
-                    onPress={() => rmPickerIdx != null && changeExerciseRm(rmPickerIdx, n)}
-                  >
-                    <Text style={[styles.rmPickText, cur === n && styles.rmPickTextOn]}>{n}RM</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Pressable style={styles.menuCancel} onPress={() => setRmPickerIdx(null)}>
-              <Text style={styles.menuCancelText}>닫기</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* 기준 RM 선택 시트 */}
+      <RmBasisSheet
+        visible={rmPickerIdx != null}
+        exerciseName={rmPickerIdx != null ? exercises[rmPickerIdx]?.exerciseName : undefined}
+        initialReps={rmPickerIdx != null ? (rmBasisMap[exercises[rmPickerIdx]?.exerciseId] ?? 10) : 10}
+        initialMode={rmPickerIdx != null ? (rmModeMap[exercises[rmPickerIdx]?.exerciseId] ?? 'actual') : 'actual'}
+        onConfirm={(reps, mode) => { if (rmPickerIdx != null) confirmRmBasis(rmPickerIdx, reps, mode); }}
+        onClose={() => setRmPickerIdx(null)}
+      />
 
       {/* 휴식 시간 다이얼 시트 */}
       <Modal visible={restPickerIdx != null} transparent animationType="fade" onRequestClose={closeRestPicker}>

@@ -493,15 +493,25 @@ export async function setBodyTags(tags: string[]): Promise<void> {
   await setSetting('body_tags', tags.join(','));
 }
 
-// 종목별 통계 기준 RM(반복수). 미설정 시 1.
+// 종목별 통계 기준 RM(반복수). 미설정 시 10.
 export async function getExerciseRmBasis(exerciseId: number): Promise<number> {
-  const raw = await getSetting(`rm_basis_${exerciseId}`, '1');
+  const raw = await getSetting(`rm_basis_${exerciseId}`, '10');
   const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n >= 1 ? n : 1;
+  return Number.isFinite(n) && n >= 1 ? n : 10;
 }
 
 export async function setExerciseRmBasis(exerciseId: number, reps: number): Promise<void> {
   await setSetting(`rm_basis_${exerciseId}`, String(reps));
+}
+
+// 종목별 RM 기준 모드: 'actual'(실제) | 'estimated'(추정). 미설정 시 'actual'.
+export async function getExerciseRmMode(exerciseId: number): Promise<'actual' | 'estimated'> {
+  const raw = await getSetting(`rm_mode_${exerciseId}`, 'actual');
+  return raw === 'estimated' ? 'estimated' : 'actual';
+}
+
+export async function setExerciseRmMode(exerciseId: number, mode: 'actual' | 'estimated'): Promise<void> {
+  await setSetting(`rm_mode_${exerciseId}`, mode);
 }
 
 // Epley 추정 1RM → N-RM 무게 환산 (N=1이면 그대로).
