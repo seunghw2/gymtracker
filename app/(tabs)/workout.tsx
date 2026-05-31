@@ -215,6 +215,7 @@ export default function WorkoutScreen() {
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
+  const [sessMemoOpen, setSessMemoOpen] = useState<Record<number, boolean>>({});
   // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
@@ -1522,11 +1523,6 @@ export default function WorkoutScreen() {
           const bestORM = ex.sets
             .filter(s => s.done && s.estimated_1rm)
             .reduce((m, s) => Math.max(m, s.estimated_1rm ?? 0), 0);
-          // 워밍업 제외 볼륨 + 완료 세트 수
-          const doneSets = ex.sets.filter(s => s.done);
-          const volume = doneSets
-            .filter(s => (s.setType ?? 'NORMAL') !== 'WARMUP')
-            .reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
 
           return (
             <View style={[styles.exerciseCard, isActive && styles.exerciseCardDragging]}>
@@ -1544,10 +1540,23 @@ export default function WorkoutScreen() {
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
                   {(() => {
-                    const parts: string[] = [];
-                    if (volume > 0 || doneSets.length > 0) parts.push(`볼륨 ${Math.round(toDisplay(volume, unitKg)).toLocaleString()}${u} · ${doneSets.length}세트`);
-                    if (bestORM > 0) parts.push(`1RM ${toDisplay(bestORM, unitKg)}${u}`);
-                    return parts.length > 0 ? <Text style={styles.exVolume}>{parts.join(' · ')}</Text> : null;
+                    const curD = toDisplay(bestORM, unitKg);
+                    const prevD = toDisplay(ex.prevBest1rm ?? 0, unitKg);
+                    if (bestORM > 0) {
+                      const diff = Math.round((curD - prevD) * 10) / 10;
+                      return (
+                        <Text style={styles.exVolume}>
+                          1RM {curD}{u}
+                          {(ex.prevBest1rm ?? 0) > 0 && diff !== 0 ? (
+                            <Text style={{ color: diff > 0 ? '#30D158' : '#FF453A', fontWeight: '700' }}>{'  '}{diff > 0 ? '▲' : '▼'}{Math.abs(diff)}{u}</Text>
+                          ) : null}
+                        </Text>
+                      );
+                    }
+                    if ((ex.prevBest1rm ?? 0) > 0) {
+                      return <Text style={styles.exVolume}>이전 1RM {prevD}{u}</Text>;
+                    }
+                    return null;
                   })()}
                 </View>
                 <Pressable onPress={() => setCardMenuIdx(exIdx)} hitSlop={8} style={styles.exMenuBtn}>
@@ -1559,41 +1568,42 @@ export default function WorkoutScreen() {
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
-              {/* 메모 — 기본 접힘. 내용 있으면 한 줄 요약, 탭하면 편집 */}
-              {memoOpen[exIdx] ? (
-                <>
-                  <TextInput
-                    style={styles.exNoteInput}
-                    placeholder="📌 종목 메모 (항상 표시)"
-                    placeholderTextColor="#48484A"
-                    value={ex.note ?? ''}
-                    onChangeText={t => setExerciseNote(exIdx, t)}
-                    onEndEditing={() => handleExerciseNoteBlur(exIdx)}
-                    multiline
-                  />
-                  <TextInput
-                    style={styles.exSessionNoteInput}
-                    placeholder="📝 오늘 메모 (이 세션만)"
-                    placeholderTextColor="#48484A"
-                    value={ex.sessionNote ?? ''}
-                    onChangeText={t => setExerciseSessionNote(exIdx, t)}
-                    onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
-                    multiline
-                  />
-                  <Pressable style={styles.memoToggle} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: false }))}>
-                    <Text style={styles.memoToggleText}>메모 접기</Text>
-                  </Pressable>
-                </>
-              ) : (ex.note || ex.sessionNote) ? (
-                <Pressable style={styles.memoSummary} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: true }))}>
-                  <Text style={styles.memoSummaryText} numberOfLines={1}>
-                    📝 {[ex.note, ex.sessionNote].filter(Boolean).join(' · ')}
+              {/* 메모 — 종목/오늘 각각 버튼, 누르면 해당 입력칸 펼침 */}
+              <View style={styles.memoBtnRow}>
+                <Pressable style={[styles.memoChip, memoOpen[exIdx] && styles.memoChipOn]} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] }))}>
+                  <Text style={[styles.memoChipText, !ex.note?.trim() && styles.memoChipPlaceholder]} numberOfLines={1}>
+                    📌 {ex.note?.trim() ? ex.note.trim() : '종목 메모'}
                   </Text>
                 </Pressable>
-              ) : (
-                <Pressable style={styles.memoToggle} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: true }))}>
-                  <Text style={styles.memoToggleText}>＋ 메모</Text>
+                <Pressable style={[styles.memoChip, sessMemoOpen[exIdx] && styles.memoChipOn]} onPress={() => setSessMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] }))}>
+                  <Text style={[styles.memoChipText, !ex.sessionNote?.trim() && styles.memoChipPlaceholder]} numberOfLines={1}>
+                    📝 {ex.sessionNote?.trim() ? ex.sessionNote.trim() : '오늘 메모'}
+                  </Text>
                 </Pressable>
+              </View>
+              {memoOpen[exIdx] && (
+                <TextInput
+                  style={styles.exNoteInput}
+                  placeholder="📌 종목 메모 (항상 표시)"
+                  placeholderTextColor="#48484A"
+                  value={ex.note ?? ''}
+                  onChangeText={t => setExerciseNote(exIdx, t)}
+                  onEndEditing={() => handleExerciseNoteBlur(exIdx)}
+                  multiline
+                  autoFocus
+                />
+              )}
+              {sessMemoOpen[exIdx] && (
+                <TextInput
+                  style={styles.exSessionNoteInput}
+                  placeholder="📝 오늘 메모 (이 세션만)"
+                  placeholderTextColor="#48484A"
+                  value={ex.sessionNote ?? ''}
+                  onChangeText={t => setExerciseSessionNote(exIdx, t)}
+                  onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
+                  multiline
+                  autoFocus
+                />
               )}
 
               <View style={styles.setHeader}>
@@ -2135,7 +2145,7 @@ const styles = StyleSheet.create({
   },
   exerciseName: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   exerciseBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
-  exVolume: { color: '#30D158', fontSize: 12, marginTop: 4, fontVariant: ['tabular-nums'] },
+  exVolume: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginTop: 4, fontVariant: ['tabular-nums'] },
   exNoteInput: {
     backgroundColor: '#23201A',
     borderRadius: 8,
@@ -2346,10 +2356,11 @@ const styles = StyleSheet.create({
   },
   detailTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
   timeBadge: { color: '#0A84FF', fontSize: 12, fontWeight: '700', marginBottom: 6 },
-  memoToggle: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2, marginBottom: 6 },
-  memoToggleText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-  memoSummary: { backgroundColor: '#23201A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8 },
-  memoSummaryText: { color: '#E5C07B', fontSize: 13 },
+  memoBtnRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  memoChip: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  memoChipOn: { backgroundColor: '#14331F', borderWidth: 1, borderColor: '#30D158' },
+  memoChipText: { color: '#E5C07B', fontSize: 13, fontWeight: '600' },
+  memoChipPlaceholder: { color: '#8E8E93', fontWeight: '500' },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',
