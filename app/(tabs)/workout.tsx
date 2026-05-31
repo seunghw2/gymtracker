@@ -1543,28 +1543,24 @@ export default function WorkoutScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
-                  {(volume > 0 || doneSets.length > 0) && (
-                    <Text style={styles.exVolume}>
-                      볼륨 {Math.round(toDisplay(volume, unitKg)).toLocaleString()}{u} · {doneSets.length}세트
-                    </Text>
-                  )}
+                  {(() => {
+                    const parts: string[] = [];
+                    if (volume > 0 || doneSets.length > 0) parts.push(`볼륨 ${Math.round(toDisplay(volume, unitKg)).toLocaleString()}${u} · ${doneSets.length}세트`);
+                    if (bestORM > 0) parts.push(`1RM ${toDisplay(bestORM, unitKg)}${u}`);
+                    return parts.length > 0 ? <Text style={styles.exVolume}>{parts.join(' · ')}</Text> : null;
+                  })()}
                 </View>
-                <View style={styles.exerciseHeaderRight}>
-                  {bestORM > 0 && (
-                    <Text style={styles.ormBadge}>1RM {toDisplay(bestORM, unitKg)}{u}</Text>
-                  )}
-                  <Pressable onPress={() => setCardMenuIdx(exIdx)} hitSlop={8} style={styles.exMenuBtn}>
-                    <Text style={styles.exMenuText}>⋯</Text>
-                  </Pressable>
-                </View>
+                <Pressable onPress={() => setCardMenuIdx(exIdx)} hitSlop={8} style={styles.exMenuBtn}>
+                  <Text style={styles.exMenuText}>⋯</Text>
+                </Pressable>
               </View>
 
               {ex.timeBased && (
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
-              {/* 메모 (기본 접힘 — 내용 있으면 자동 펼침) */}
-              {(memoOpen[exIdx] || ex.note || ex.sessionNote) ? (
+              {/* 메모 — 기본 접힘. 내용 있으면 한 줄 요약, 탭하면 편집 */}
+              {memoOpen[exIdx] ? (
                 <>
                   <TextInput
                     style={styles.exNoteInput}
@@ -1584,7 +1580,16 @@ export default function WorkoutScreen() {
                     onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
                     multiline
                   />
+                  <Pressable style={styles.memoToggle} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: false }))}>
+                    <Text style={styles.memoToggleText}>메모 접기</Text>
+                  </Pressable>
                 </>
+              ) : (ex.note || ex.sessionNote) ? (
+                <Pressable style={styles.memoSummary} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: true }))}>
+                  <Text style={styles.memoSummaryText} numberOfLines={1}>
+                    📝 {[ex.note, ex.sessionNote].filter(Boolean).join(' · ')}
+                  </Text>
+                </Pressable>
               ) : (
                 <Pressable style={styles.memoToggle} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: true }))}>
                   <Text style={styles.memoToggleText}>＋ 메모</Text>
@@ -2343,6 +2348,8 @@ const styles = StyleSheet.create({
   timeBadge: { color: '#0A84FF', fontSize: 12, fontWeight: '700', marginBottom: 6 },
   memoToggle: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2, marginBottom: 6 },
   memoToggleText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  memoSummary: { backgroundColor: '#23201A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8 },
+  memoSummaryText: { color: '#E5C07B', fontSize: 13 },
   setActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   warmupBtn: {
     backgroundColor: '#2A2620',
