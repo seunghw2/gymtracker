@@ -1,11 +1,15 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
+import { useWorkoutStore } from '../../store/useStore';
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
 }
 
 export default function TabLayout() {
+  // 운동 진행 중에는 탭 바를 얇게(아이콘만) 해 화면을 넓게 쓴다
+  const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
+
   return (
     <Tabs
       screenOptions={{
@@ -13,9 +17,11 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#1C1C1E',
           borderTopColor: '#2C2C2E',
-          height: 80,
-          paddingBottom: 20,
+          height: workoutActive ? 50 : 80,
+          paddingBottom: workoutActive ? 6 : 20,
+          paddingTop: workoutActive ? 4 : 0,
         },
+        tabBarShowLabel: !workoutActive,
         tabBarActiveTintColor: '#30D158',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
