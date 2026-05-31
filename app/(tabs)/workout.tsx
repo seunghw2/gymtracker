@@ -15,6 +15,7 @@ import {
   InputAccessoryView,
   ActivityIndicator,
   findNodeHandle,
+  Dimensions,
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import DragList, { DragListRenderItemInfo } from 'react-native-draglist';
@@ -231,6 +232,7 @@ export default function WorkoutScreen() {
   const listRef = useRef<FlatList<ExerciseEntry>>(null);
   const noteDraftRef = useRef(''); // 종목 메모 입력 중 임시값(타이핑마다 스토어 갱신 방지)
   const rowRefs = useRef<Map<string, View>>(new Map());
+  const scrollY = useRef(0);
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -578,8 +580,16 @@ export default function WorkoutScreen() {
     setEdit({ exIdx, setIdx, kind });
     setEditValue(fieldValueStr(s, kind));
     Haptics.selectionAsync();
-    // 활성 종목 카드를 화면 상단 쪽으로 스크롤(숫자패드 가림 방지)
-    setTimeout(() => listRef.current?.scrollToIndex({ index: exIdx, viewPosition: 0, viewOffset: 16, animated: true }), 60);
+    // 편집하는 세트 행이 숫자패드 위에 보이도록 스크롤(행 기준 정밀)
+    setTimeout(() => {
+      const node = rowRefs.current.get(`${exIdx}-${setIdx}`);
+      node?.measure((_x, _y, _w, h, _px, py) => {
+        const winH = Dimensions.get('window').height;
+        const padTop = winH - 320; // 숫자패드 상단 추정선
+        const overflow = (py + h + 12) - padTop;
+        if (overflow > 0) listRef.current?.scrollToOffset({ offset: scrollY.current + overflow, animated: true });
+      });
+    }, 80);
   };
 
   const commitEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration', valStr: string) => {
@@ -1476,6 +1486,8 @@ export default function WorkoutScreen() {
         onReordered={(from, to) => reorderExercise(from, to)}
         contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}
         keyboardShouldPersistTaps="handled"
+        onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         onScrollToIndexFailed={() => {}}
         ListHeaderComponent={(
           <>
