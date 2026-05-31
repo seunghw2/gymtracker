@@ -17,6 +17,7 @@ import {
   findNodeHandle,
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import DragList, { DragListRenderItemInfo } from 'react-native-draglist';
 import * as Haptics from 'expo-haptics';
 import {
   getExercises,
@@ -149,7 +150,7 @@ export default function WorkoutScreen() {
     addSetToExercise,
     prependWarmupSets,
     markSetDone,
-    moveExercise,
+    reorderExercise,
     toggleTimeBased,
     removeSet,
     removeExercise,
@@ -210,8 +211,7 @@ export default function WorkoutScreen() {
   // 앱 자체 숫자패드 편집 상태
   const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
   const [editValue, setEditValue] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
-  const cardY = useRef<Map<number, number>>(new Map());
+  const listRef = useRef<FlatList<ExerciseEntry>>(null);
   const rowRefs = useRef<Map<string, View>>(new Map());
 
   const loadExercises = useCallback(async () => {
@@ -533,8 +533,7 @@ export default function WorkoutScreen() {
     setEditValue(fieldValueStr(s, kind));
     Haptics.selectionAsync();
     // 활성 종목 카드를 화면 상단 쪽으로 스크롤(숫자패드 가림 방지)
-    const cy = cardY.current.get(exIdx);
-    if (cy != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, cy - 16), animated: true }), 60);
+    setTimeout(() => listRef.current?.scrollToIndex({ index: exIdx, viewPosition: 0, viewOffset: 16, animated: true }), 60);
   };
 
   const commitEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration', valStr: string) => {
@@ -769,8 +768,7 @@ export default function WorkoutScreen() {
     // 같은 종목에 남은 미완료 세트가 있으면 해당 카드를 보기 좋게 스크롤(키보드는 안 띄움)
     const hasMore = ex.sets.some((st, j) => j !== setIdx && !st.done);
     if (hasMore) {
-      const cy = cardY.current.get(exIdx);
-      if (cy != null) setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, cy - 16), animated: true }), 80);
+      setTimeout(() => listRef.current?.scrollToIndex({ index: exIdx, viewPosition: 0, viewOffset: 16, animated: true }), 80);
     }
 
     const nextSet = ex.sets[setIdx + 1];
@@ -1422,7 +1420,16 @@ export default function WorkoutScreen() {
         </Pressable>
       </View>
 
-      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}>
+      <DragList
+        ref={listRef}
+        data={exercises}
+        keyExtractor={(ex) => String(ex.exerciseId)}
+        onReordered={(from, to) => reorderExercise(from, to)}
+        contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}
+        keyboardShouldPersistTaps="handled"
+        onScrollToIndexFailed={() => {}}
+        ListHeaderComponent={(
+          <>
         <View style={styles.metaRow}>
           <Pressable style={styles.metaChip} onPress={() => setShowTags(true)}>
             <Text style={[styles.metaChipText, sessionTags.length === 0 && styles.tagButtonPlaceholder]} numberOfLines={1}>
@@ -1445,59 +1452,19 @@ export default function WorkoutScreen() {
           />
         )}
 
-        <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => { setShowTags(false); setTagEdit(false); }}>
-          <Pressable style={styles.centerBackdrop} onPress={() => { setShowTags(false); setTagEdit(false); }}>
-            <Pressable style={styles.centerCard} onPress={() => {}}>
-              <View style={styles.tagHeaderRow}>
-                <Text style={styles.gymSheetTitle}>부위 선택</Text>
-                <Pressable onPress={() => setTagEdit(e => !e)} hitSlop={8}>
-                  <Text style={styles.tagEditBtn}>{tagEdit ? '완료' : '편집'}</Text>
-                </Pressable>
-              </View>
-              <View style={styles.tagRow}>
-                {bodyTags.map(t => {
-                  const on = sessionTags.includes(t);
-                  return (
-                    <Pressable
-                      key={t}
-                      style={[styles.tagChip, on && !tagEdit && styles.tagChipOn]}
-                      onPress={() => tagEdit ? removeBodyTag(t) : toggleSessionTag(t)}
-                    >
-                      <Text style={[styles.tagChipText, on && !tagEdit && styles.tagChipTextOn]}>{tagEdit ? `${t}  ✕` : t}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {tagEdit && (
-                <View style={styles.tagAddRow}>
-                  <TextInput
-                    style={styles.tagAddInput}
-                    placeholder="부위 추가"
-                    placeholderTextColor="#48484A"
-                    value={newTag}
-                    onChangeText={setNewTag}
-                    onSubmitEditing={addBodyTag}
-                    returnKeyType="done"
-                  />
-                  <Pressable style={[styles.tagAddBtn, !newTag.trim() && { opacity: 0.4 }]} onPress={addBodyTag} disabled={!newTag.trim()}>
-                    <Text style={styles.tagAddBtnText}>추가</Text>
-                  </Pressable>
-                </View>
-              )}
-              <Pressable style={styles.tagDoneBtn} onPress={() => { setShowTags(false); setTagEdit(false); }}>
-                <Text style={styles.tagDoneText}>{sessionTags.length > 0 ? '완료' : '건너뛰기'}</Text>
-              </Pressable>
-            </Pressable>
-          </Pressable>
-        </Modal>
-
         {exercises.length === 0 && (
           <View style={styles.emptyHint}>
             <Text style={styles.emptyHintText}>아래 버튼으로 운동을 추가하세요</Text>
           </View>
         )}
-
-        {exercises.map((ex, exIdx) => {
+          </>
+        )}
+        ListFooterComponent={(
+          <Pressable style={styles.addExerciseBtn} onPress={() => openExerciseSelect('active')}>
+            <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
+          </Pressable>
+        )}
+        renderItem={({ item: ex, index: exIdx, onDragStart, onDragEnd, isActive }: DragListRenderItemInfo<ExerciseEntry>) => {
           const bestORM = ex.sets
             .filter(s => s.done && s.estimated_1rm)
             .reduce((m, s) => Math.max(m, s.estimated_1rm ?? 0), 0);
@@ -1508,11 +1475,7 @@ export default function WorkoutScreen() {
             .reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
 
           return (
-            <View
-              key={exIdx}
-              style={styles.exerciseCard}
-              onLayout={e => cardY.current.set(exIdx, e.nativeEvent.layout.y)}
-            >
+            <View style={[styles.exerciseCard, isActive && styles.exerciseCardDragging]}>
               <View style={styles.exerciseCardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
@@ -1528,20 +1491,13 @@ export default function WorkoutScreen() {
                     <Text style={styles.ormBadge}>1RM {toDisplay(bestORM, unitKg)}{u}</Text>
                   )}
                   <Pressable
-                    onPress={() => moveExercise(exIdx, -1)}
-                    disabled={exIdx === 0}
-                    hitSlop={6}
-                    style={[styles.moveBtn, exIdx === 0 && styles.moveBtnDisabled]}
+                    onPressIn={onDragStart}
+                    onPressOut={onDragEnd}
+                    delayLongPress={120}
+                    hitSlop={8}
+                    style={styles.dragHandle}
                   >
-                    <Text style={styles.moveBtnText}>↑</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => moveExercise(exIdx, 1)}
-                    disabled={exIdx === exercises.length - 1}
-                    hitSlop={6}
-                    style={[styles.moveBtn, exIdx === exercises.length - 1 && styles.moveBtnDisabled]}
-                  >
-                    <Text style={styles.moveBtnText}>↓</Text>
+                    <Text style={styles.dragHandleText}>≡</Text>
                   </Pressable>
                   <Pressable onPress={() => handleRemoveExercise(exIdx)} hitSlop={8} style={styles.exDeleteBtn}>
                     <Text style={styles.exDeleteText}>✕</Text>
@@ -1683,12 +1639,54 @@ export default function WorkoutScreen() {
               </View>
             </View>
           );
-        })}
+        }}
+      />
 
-        <Pressable style={styles.addExerciseBtn} onPress={() => openExerciseSelect('active')}>
-          <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
+      <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => { setShowTags(false); setTagEdit(false); }}>
+        <Pressable style={styles.centerBackdrop} onPress={() => { setShowTags(false); setTagEdit(false); }}>
+          <Pressable style={styles.centerCard} onPress={() => {}}>
+            <View style={styles.tagHeaderRow}>
+              <Text style={styles.gymSheetTitle}>부위 선택</Text>
+              <Pressable onPress={() => setTagEdit(e => !e)} hitSlop={8}>
+                <Text style={styles.tagEditBtn}>{tagEdit ? '완료' : '편집'}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.tagRow}>
+              {bodyTags.map(t => {
+                const on = sessionTags.includes(t);
+                return (
+                  <Pressable
+                    key={t}
+                    style={[styles.tagChip, on && !tagEdit && styles.tagChipOn]}
+                    onPress={() => tagEdit ? removeBodyTag(t) : toggleSessionTag(t)}
+                  >
+                    <Text style={[styles.tagChipText, on && !tagEdit && styles.tagChipTextOn]}>{tagEdit ? `${t}  ✕` : t}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {tagEdit && (
+              <View style={styles.tagAddRow}>
+                <TextInput
+                  style={styles.tagAddInput}
+                  placeholder="부위 추가"
+                  placeholderTextColor="#48484A"
+                  value={newTag}
+                  onChangeText={setNewTag}
+                  onSubmitEditing={addBodyTag}
+                  returnKeyType="done"
+                />
+                <Pressable style={[styles.tagAddBtn, !newTag.trim() && { opacity: 0.4 }]} onPress={addBodyTag} disabled={!newTag.trim()}>
+                  <Text style={styles.tagAddBtnText}>추가</Text>
+                </Pressable>
+              </View>
+            )}
+            <Pressable style={styles.tagDoneBtn} onPress={() => { setShowTags(false); setTagEdit(false); }}>
+              <Text style={styles.tagDoneText}>{sessionTags.length > 0 ? '완료' : '건너뛰기'}</Text>
+            </Pressable>
+          </Pressable>
         </Pressable>
-      </ScrollView>
+      </Modal>
 
       {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
       <View style={[styles.restDock, edit && styles.restDockEditing]} pointerEvents="box-none">
@@ -1995,6 +1993,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
+  exerciseCardDragging: { opacity: 0.92, borderWidth: 1, borderColor: '#30D158', backgroundColor: '#23241F' },
   exerciseCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2120,16 +2119,15 @@ const styles = StyleSheet.create({
   checkDone: { color: '#30D158' },
   checkPR: { fontSize: 18 },
 
-  moveBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  dragHandle: {
+    width: 34,
+    height: 30,
+    borderRadius: 8,
     backgroundColor: '#2C2C2E',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  moveBtnDisabled: { opacity: 0.3 },
-  moveBtnText: { color: '#8E8E93', fontSize: 15, fontWeight: '700' },
+  dragHandleText: { color: '#8E8E93', fontSize: 18, fontWeight: '700' },
 
   detailNoteChip: {
     backgroundColor: '#2C2C2E',

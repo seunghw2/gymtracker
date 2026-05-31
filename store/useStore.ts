@@ -73,7 +73,7 @@ type WorkoutState = {
   addSetToExercise: (exIdx: number) => void;
   prependWarmupSets: (exIdx: number, warmups: { weight_kg: number; reps: number }[]) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number, isPR?: boolean) => void;
-  moveExercise: (exIdx: number, dir: -1 | 1) => void;
+  reorderExercise: (from: number, to: number) => void;
   toggleTimeBased: (exIdx: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
   removeExercise: (exIdx: number) => void;
@@ -176,12 +176,12 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
       exercises: state.exercises.map((ex, i) => i === exIdx ? { ...ex, prevBest1rm: best } : ex),
     })),
 
-  moveExercise: (exIdx, dir) =>
+  reorderExercise: (from, to) =>
     set((state) => {
-      const target = exIdx + dir;
-      if (target < 0 || target >= state.exercises.length) return state;
+      if (from === to || from < 0 || to < 0 || from >= state.exercises.length || to >= state.exercises.length) return state;
       const exercises = [...state.exercises];
-      [exercises[exIdx], exercises[target]] = [exercises[target], exercises[exIdx]];
+      const [moved] = exercises.splice(from, 1);
+      exercises.splice(to, 0, moved);
       return { exercises };
     }),
 
