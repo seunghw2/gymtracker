@@ -58,6 +58,8 @@ export default function SettingsScreen() {
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
   const [bodyTags, setBodyTagsState] = useState<string[]>([]);
   const [newBodyTag, setNewBodyTag] = useState('');
+  const [open, setOpen] = useState<string | null>(null);
+  const toggle = (id: string) => setOpen(o => (o === id ? null : id));
 
   const load = useCallback(async () => {
     const [gymList, exList, allEx] = await Promise.all([getGyms(), getCustomExercises(), getExercises()]);
@@ -214,7 +216,11 @@ export default function SettingsScreen() {
         {/* 계정 */}
         {user && (
           <>
-            <Text style={styles.sectionTitle}>계정</Text>
+            <Pressable style={styles.catRow} onPress={() => toggle('account')}>
+              <Text style={styles.catTitle}>계정</Text>
+              <Text style={styles.catChevron}>{open === 'account' ? '⌄' : '›'}</Text>
+            </Pressable>
+            {open === 'account' && (
             <View style={styles.card}>
               <View style={styles.row}>
                 <View>
@@ -229,11 +235,16 @@ export default function SettingsScreen() {
                 <Text style={[styles.label, { color: '#FF453A' }]}>로그아웃</Text>
               </Pressable>
             </View>
+            )}
           </>
         )}
 
         {/* 목표 설정 */}
-        <Text style={styles.sectionTitle}>목표 설정</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('goals')}>
+          <Text style={styles.catTitle}>목표 설정</Text>
+          <Text style={styles.catChevron}>{open === 'goals' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'goals' && (
         <View style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.label}>목표 체중 (kg)</Text>
@@ -271,9 +282,14 @@ export default function SettingsScreen() {
             <Text style={styles.saveBtnText}>저장</Text>
           </Pressable>
         </View>
+        )}
 
         {/* 단위 설정 */}
-        <Text style={styles.sectionTitle}>단위</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('unit')}>
+          <Text style={styles.catTitle}>단위</Text>
+          <Text style={styles.catChevron}>{open === 'unit' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'unit' && (
         <View style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.label}>kg 단위 사용</Text>
@@ -285,9 +301,14 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+        )}
 
         {/* 표시·동작 */}
-        <Text style={styles.sectionTitle}>표시·동작</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('display')}>
+          <Text style={styles.catTitle}>표시·동작</Text>
+          <Text style={styles.catChevron}>{open === 'display' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'display' && (
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={{ flex: 1, paddingRight: 12 }}>
@@ -332,9 +353,14 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+        )}
 
         {/* 알림 */}
-        <Text style={styles.sectionTitle}>휴식 알림</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('rest')}>
+          <Text style={styles.catTitle}>휴식 알림</Text>
+          <Text style={styles.catChevron}>{open === 'rest' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'rest' && (
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={{ flex: 1, paddingRight: 12 }}>
@@ -351,9 +377,14 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+        )}
 
         {/* 종목별 휴식시간 */}
-        <Text style={styles.sectionTitle}>종목별 휴식시간 (초)</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('exRest')}>
+          <Text style={styles.catTitle}>종목별 휴식시간</Text>
+          <Text style={styles.catChevron}>{open === 'exRest' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'exRest' && (
         <View style={styles.card}>
           <Text style={[styles.listItemSub, { marginBottom: 4 }]}>
             비워두면 기본 {restDurationSec}초 적용
@@ -385,9 +416,14 @@ export default function SettingsScreen() {
             <Text style={styles.emptyText}>종목이 없습니다</Text>
           )}
         </View>
+        )}
 
         {/* 헬스장 관리 */}
-        <Text style={styles.sectionTitle}>헬스장 관리</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('gym')}>
+          <Text style={styles.catTitle}>헬스장 관리</Text>
+          <Text style={styles.catChevron}>{open === 'gym' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'gym' && (
         <View style={styles.card}>
           <TextInput
             style={styles.fullInput}
@@ -421,9 +457,14 @@ export default function SettingsScreen() {
             <Text style={styles.emptyText}>등록된 헬스장이 없습니다</Text>
           )}
         </View>
+        )}
 
         {/* 부위 관리 */}
-        <Text style={styles.sectionTitle}>부위 관리</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('bodyTags')}>
+          <Text style={styles.catTitle}>부위 관리</Text>
+          <Text style={styles.catChevron}>{open === 'bodyTags' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'bodyTags' && (
         <View style={styles.card}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TextInput
@@ -451,17 +492,27 @@ export default function SettingsScreen() {
             <Text style={styles.emptyText}>등록된 부위가 없습니다</Text>
           )}
         </View>
+        )}
 
         {/* 데이터 */}
-        <Text style={styles.sectionTitle}>데이터</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('data')}>
+          <Text style={styles.catTitle}>데이터</Text>
+          <Text style={styles.catChevron}>{open === 'data' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'data' && (
         <View style={styles.card}>
           <Pressable style={styles.addBtn} onPress={handleExport} disabled={exporting}>
             <Text style={styles.addBtnText}>{exporting ? '내보내는 중…' : '운동 기록 CSV 내보내기'}</Text>
           </Pressable>
         </View>
+        )}
 
         {/* 커스텀 운동 관리 */}
-        <Text style={styles.sectionTitle}>커스텀 운동</Text>
+        <Pressable style={styles.catRow} onPress={() => toggle('custom')}>
+          <Text style={styles.catTitle}>커스텀 운동</Text>
+          <Text style={styles.catChevron}>{open === 'custom' ? '⌄' : '›'}</Text>
+        </Pressable>
+        {open === 'custom' && (
         <View style={styles.card}>
           {customExercises.map(ex => (
             <View key={ex.id} style={styles.listItem}>
@@ -478,6 +529,7 @@ export default function SettingsScreen() {
             <Text style={styles.emptyText}>등록된 커스텀 운동이 없습니다</Text>
           )}
         </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -489,6 +541,19 @@ const styles = StyleSheet.create({
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },
 
   sectionTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 16, textTransform: 'uppercase' },
+
+  catRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  catTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  catChevron: { color: '#8E8E93', fontSize: 20, fontWeight: '700' },
 
   card: {
     backgroundColor: '#1C1C1E',
