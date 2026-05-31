@@ -52,6 +52,7 @@ import {
   getBodyTags,
   setBodyTags,
   getExerciseRmBasis,
+  setExerciseRmBasis,
   convertRm,
   Exercise,
   SessionSummary,
@@ -220,6 +221,7 @@ export default function WorkoutScreen() {
   const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
   // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
+  const [rmPickerIdx, setRmPickerIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
   const [restMain, setRestMain] = useState<number>(90);
   const [restWarm, setRestWarm] = useState<number>(30);
@@ -328,6 +330,15 @@ export default function WorkoutScreen() {
   };
 
   const gymName = (id: number | null | undefined) => gyms.find(g => g.id === id)?.name ?? null;
+
+  const RM_OPTIONS = [1, 3, 5, 8, 10, 12];
+  const changeExerciseRm = (exIdx: number, n: number) => {
+    const ex = exercises[exIdx];
+    if (!ex) return;
+    setRmBasisMap(m => ({ ...m, [ex.exerciseId]: n }));
+    setExerciseRmBasis(ex.exerciseId, n).catch(() => {});
+    setRmPickerIdx(null);
+  };
 
   const handleStartWorkout = async () => {
     const date = getTodayStr();
@@ -1567,23 +1578,30 @@ export default function WorkoutScreen() {
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
                   {(() => {
                     const basisN = rmBasisMap[ex.exerciseId] ?? 1;
+                    const hasPrev = (ex.prevBest1rm ?? 0) > 0;
                     const curD = toDisplay(convertRm(bestORM, basisN), unitKg);
                     const prevD = toDisplay(convertRm(ex.prevBest1rm ?? 0, basisN), unitKg);
+                    const diff = Math.round((curD - prevD) * 10) / 10;
+                    // 체크 후: 이전 → 현재 + 증감을 함께 표시 (이전 기록 유지)
                     if (bestORM > 0) {
-                      const diff = Math.round((curD - prevD) * 10) / 10;
                       return (
-                        <Text style={styles.exVolume}>
-                          {basisN}RM {curD}{u}
-                          {(ex.prevBest1rm ?? 0) > 0 && diff !== 0 ? (
-                            <Text style={{ color: diff > 0 ? '#30D158' : '#FF453A', fontWeight: '700' }}>{'  '}{diff > 0 ? '▲' : '▼'}{Math.abs(diff)}{u}</Text>
-                          ) : null}
-                        </Text>
+                        <Pressable onPress={() => setRmPickerIdx(exIdx)} hitSlop={6}>
+                          <Text style={styles.exVolume}>
+                            {hasPrev ? `이전 ${basisN}RM ${prevD}${u} → ` : `${basisN}RM `}{curD}{u}
+                            {hasPrev && diff !== 0 ? (
+                              <Text style={{ color: diff > 0 ? '#30D158' : '#FF453A', fontWeight: '700' }}>{'  '}{diff > 0 ? '▲' : '▼'}{Math.abs(diff)}{u}</Text>
+                            ) : null}
+                          </Text>
+                        </Pressable>
                       );
                     }
-                    if ((ex.prevBest1rm ?? 0) > 0) {
-                      return <Text style={styles.exVolume}>이전 {basisN}RM {prevD}{u}</Text>;
-                    }
-                    return null;
+                    return (
+                      <Pressable onPress={() => setRmPickerIdx(exIdx)} hitSlop={6}>
+                        <Text style={styles.exVolume}>
+                          {hasPrev ? `이전 ${basisN}RM ${prevD}${u}` : `${basisN}RM 기록 없음`}
+                        </Text>
+                      </Pressable>
+                    );
                   })()}
                 </View>
                 <Pressable onPress={() => setCardMenuIdx(exIdx)} hitSlop={8} style={styles.exMenuBtn}>
@@ -1783,10 +1801,39 @@ export default function WorkoutScreen() {
             <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => handleAddWarmup(i), 180); }}>
               <Text style={styles.menuItemText}>🔥 워밍업 추가</Text>
             </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => setRmPickerIdx(i), 180); }}>
+              <Text style={styles.menuItemText}>🎯 기준 RM</Text>
+            </Pressable>
             <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => handleRemoveExercise(i), 180); }}>
               <Text style={[styles.menuItemText, { color: '#FF453A' }]}>🗑 운동 삭제</Text>
             </Pressable>
             <Pressable style={styles.menuCancel} onPress={() => setCardMenuIdx(null)}>
+              <Text style={styles.menuCancelText}>닫기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 기준 RM 선택 */}
+      <Modal visible={rmPickerIdx != null} transparent animationType="fade" onRequestClose={() => setRmPickerIdx(null)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setRmPickerIdx(null)}>
+          <Pressable style={styles.menuSheet} onPress={() => {}}>
+            <Text style={styles.menuHeader}>기준 RM</Text>
+            <View style={styles.rmPickRow}>
+              {RM_OPTIONS.map(n => {
+                const cur = rmPickerIdx != null ? (rmBasisMap[exercises[rmPickerIdx]?.exerciseId] ?? 1) : 1;
+                return (
+                  <Pressable
+                    key={n}
+                    style={[styles.rmPickChip, cur === n && styles.rmPickChipOn]}
+                    onPress={() => rmPickerIdx != null && changeExerciseRm(rmPickerIdx, n)}
+                  >
+                    <Text style={[styles.rmPickText, cur === n && styles.rmPickTextOn]}>{n}RM</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable style={styles.menuCancel} onPress={() => setRmPickerIdx(null)}>
               <Text style={styles.menuCancelText}>닫기</Text>
             </Pressable>
           </Pressable>
@@ -2217,6 +2264,11 @@ const styles = StyleSheet.create({
   menuHeader: { color: '#8E8E93', fontSize: 13, fontWeight: '600', paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8 },
   menuItem: { paddingVertical: 16, paddingHorizontal: 12 },
   menuItemText: { color: '#FFFFFF', fontSize: 17 },
+  rmPickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
+  rmPickChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#2C2C2E' },
+  rmPickChipOn: { backgroundColor: '#30D158' },
+  rmPickText: { color: '#8E8E93', fontSize: 15, fontWeight: '600' },
+  rmPickTextOn: { color: '#000000' },
   menuCancel: { marginTop: 8, paddingVertical: 16, alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 12 },
   menuCancelText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
   restSeg: { flexDirection: 'row', backgroundColor: '#2C2C2E', borderRadius: 10, padding: 4, marginHorizontal: 12, marginTop: 4 },
