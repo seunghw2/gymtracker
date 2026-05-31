@@ -14,6 +14,8 @@ import {
   getGyms,
   addGym,
   deleteGym,
+  getBodyTags,
+  setBodyTags,
   getCustomExercises,
   deleteCustomExercise,
   getExercises,
@@ -54,6 +56,8 @@ export default function SettingsScreen() {
   const [showSessionNote, setShowSessionNote] = useState(true);
   const [weightPrompt, setWeightPrompt] = useState(true);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
+  const [bodyTags, setBodyTagsState] = useState<string[]>([]);
+  const [newBodyTag, setNewBodyTag] = useState('');
 
   const load = useCallback(async () => {
     const [gymList, exList, allEx] = await Promise.all([getGyms(), getCustomExercises(), getExercises()]);
@@ -72,6 +76,7 @@ export default function SettingsScreen() {
     setShowSessionNote(ssn !== '0');
     setWeightPrompt(wpe !== '0');
     setAutoTagPrompt(atp !== '0');
+    setBodyTagsState(await getBodyTags());
 
     const restMap: Record<number, string> = {};
     for (const ex of allEx) {
@@ -171,6 +176,21 @@ export default function SettingsScreen() {
   const toggleAutoTagPrompt = async (val: boolean) => {
     setAutoTagPrompt(val);
     await setSetting('auto_tag_prompt', val ? '1' : '0');
+  };
+
+  const handleAddBodyTag = async () => {
+    const t = newBodyTag.trim();
+    if (!t || bodyTags.includes(t)) { setNewBodyTag(''); return; }
+    const next = [...bodyTags, t];
+    setBodyTagsState(next);
+    setNewBodyTag('');
+    await setBodyTags(next);
+  };
+
+  const handleDeleteBodyTag = async (t: string) => {
+    const next = bodyTags.filter(x => x !== t);
+    setBodyTagsState(next);
+    await setBodyTags(next);
   };
 
   const [exporting, setExporting] = useState(false);
@@ -399,6 +419,36 @@ export default function SettingsScreen() {
           ))}
           {gyms.length === 0 && (
             <Text style={styles.emptyText}>등록된 헬스장이 없습니다</Text>
+          )}
+        </View>
+
+        {/* 부위 관리 */}
+        <Text style={styles.sectionTitle}>부위 관리</Text>
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              style={[styles.fullInput, { flex: 1 }]}
+              placeholder="부위 이름 (예: 가슴)"
+              placeholderTextColor="#48484A"
+              value={newBodyTag}
+              onChangeText={setNewBodyTag}
+              onSubmitEditing={handleAddBodyTag}
+              returnKeyType="done"
+            />
+            <Pressable style={[styles.addBtn, { marginTop: 0, paddingHorizontal: 18, justifyContent: 'center' }]} onPress={handleAddBodyTag}>
+              <Text style={styles.addBtnText}>추가</Text>
+            </Pressable>
+          </View>
+          {bodyTags.map(t => (
+            <View key={t} style={styles.listItem}>
+              <Text style={styles.listItemName}>{t}</Text>
+              <Pressable onPress={() => handleDeleteBodyTag(t)}>
+                <Text style={styles.deleteText}>삭제</Text>
+              </Pressable>
+            </View>
+          ))}
+          {bodyTags.length === 0 && (
+            <Text style={styles.emptyText}>등록된 부위가 없습니다</Text>
           )}
         </View>
 

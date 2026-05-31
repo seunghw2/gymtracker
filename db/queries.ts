@@ -464,6 +464,19 @@ export async function setSetting(key: string, value: string): Promise<void> {
   settingsCache = null;
 }
 
+// 부위 태그 목록(사용자 편집 가능). 미설정 시 기본 7개.
+export const DEFAULT_BODY_TAGS = ['가슴', '등', '어깨', '하체', '팔', '코어', '유산소'];
+
+export async function getBodyTags(): Promise<string[]> {
+  const raw = await getSetting('body_tags', '');
+  const list = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  return list.length > 0 ? list : DEFAULT_BODY_TAGS;
+}
+
+export async function setBodyTags(tags: string[]): Promise<void> {
+  await setSetting('body_tags', tags.join(','));
+}
+
 // 종목별 휴식시간(초). 미설정 시 fallback 반환.
 export async function getExerciseRest(exerciseId: number, fallback: number): Promise<number> {
   const raw = await getSetting(`rest_ex_${exerciseId}`, '');

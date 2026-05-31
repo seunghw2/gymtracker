@@ -44,6 +44,8 @@ import {
   getGyms,
   getSetting,
   setSetting,
+  getBodyTags,
+  setBodyTags,
   Exercise,
   SessionSummary,
   SessionSetRow,
@@ -59,7 +61,6 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LAST_GYM_KEY = 'last_gym_id';
-const BODY_TAGS = ['가슴', '등', '어깨', '하체', '팔', '코어', '유산소'];
 
 // 운동 추가 모달에서 선택 가능한 종목(목록·최근 종목 공통)
 type SelectableExercise = {
@@ -183,6 +184,9 @@ export default function WorkoutScreen() {
   const [showTags, setShowTags] = useState(false);
   const [showNote, setShowNote] = useState(true);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
+  const [bodyTags, setBodyTagsState] = useState<string[]>([]);
+  const [tagEdit, setTagEdit] = useState(false);
+  const [newTag, setNewTag] = useState('');
   const [sessionNote, setSessionNote] = useState('');
   const [detailTitle, setDetailTitle] = useState('');
   const [detailNote, setDetailNote] = useState('');
@@ -232,7 +236,23 @@ export default function WorkoutScreen() {
     getGyms().then(setGyms).catch(() => {});
     getSetting('show_session_note', '1').then(v => setShowNote(v !== '0')).catch(() => {});
     getSetting('auto_tag_prompt', '1').then(v => setAutoTagPrompt(v !== '0')).catch(() => {});
+    getBodyTags().then(setBodyTagsState).catch(() => {});
   }, []);
+
+  const addBodyTag = () => {
+    const t = newTag.trim();
+    if (!t || bodyTags.includes(t)) { setNewTag(''); return; }
+    const next = [...bodyTags, t];
+    setBodyTagsState(next);
+    setNewTag('');
+    setBodyTags(next).catch(() => {});
+  };
+
+  const removeBodyTag = (t: string) => {
+    const next = bodyTags.filter(x => x !== t);
+    setBodyTagsState(next);
+    setBodyTags(next).catch(() => {});
+  };
 
   // 운동 중 화면 꺼짐 방지
   useEffect(() => {
@@ -282,11 +302,13 @@ export default function WorkoutScreen() {
     if (activeSessionId) updateSession(activeSessionId, { gymId }).catch(() => {});
   };
 
-  // 진행 중 세션 부위 태그 토글
+  // 진행 중 세션 부위 태그 토글 — 세션 이름도 선택 부위로 자동 설정
   const toggleSessionTag = (tag: string) => {
     const next = sessionTags.includes(tag) ? sessionTags.filter(t => t !== tag) : [...sessionTags, tag];
     setSessionTags(next);
-    if (activeSessionId) updateSession(activeSessionId, { tags: next.join(',') }).catch(() => {});
+    const autoTitle = next.join('·');
+    setSessionTitle(autoTitle);
+    if (activeSessionId) updateSession(activeSessionId, { tags: next.join(','), title: autoTitle }).catch(() => {});
   };
 
   // 지난 세션을 그대로 새 운동으로 불러와 시작
@@ -1453,14 +1475,9 @@ export default function WorkoutScreen() {
       {/* 헤더 */}
       <View style={styles.sessionHeader}>
         <View style={{ flex: 1 }}>
-          <TextInput
-            style={styles.sessionTitleInput}
-            placeholder="운동 이름"
-            placeholderTextColor="#8E8E93"
-            value={sessionTitle ?? ''}
-            onChangeText={setSessionTitle}
-            onEndEditing={handleSessionTitleBlur}
-          />
+          <Text style={styles.sessionTitleInput} numberOfLines={1}>
+            {sessionTitle?.trim() || (sessionDate ? formatDate(sessionDate) : '운동')}
+          </Text>
           <Text style={styles.sessionElapsed}>
             {sessionDate ? `${formatDate(sessionDate)} · ` : ''}{elapsed}
           </Text>
@@ -1496,22 +1513,47 @@ export default function WorkoutScreen() {
           />
         )}
 
-        <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => setShowTags(false)}>
-          <Pressable style={styles.centerBackdrop} onPress={() => setShowTags(false)}>
+        <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => { setShowTags(false); setTagEdit(false); }}>
+          <Pressable style={styles.centerBackdrop} onPress={() => { setShowTags(false); setTagEdit(false); }}>
             <Pressable style={styles.centerCard} onPress={() => {}}>
-              <Text style={styles.gymSheetTitle}>부위 선택</Text>
+              <View style={styles.tagHeaderRow}>
+                <Text style={styles.gymSheetTitle}>부위 선택</Text>
+                <Pressable onPress={() => setTagEdit(e => !e)} hitSlop={8}>
+                  <Text style={styles.tagEditBtn}>{tagEdit ? '완료' : '편집'}</Text>
+                </Pressable>
+              </View>
               <View style={styles.tagRow}>
-                {BODY_TAGS.map(t => {
+                {bodyTags.map(t => {
                   const on = sessionTags.includes(t);
                   return (
-                    <Pressable key={t} style={[styles.tagChip, on && styles.tagChipOn]} onPress={() => toggleSessionTag(t)}>
-                      <Text style={[styles.tagChipText, on && styles.tagChipTextOn]}>{t}</Text>
+                    <Pressable
+                      key={t}
+                      style={[styles.tagChip, on && !tagEdit && styles.tagChipOn]}
+                      onPress={() => tagEdit ? removeBodyTag(t) : toggleSessionTag(t)}
+                    >
+                      <Text style={[styles.tagChipText, on && !tagEdit && styles.tagChipTextOn]}>{tagEdit ? `${t}  ✕` : t}</Text>
                     </Pressable>
                   );
                 })}
               </View>
-              <Pressable style={styles.tagDoneBtn} onPress={() => setShowTags(false)}>
-                <Text style={styles.tagDoneText}>완료</Text>
+              {tagEdit && (
+                <View style={styles.tagAddRow}>
+                  <TextInput
+                    style={styles.tagAddInput}
+                    placeholder="부위 추가"
+                    placeholderTextColor="#48484A"
+                    value={newTag}
+                    onChangeText={setNewTag}
+                    onSubmitEditing={addBodyTag}
+                    returnKeyType="done"
+                  />
+                  <Pressable style={[styles.tagAddBtn, !newTag.trim() && { opacity: 0.4 }]} onPress={addBodyTag} disabled={!newTag.trim()}>
+                    <Text style={styles.tagAddBtnText}>추가</Text>
+                  </Pressable>
+                </View>
+              )}
+              <Pressable style={styles.tagDoneBtn} onPress={() => { setShowTags(false); setTagEdit(false); }}>
+                <Text style={styles.tagDoneText}>{sessionTags.length > 0 ? '완료' : '건너뛰기'}</Text>
               </Pressable>
             </Pressable>
           </Pressable>
@@ -1918,6 +1960,12 @@ const styles = StyleSheet.create({
   tagChipOn: { backgroundColor: '#0A84FF' },
   tagChipText: { color: '#8E8E93', fontSize: 16, fontWeight: '600' },
   tagChipTextOn: { color: '#FFFFFF' },
+  tagHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  tagEditBtn: { color: '#0A84FF', fontSize: 15, fontWeight: '600' },
+  tagAddRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  tagAddInput: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: '#FFFFFF', fontSize: 15 },
+  tagAddBtn: { backgroundColor: '#30D158', borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
+  tagAddBtnText: { color: '#000000', fontSize: 15, fontWeight: '700' },
   tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagBadge: { color: '#5AB0FF', fontSize: 11, fontWeight: '600', backgroundColor: '#0A2A4A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
   sessionNoteInput: {
