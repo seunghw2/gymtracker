@@ -42,6 +42,8 @@ import {
   createTemplate,
   deleteTemplate,
   getGyms,
+  getSetting,
+  setSetting,
   Exercise,
   SessionSummary,
   SessionSetRow,
@@ -178,10 +180,16 @@ export default function WorkoutScreen() {
   const [startGymId, setStartGymId] = useState<number | null>(null);
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [showGymPicker, setShowGymPicker] = useState(false);
+  const [showTags, setShowTags] = useState(false);
+  const [showNote, setShowNote] = useState(true);
+  const [autoTagPrompt, setAutoTagPrompt] = useState(true);
   const [sessionNote, setSessionNote] = useState('');
   const [detailTitle, setDetailTitle] = useState('');
   const [detailNote, setDetailNote] = useState('');
   const [recents, setRecents] = useState<TrainedExercise[]>([]);
+  const [modalSearch, setModalSearch] = useState('');
+  const [searchAll, setSearchAll] = useState<Exercise[]>([]);
+  const [favIds, setFavIds] = useState<number[]>([]);
   const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
   const [repeatLoading, setRepeatLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
@@ -222,6 +230,8 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
+    getSetting('show_session_note', '1').then(v => setShowNote(v !== '0')).catch(() => {});
+    getSetting('auto_tag_prompt', '1').then(v => setAutoTagPrompt(v !== '0')).catch(() => {});
   }, []);
 
   // 운동 중 화면 꺼짐 방지
@@ -232,10 +242,26 @@ export default function WorkoutScreen() {
     }
   }, [activeSessionId]);
 
-  // 운동 추가 모달 열릴 때 최근 종목 로드(빠른 추가용)
+  // 운동 추가 모달 열릴 때 최근 종목·전체 목록·즐겨찾기 로드
   useEffect(() => {
-    if (showExerciseModal) getTrainedExercises().then(setRecents).catch(() => {});
+    if (showExerciseModal) {
+      setModalSearch('');
+      getTrainedExercises().then(setRecents).catch(() => {});
+      getExercises().then(setSearchAll).catch(() => {});
+      getSetting('fav_exercises', '').then(v => {
+        setFavIds(v ? v.split(',').map(Number).filter(Boolean) : []);
+      }).catch(() => {});
+    }
   }, [showExerciseModal]);
+
+  const toggleFav = (id: number) => {
+    setFavIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      setSetting('fav_exercises', next.join(',')).catch(() => {});
+      return next;
+    });
+    Haptics.selectionAsync();
+  };
 
   const gymName = (id: number | null | undefined) => gyms.find(g => g.id === id)?.name ?? null;
 
@@ -245,6 +271,7 @@ export default function WorkoutScreen() {
     startSession(sessionId, date, null, null);
     setSessionNote('');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (autoTagPrompt) setShowTags(true);
   };
 
   // 진행 중 세션 헬스장 선택
@@ -931,32 +958,83 @@ export default function WorkoutScreen() {
         </View>
 
         {selectStep === 'muscle' && (
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            {recents.length > 0 && (
-              <View style={{ marginBottom: 20 }}>
-                <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
-                <View style={styles.chipWrap}>
-                  {recents.slice(0, 8).map(r => {
-                    const on = !!selectedToAdd[r.id];
-                    return (
-                      <Pressable key={r.id} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleSelect(r)}>
-                        <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>{on ? '✓ ' : ''}{r.name}</Text>
-                        {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-            <Text style={styles.quickAddTitle}>부위로 찾기</Text>
-            <View style={styles.muscleGrid}>
-              {MUSCLE_GROUPS.map(mg => (
-                <Pressable key={mg} style={styles.muscleBtn} onPress={() => { setSelectedMuscle(mg); setSelectStep('equipment'); }}>
-                  <Text style={styles.muscleBtnText}>{mg}</Text>
-                </Pressable>
-              ))}
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="종목 검색"
+                placeholderTextColor="#48484A"
+                value={modalSearch}
+                onChangeText={setModalSearch}
+                clearButtonMode="while-editing"
+              />
             </View>
-          </ScrollView>
+            {modalSearch.trim() ? (
+              <FlatList
+                data={searchAll.filter(e => e.name.toLowerCase().includes(modalSearch.trim().toLowerCase()))}
+                keyExtractor={item => String(item.id)}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={[styles.modalContent, Object.keys(selectedToAdd).length > 0 && { paddingBottom: 110 }]}
+                renderItem={({ item }) => {
+                  const on = !!selectedToAdd[item.id];
+                  return (
+                    <View style={[styles.exItem, on && styles.exItemOn]}>
+                      <Pressable style={styles.exItemMain} onPress={() => toggleSelect(item)}>
+                        <Text style={styles.exName} numberOfLines={1}>{on ? '✓ ' : ''}{item.name}</Text>
+                        {item.brand && <Text style={styles.exBrand} numberOfLines={1}>{item.brand}</Text>}
+                      </Pressable>
+                      <Pressable onPress={() => toggleFav(item.id)} hitSlop={8}>
+                        <Text style={styles.favStar}>{favIds.includes(item.id) ? '⭐' : '☆'}</Text>
+                      </Pressable>
+                    </View>
+                  );
+                }}
+              />
+            ) : (
+              <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+                {searchAll.filter(e => favIds.includes(e.id)).length > 0 && (
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={styles.quickAddTitle}>⭐ 즐겨찾기</Text>
+                    <View style={styles.chipWrap}>
+                      {searchAll.filter(e => favIds.includes(e.id)).map(f => {
+                        const on = !!selectedToAdd[f.id];
+                        return (
+                          <Pressable key={f.id} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleSelect(f)}>
+                            <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>{on ? '✓ ' : ''}{f.name}</Text>
+                            {f.brand && <Text style={styles.chipBrand} numberOfLines={1}>{f.brand}</Text>}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+                {recents.length > 0 && (
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
+                    <View style={styles.chipWrap}>
+                      {recents.slice(0, 6).map(r => {
+                        const on = !!selectedToAdd[r.id];
+                        return (
+                          <Pressable key={r.id} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleSelect(r)}>
+                            <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>{on ? '✓ ' : ''}{r.name}</Text>
+                            {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+                <Text style={styles.quickAddTitle}>부위로 찾기</Text>
+                <View style={styles.muscleGrid}>
+                  {MUSCLE_GROUPS.map(mg => (
+                    <Pressable key={mg} style={styles.muscleBtn} onPress={() => { setSelectedMuscle(mg); setSelectStep('equipment'); }}>
+                      <Text style={styles.muscleBtnText}>{mg}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+          </View>
         )}
 
         {selectStep === 'equipment' && (
@@ -1377,14 +1455,14 @@ export default function WorkoutScreen() {
         <View style={{ flex: 1 }}>
           <TextInput
             style={styles.sessionTitleInput}
-            placeholder={sessionDate ? formatDate(sessionDate) : '운동 이름'}
+            placeholder="운동 이름"
             placeholderTextColor="#8E8E93"
             value={sessionTitle ?? ''}
             onChangeText={setSessionTitle}
             onEndEditing={handleSessionTitleBlur}
           />
           <Text style={styles.sessionElapsed}>
-            {(sessionDate ? formatDate(sessionDate) : '')}{gymName(sessionGymId) ? ` · ${gymName(sessionGymId)}` : ''} · {elapsed}
+            {sessionDate ? `${formatDate(sessionDate)} · ` : ''}{elapsed}
           </Text>
         </View>
         <Pressable style={styles.cancelBtn} onPress={handleCancelWorkout}>
@@ -1396,28 +1474,48 @@ export default function WorkoutScreen() {
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}>
-        <Pressable style={styles.gymChip} onPress={() => setShowGymPicker(true)}>
-          <Text style={styles.gymChipText}>📍 {gymName(sessionGymId) ?? '헬스장 선택'}</Text>
-        </Pressable>
-        <View style={styles.tagRow}>
-          {BODY_TAGS.map(t => {
-            const on = sessionTags.includes(t);
-            return (
-              <Pressable key={t} style={[styles.tagChip, on && styles.tagChipOn]} onPress={() => toggleSessionTag(t)}>
-                <Text style={[styles.tagChipText, on && styles.tagChipTextOn]}>{t}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.metaRow}>
+          <Pressable style={styles.metaChip} onPress={() => setShowTags(true)}>
+            <Text style={[styles.metaChipText, sessionTags.length === 0 && styles.tagButtonPlaceholder]} numberOfLines={1}>
+              🏷 {sessionTags.length > 0 ? sessionTags.join('·') : '부위'}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.metaChip} onPress={() => setShowGymPicker(true)}>
+            <Text style={styles.metaChipText} numberOfLines={1}>📍 {gymName(sessionGymId) ?? '헬스장'}</Text>
+          </Pressable>
         </View>
-        <TextInput
-          style={styles.sessionNoteInput}
-          placeholder="세션 메모 (선택)"
-          placeholderTextColor="#48484A"
-          value={sessionNote}
-          onChangeText={setSessionNote}
-          onEndEditing={handleSessionNoteBlur}
-          multiline
-        />
+        {showNote && (
+          <TextInput
+            style={styles.sessionNoteInput}
+            placeholder="세션 메모 (선택)"
+            placeholderTextColor="#48484A"
+            value={sessionNote}
+            onChangeText={setSessionNote}
+            onEndEditing={handleSessionNoteBlur}
+            multiline
+          />
+        )}
+
+        <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => setShowTags(false)}>
+          <Pressable style={styles.centerBackdrop} onPress={() => setShowTags(false)}>
+            <Pressable style={styles.centerCard} onPress={() => {}}>
+              <Text style={styles.gymSheetTitle}>부위 선택</Text>
+              <View style={styles.tagRow}>
+                {BODY_TAGS.map(t => {
+                  const on = sessionTags.includes(t);
+                  return (
+                    <Pressable key={t} style={[styles.tagChip, on && styles.tagChipOn]} onPress={() => toggleSessionTag(t)}>
+                      <Text style={[styles.tagChipText, on && styles.tagChipTextOn]}>{t}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Pressable style={styles.tagDoneBtn} onPress={() => setShowTags(false)}>
+                <Text style={styles.tagDoneText}>완료</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {exercises.length === 0 && (
           <View style={styles.emptyHint}>
@@ -1805,10 +1903,20 @@ const styles = StyleSheet.create({
   sessionTitleInput: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', paddingVertical: 2 },
   gymChip: { alignSelf: 'flex-start', backgroundColor: '#2C2C2E', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 8 },
   gymChipText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  tagChip: { backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
+  metaRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  metaChip: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 9 },
+  metaChipText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
+  centerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  centerCard: { backgroundColor: '#1C1C1E', borderRadius: 20, padding: 20, alignSelf: 'stretch' },
+  tagButton: { alignSelf: 'flex-start', backgroundColor: '#2C2C2E', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 8 },
+  tagButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
+  tagButtonPlaceholder: { color: '#8E8E93' },
+  tagDoneBtn: { backgroundColor: '#0A84FF', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  tagDoneText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  tagChip: { backgroundColor: '#2C2C2E', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 14, minWidth: 76, alignItems: 'center' },
   tagChipOn: { backgroundColor: '#0A84FF' },
-  tagChipText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  tagChipText: { color: '#8E8E93', fontSize: 16, fontWeight: '600' },
   tagChipTextOn: { color: '#FFFFFF' },
   tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagBadge: { color: '#5AB0FF', fontSize: 11, fontWeight: '600', backgroundColor: '#0A2A4A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
@@ -2251,6 +2359,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exItemOn: { backgroundColor: '#16301F', borderWidth: 1, borderColor: '#30D158' },
+  exItemMain: { flex: 1, paddingRight: 12 },
+  favStar: { fontSize: 22 },
   exName: { color: '#FFFFFF', fontSize: 16 },
   exBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
   exArrow: { color: '#8E8E93', fontSize: 24 },

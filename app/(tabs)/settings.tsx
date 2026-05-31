@@ -51,6 +51,9 @@ export default function SettingsScreen() {
   const [goalWeightInput, setGoalWeightInput] = useState(String(goalWeightKg));
   const [goalFatInput, setGoalFatInput] = useState(String(goalBodyFatPct));
   const [restInput, setRestInput] = useState(String(restDurationSec));
+  const [showSessionNote, setShowSessionNote] = useState(true);
+  const [weightPrompt, setWeightPrompt] = useState(true);
+  const [autoTagPrompt, setAutoTagPrompt] = useState(true);
 
   const load = useCallback(async () => {
     const [gymList, exList, allEx] = await Promise.all([getGyms(), getCustomExercises(), getExercises()]);
@@ -63,6 +66,12 @@ export default function SettingsScreen() {
     const rd = await getSetting('rest_duration_sec', String(restDurationSec));
     const uk = await getSetting('unit_kg', '1');
     const sos = await getSetting('sound_silent_override', '1');
+    const ssn = await getSetting('show_session_note', '1');
+    const wpe = await getSetting('weight_prompt_enabled', '1');
+    const atp = await getSetting('auto_tag_prompt', '1');
+    setShowSessionNote(ssn !== '0');
+    setWeightPrompt(wpe !== '0');
+    setAutoTagPrompt(atp !== '0');
 
     const restMap: Record<number, string> = {};
     for (const ex of allEx) {
@@ -147,6 +156,21 @@ export default function SettingsScreen() {
   const toggleSoundOnSilent = async (val: boolean) => {
     setSoundOnSilent(val);
     await setSetting('sound_silent_override', val ? '1' : '0');
+  };
+
+  const toggleShowSessionNote = async (val: boolean) => {
+    setShowSessionNote(val);
+    await setSetting('show_session_note', val ? '1' : '0');
+  };
+
+  const toggleWeightPrompt = async (val: boolean) => {
+    setWeightPrompt(val);
+    await setSetting('weight_prompt_enabled', val ? '1' : '0');
+  };
+
+  const toggleAutoTagPrompt = async (val: boolean) => {
+    setAutoTagPrompt(val);
+    await setSetting('auto_tag_prompt', val ? '1' : '0');
   };
 
   const [exporting, setExporting] = useState(false);
@@ -236,6 +260,53 @@ export default function SettingsScreen() {
             <Switch
               value={unitKg}
               onValueChange={toggleUnit}
+              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        {/* 표시·동작 */}
+        <Text style={styles.sectionTitle}>표시·동작</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.label}>세션 메모 칸 표시</Text>
+              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
+                운동 화면에 세션 메모 입력칸을 표시
+              </Text>
+            </View>
+            <Switch
+              value={showSessionNote}
+              onValueChange={toggleShowSessionNote}
+              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <View style={[styles.row, { marginTop: 12 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.label}>체중 자동 팝업</Text>
+              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
+                홈 진입 시 당일 체중 미입력이면 자동으로 팝업
+              </Text>
+            </View>
+            <Switch
+              value={weightPrompt}
+              onValueChange={toggleWeightPrompt}
+              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <View style={[styles.row, { marginTop: 12 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.label}>시작 시 부위 선택 자동 표시</Text>
+              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
+                운동 시작하면 부위 선택 팝업을 바로 표시
+              </Text>
+            </View>
+            <Switch
+              value={autoTagPrompt}
+              onValueChange={toggleAutoTagPrompt}
               trackColor={{ false: '#3A3A3C', true: '#30D158' }}
               thumbColor="#FFFFFF"
             />

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,16 @@ import {
   Pressable,
   Modal,
   SafeAreaView,
-  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   getTodayBodyLog,
   getLatestBodyLog,
   upsertBodyLog,
   getWeeklyWorkoutCount,
   getAllWorkoutDates,
+  getSetting,
 } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
@@ -41,30 +42,11 @@ function getWeekRange() {
   };
 }
 
-function calcStreak(dates: string[]): number {
-  if (dates.length === 0) return 0;
-  const today = getTodayStr();
-  const sorted = [...new Set(dates)].sort().reverse();
-  let streak = 0;
-  let current = today;
-  for (const d of sorted) {
-    if (d === current) {
-      streak++;
-      const prev = new Date(current);
-      prev.setDate(prev.getDate() - 1);
-      current = prev.toISOString().slice(0, 10);
-    } else if (d < current) {
-      break;
-    }
-  }
-  return streak;
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const { goalWeightKg, goalBodyFatPct } = useSettingsStore();
   const [weekCount, setWeekCount] = useState(0);
-  const [streak, setStreak] = useState(0);
+  const [monthCount, setMonthCount] = useState(0);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [dialValue, setDialValue] = useState(70);
@@ -89,15 +71,17 @@ export default function HomeScreen() {
     }
 
     setWeekCount(count);
-    setStreak(calcStreak(allDates));
+    const ym = today.slice(0, 7);
+    setMonthCount(allDates.filter(d => d.startsWith(ym)).length);
 
     if (todayLog?.weight_kg) {
       setTodayWeight(todayLog.weight_kg);
       setTodayBodyFat(todayLog.body_fat_pct ?? null);
     } else {
-      // 오늘 이미 "나중에"로 닫았으면 다시 자동으로 띄우지 않음
+      // 설정에서 자동 팝업을 껐거나, 오늘 이미 "나중에"로 닫았으면 안 띄움
+      const enabled = await getSetting('weight_prompt_enabled', '1').catch(() => '1');
       const dismissed = await AsyncStorage.getItem(WEIGHT_PROMPT_KEY).catch(() => null);
-      if (dismissed !== today) setShowWeightModal(true);
+      if (enabled !== '0' && dismissed !== today) setShowWeightModal(true);
       setDialValue(latestLog?.weight_kg ?? 70);
       setBodyFatInput(latestLog?.body_fat_pct ? String(latestLog.body_fat_pct) : '');
     }
@@ -120,22 +104,17 @@ export default function HomeScreen() {
     setShowWeightModal(true);
   };
 
-  // 체중·체지방 변경 시 디바운스 자동 저장 (별도 저장 버튼 없음)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleSave = useCallback((weight: number, fatStr: string) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      const fat = parseFloat(fatStr);
-      const fatVal = Number.isFinite(fat) && fat > 0 ? fat : undefined;
-      try {
-        await upsertBodyLog(getTodayStr(), weight, fatVal);
-      } catch {
-        // 저장 실패는 무시 (다음 변경 시 재시도)
-      }
-      setTodayWeight(weight);
-      setTodayBodyFat(fatVal ?? null);
-    }, 400);
-  }, []);
+  // 저장 버튼으로 명시 저장 (체지방은 통계 화면에서 별도 입력)
+  const handleSaveWeight = async () => {
+    try {
+      await upsertBodyLog(getTodayStr(), dialValue, todayBodyFat ?? undefined);
+    } catch {
+      // 저장 실패 무시
+    }
+    setTodayWeight(dialValue);
+    AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {});
+    setShowWeightModal(false);
+  };
 
   // 바깥 화면 탭으로 닫기 (오늘은 자동 팝업 재등장 방지)
   const closeWeightModal = () => {
@@ -159,12 +138,12 @@ export default function HomeScreen() {
         {/* 이번주 통계 */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{weekCount}</Text>
-            <Text style={styles.statLabel}>이번주 운동</Text>
+            <Text style={styles.statValue}>{monthCount}</Text>
+            <Text style={styles.statLabel}>이번달 운동</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{streak}</Text>
-            <Text style={styles.statLabel}>연속 스트릭</Text>
+            <Text style={styles.statValue}>{weekCount}</Text>
+            <Text style={styles.statLabel}>이번주 운동</Text>
           </View>
         </View>
 
@@ -221,33 +200,21 @@ export default function HomeScreen() {
 
       {/* 체중 입력 모달 — 눈금자 + 자동 저장, 바깥 탭하면 닫힘 */}
       <Modal visible={showWeightModal} transparent animationType="slide" onRequestClose={closeWeightModal}>
-        <Pressable style={styles.modalOverlay} onPress={closeWeightModal}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>오늘의 체중</Text>
-            <Text style={styles.weightReadout}>{dialValue.toFixed(1)}<Text style={styles.weightUnit}>kg</Text></Text>
-            <RulerPicker
-              initial={dialValue}
-              onChange={v => { setDialValue(v); scheduleSave(v, bodyFatInput); }}
-            />
-            <View style={styles.fatRow}>
-              <Text style={styles.fatLabel}>체지방률</Text>
-              <TextInput
-                style={styles.fatInput}
-                value={bodyFatInput}
-                onChangeText={t => {
-                  const c = t.replace(/[^0-9.]/g, '');
-                  setBodyFatInput(c);
-                  scheduleSave(dialValue, c);
-                }}
-                keyboardType="decimal-pad"
-                placeholder="선택"
-                placeholderTextColor="#48484A"
-                selectTextOnFocus
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <Pressable style={styles.modalOverlay} onPress={closeWeightModal}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>오늘의 체중</Text>
+              <Text style={styles.weightReadout}>{dialValue.toFixed(1)}<Text style={styles.weightUnit}>kg</Text></Text>
+              <RulerPicker
+                initial={dialValue}
+                onChange={v => setDialValue(v)}
               />
-              <Text style={styles.fatUnit}>%</Text>
+              <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
+                <Text style={styles.saveBtnText}>저장</Text>
+              </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </GestureHandlerRootView>
       </Modal>
     </SafeAreaView>
   );
@@ -330,6 +297,8 @@ const styles = StyleSheet.create({
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginBottom: 4 },
   weightReadout: { color: '#FFFFFF', fontSize: 56, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
   weightUnit: { color: '#8E8E93', fontSize: 24, fontWeight: '600' },
+  saveBtn: { backgroundColor: '#30D158', borderRadius: 14, paddingVertical: 14, alignItems: 'center', alignSelf: 'stretch', marginTop: 20 },
+  saveBtnText: { color: '#000000', fontSize: 17, fontWeight: '700' },
   fatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   fatLabel: { color: '#8E8E93', fontSize: 15 },
   fatInput: {

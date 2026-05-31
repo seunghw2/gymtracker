@@ -12,7 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, VolumeRange } from '../../db/queries';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, upsertBodyLog, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, VolumeRange } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
@@ -59,6 +59,7 @@ export default function StatsScreen() {
   const [recordSearch, setRecordSearch] = useState('');
   const [recordSort, setRecordSort] = useState<'1rm' | 'name'>('1rm');
   const [muscleFreq, setMuscleFreq] = useState<MuscleFrequency[]>([]);
+  const [fatInput, setFatInput] = useState('');
   const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
 
@@ -66,6 +67,22 @@ export default function StatsScreen() {
     const logs = await getBodyLogs(30);
     setBodyLogs(logs.reverse());
   }, []);
+
+  const saveFat = async () => {
+    const fat = parseFloat(fatInput);
+    if (!Number.isFinite(fat) || fat <= 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = bodyLogs.find(l => l.date === today);
+    const latestWeight = bodyLogs.length > 0 ? bodyLogs[bodyLogs.length - 1].weight_kg ?? 0 : 0;
+    const weight = todayLog?.weight_kg ?? latestWeight;
+    try {
+      await upsertBodyLog(today, weight, fat);
+      setFatInput('');
+      await load();
+    } catch {
+      /* 무시 */
+    }
+  };
 
   useEffect(() => {
     if (activeChip === '1RM 성장' && !trainedExercises) {
@@ -286,6 +303,22 @@ export default function StatsScreen() {
 
         {activeChip === '체지방' && (
           <View>
+            <View style={styles.fatEntryRow}>
+              <Text style={styles.fatEntryLabel}>오늘 체지방률</Text>
+              <TextInput
+                style={styles.fatEntryInput}
+                value={fatInput}
+                onChangeText={t => setFatInput(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder={currentFat > 0 ? String(currentFat) : '예: 15'}
+                placeholderTextColor="#48484A"
+                selectTextOnFocus
+              />
+              <Text style={styles.fatEntryUnit}>%</Text>
+              <Pressable style={[styles.fatEntrySave, !fatInput && { opacity: 0.4 }]} onPress={saveFat} disabled={!fatInput}>
+                <Text style={styles.fatEntrySaveText}>저장</Text>
+              </Pressable>
+            </View>
             {hasFatData ? (
               <LineChart
                 data={{
@@ -323,7 +356,7 @@ export default function StatsScreen() {
                   ? currentFat > goalBodyFatPct
                     ? `${(currentFat - goalBodyFatPct).toFixed(1)}% 남음`
                     : '목표 달성!'
-                  : '홈에서 체지방을 입력하세요'}
+                  : '위에서 체지방을 입력하세요'}
               </Text>
             </View>
           </View>
@@ -480,6 +513,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
   },
+  fatEntryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16, marginBottom: 16 },
+  fatEntryLabel: { color: '#8E8E93', fontSize: 14, flex: 1 },
+  fatEntryInput: { backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: '#FFFFFF', fontSize: 16, minWidth: 70, textAlign: 'center' },
+  fatEntryUnit: { color: '#8E8E93', fontSize: 15 },
+  fatEntrySave: { backgroundColor: '#FF9F0A', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  fatEntrySaveText: { color: '#000000', fontSize: 15, fontWeight: '700' },
   goalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   goalLabel: { color: '#8E8E93', fontSize: 14 },
   progressBar: { height: 8, backgroundColor: '#2C2C2E', borderRadius: 4, overflow: 'hidden' },

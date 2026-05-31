@@ -113,15 +113,15 @@ export default function CalendarScreen() {
 
   const renderSessionCard = (s: SessionSummary) => (
     <Pressable key={s.id} style={styles.sessionCard} onPress={() => openSessionDetail(s)}>
+      <Text style={styles.sessionDateTop}>{formatShortWithDay(s.date)}</Text>
       <View style={styles.sessionCardTop}>
         <Text style={styles.sessionTitle} numberOfLines={1}>
-          {s.title?.trim() || formatShortWithDay(s.date)}
+          {s.title?.trim() || '운동'}
         </Text>
         <Text style={styles.sessionMeta}>
           {s.exercise_count}종목·{s.set_count}세트{s.duration_sec ? `·${formatDuration(s.duration_sec)}` : ''}
         </Text>
       </View>
-      {s.title?.trim() ? <Text style={styles.sessionDate}>{formatShortWithDay(s.date)}</Text> : null}
       {s.tags ? (
         <View style={styles.tagBadgeRow}>
           {s.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{t}</Text>)}
@@ -222,18 +222,6 @@ export default function CalendarScreen() {
               </Pressable>
             );
           })}
-        </View>
-
-        {/* 월 요약 */}
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{stats.count}</Text>
-            <Text style={styles.summaryLabel}>이번달 운동</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{stats.totalSec > 0 ? formatDuration(stats.totalSec) : '-'}</Text>
-            <Text style={styles.summaryLabel}>총 운동 시간</Text>
-          </View>
         </View>
 
         {/* 선택한 날짜 요약 */}
@@ -413,6 +401,7 @@ const styles = StyleSheet.create({
   sessionTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', flex: 1, marginRight: 8 },
   sessionMeta: { color: '#30D158', fontSize: 12, fontWeight: '600' },
   sessionDate: { color: '#8E8E93', fontSize: 12, marginTop: 3 },
+  sessionDateTop: { color: '#30D158', fontSize: 15, fontWeight: '700', marginBottom: 6 },
   sessionExercises: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
   tagBadge: { color: '#5AB0FF', fontSize: 11, fontWeight: '600', backgroundColor: '#0A2A4A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
