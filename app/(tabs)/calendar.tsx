@@ -6,19 +6,10 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
-  Modal,
 } from 'react-native';
-import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, getSessionSets, getSessionExerciseNotes, SessionSummary, SessionSetRow } from '../../db/queries';
-import { formatShortWithDay, formatDateWithDay } from '../../lib/date';
-import { useSettingsStore } from '../../store/useStore';
-import { toDisplay, unitLabel } from '../../lib/units';
+import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, SessionSummary } from '../../db/queries';
+import { formatShortWithDay } from '../../lib/date';
 import SessionCard from '../../components/SessionCard';
-
-const SET_TYPE_BADGE: Record<string, { label: string; color: string }> = {
-  WARMUP: { label: 'W', color: '#FF9F0A' },
-  DROP: { label: 'D', color: '#BF5AF2' },
-  FAILURE: { label: 'F', color: '#FF453A' },
-};
 
 function getWeekRange(offset = 0) {
   const today = new Date();
@@ -60,13 +51,6 @@ function getFirstDayOfWeek(year: number, month: number): number {
   return (day + 6) % 7;
 }
 
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  if (h > 0) return `${h}시간 ${m}분`;
-  return `${m}분`;
-}
-
 export default function CalendarScreen() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -78,26 +62,8 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [weekOffset, setWeekOffset] = useState(0);
-  const [detailSession, setDetailSession] = useState<SessionSummary | null>(null);
-  const [detailSets, setDetailSets] = useState<SessionSetRow[]>([]);
-  const [detailNotes, setDetailNotes] = useState<Record<number, string>>({});
-  const { unitKg } = useSettingsStore();
-  const u = unitLabel(unitKg);
-
   const today = now.toISOString().slice(0, 10);
   const week = getWeekRange(weekOffset);
-
-  const openSessionDetail = async (s: SessionSummary) => {
-    const [sets, notes] = await Promise.all([
-      getSessionSets(s.id).catch(() => [] as SessionSetRow[]),
-      getSessionExerciseNotes(s.id).catch(() => []),
-    ]);
-    setDetailSets(sets);
-    const nm: Record<number, string> = {};
-    for (const n of notes) if (n.note) nm[n.exercise_id] = n.note;
-    setDetailNotes(nm);
-    setDetailSession(s);
-  };
 
   const load = useCallback(async () => {
     const [dates, allDates, monthStats, hist] = await Promise.all([
@@ -113,7 +79,7 @@ export default function CalendarScreen() {
   }, [year, month]);
 
   const renderSessionCard = (s: SessionSummary) => (
-    <SessionCard key={s.id} session={s} onPress={() => openSessionDetail(s)} onChanged={load} />
+    <SessionCard key={s.id} session={s} onChanged={load} />
   );
 
   useEffect(() => { load(); }, [load]);
@@ -242,72 +208,6 @@ export default function CalendarScreen() {
           </View>
         )}
       </ScrollView>
-
-      {/* 운동 상세 (보기 전용) */}
-      <Modal visible={!!detailSession} animationType="slide" transparent onRequestClose={() => setDetailSession(null)}>
-        <View style={styles.detailOverlay}>
-          <View style={styles.detailSheet}>
-            <View style={styles.detailHeader}>
-              <Text style={styles.detailTitle} numberOfLines={1}>
-                {detailSession?.title?.trim() || (detailSession ? formatDateWithDay(detailSession.date) : '')}
-              </Text>
-              <Pressable onPress={() => setDetailSession(null)} hitSlop={8}>
-                <Text style={styles.detailClose}>닫기</Text>
-              </Pressable>
-            </View>
-            {detailSession && (
-              <Text style={styles.detailSub}>
-                {formatDateWithDay(detailSession.date)}
-                {detailSession.duration_sec ? ` · ${formatDuration(detailSession.duration_sec)}` : ''}
-              </Text>
-            )}
-            {detailSession?.tags ? (
-              <View style={styles.tagBadgeRow}>
-                {detailSession.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{t}</Text>)}
-              </View>
-            ) : null}
-            {detailSession?.note?.trim() ? (
-              <Text style={styles.detailNote}>📝 {detailSession.note}</Text>
-            ) : null}
-            <ScrollView style={{ marginTop: 8 }}>
-              {(() => {
-                const groups: { id: number; name: string; brand: string | null; sets: SessionSetRow[] }[] = [];
-                const map: Record<number, number> = {};
-                for (const s of detailSets) {
-                  if (map[s.exercise_id] === undefined) {
-                    map[s.exercise_id] = groups.length;
-                    groups.push({ id: s.exercise_id, name: s.exercise_name, brand: s.brand, sets: [] });
-                  }
-                  groups[map[s.exercise_id]].sets.push(s);
-                }
-                if (groups.length === 0) return <Text style={styles.emptyText}>세트 기록이 없습니다</Text>;
-                return groups.map(g => (
-                  <View key={g.id} style={styles.detailExCard}>
-                    <Text style={styles.detailExName}>{g.name}{g.brand ? ` · ${g.brand}` : ''}</Text>
-                    {detailNotes[g.id] ? <Text style={styles.detailExNote}>📝 {detailNotes[g.id]}</Text> : null}
-                    {g.sets.map(s => {
-                      const badge = SET_TYPE_BADGE[s.set_type];
-                      return (
-                        <View key={s.id} style={styles.detailSetRow}>
-                          <Text style={styles.detailSetNum}>
-                            {badge ? <Text style={{ color: badge.color }}>{badge.label}</Text> : s.set_order}
-                          </Text>
-                          <Text style={styles.detailSetVal}>
-                            {s.duration_sec != null
-                              ? `${s.duration_sec}초`
-                              : `${toDisplay(s.weight_kg, unitKg)}${u} × ${s.reps}`}
-                          </Text>
-                          <Text style={styles.detailSet1rm}>{s.estimated_1rm ? `1RM ${toDisplay(s.estimated_1rm, unitKg)}${u}` : ''}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                ));
-              })()}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -381,29 +281,5 @@ const styles = StyleSheet.create({
   section: { marginTop: 24 },
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 10 },
   emptyText: { color: '#48484A', fontSize: 14, paddingVertical: 8 },
-  sessionCard: { backgroundColor: '#1C1C1E', borderRadius: 14, padding: 14, marginBottom: 8 },
-  sessionCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sessionTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', flex: 1, marginRight: 8 },
-  sessionMeta: { color: '#30D158', fontSize: 12, fontWeight: '600' },
-  sessionDate: { color: '#8E8E93', fontSize: 12, marginTop: 3 },
-  sessionDateTop: { color: '#30D158', fontSize: 15, fontWeight: '700', marginBottom: 6 },
-  sessionExercises: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
-  tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  tagBadge: { color: '#5AB0FF', fontSize: 11, fontWeight: '600', backgroundColor: '#0A2A4A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
   navArrowDisabled: { color: '#3A3A3C' },
-
-  detailOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  detailSheet: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, maxHeight: '85%' },
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  detailTitle: { color: '#FFFFFF', fontSize: 19, fontWeight: '700', flex: 1, marginRight: 12 },
-  detailClose: { color: '#30D158', fontSize: 16, fontWeight: '600' },
-  detailSub: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
-  detailNote: { color: '#E5E5EA', fontSize: 13, marginTop: 8, backgroundColor: '#2C2C2E', borderRadius: 8, padding: 10 },
-  detailExCard: { backgroundColor: '#2C2C2E', borderRadius: 12, padding: 14, marginBottom: 8 },
-  detailExName: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-  detailExNote: { color: '#E5C07B', fontSize: 12, marginTop: 4 },
-  detailSetRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  detailSetNum: { color: '#8E8E93', fontSize: 14, width: 28, fontWeight: '700' },
-  detailSetVal: { color: '#FFFFFF', fontSize: 15, flex: 1, fontVariant: ['tabular-nums'] },
-  detailSet1rm: { color: '#30D158', fontSize: 12, fontVariant: ['tabular-nums'] },
 });

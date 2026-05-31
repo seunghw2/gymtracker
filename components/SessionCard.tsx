@@ -3,6 +3,7 @@ import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SessionSummary } from '../db/queries';
 import { formatShortWithWeekday } from '../lib/date';
 import { useSessionActions } from '../hooks/useSessionActions';
+import SessionPreviewSheet from './SessionPreviewSheet';
 
 function formatDuration(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -13,7 +14,6 @@ function formatDuration(sec: number): string {
 
 type Props = {
   session: SessionSummary;
-  onPress: () => void;
   onChanged?: () => void;
 };
 
@@ -25,9 +25,10 @@ function MenuItem({ label, danger, onPress }: { label: string; danger?: boolean;
   );
 }
 
-export default function SessionCard({ session, onPress, onChanged }: Props) {
+export default function SessionCard({ session, onChanged }: Props) {
   const [menu, setMenu] = useState(false);
-  const { startAsIs, saveAsTemplate, rename, remove } = useSessionActions();
+  const [preview, setPreview] = useState(false);
+  const { startAsIs, saveAsTemplate, rename, remove, edit } = useSessionActions();
   const tags = session.tags ? session.tags.split(',').filter(Boolean) : [];
 
   const close = () => setMenu(false);
@@ -35,7 +36,7 @@ export default function SessionCard({ session, onPress, onChanged }: Props) {
   const run = (fn: () => void) => { close(); setTimeout(fn, 180); };
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={styles.card} onPress={() => setPreview(true)}>
       <View style={styles.topRow}>
         <Text style={styles.date}>{formatShortWithWeekday(session.date)}</Text>
         <View style={styles.topRight}>
@@ -72,6 +73,7 @@ export default function SessionCard({ session, onPress, onChanged }: Props) {
             <Text style={styles.menuHeader} numberOfLines={1}>
               {session.title?.trim() || formatShortWithWeekday(session.date)}
             </Text>
+            <MenuItem label="📝 운동 수정" onPress={() => run(() => edit(session))} />
             <MenuItem label="🔁 이대로 시작" onPress={() => run(() => startAsIs(session))} />
             <MenuItem label="⭐ 템플릿으로 저장" onPress={() => run(() => saveAsTemplate(session))} />
             <MenuItem label="✏️ 이름 변경" onPress={() => run(() => rename(session, onChanged))} />
@@ -82,6 +84,8 @@ export default function SessionCard({ session, onPress, onChanged }: Props) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <SessionPreviewSheet session={preview ? session : null} onClose={() => setPreview(false)} />
     </Pressable>
   );
 }

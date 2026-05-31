@@ -13,6 +13,7 @@ import {
   deleteSession,
 } from '../db/queries';
 import { useWorkoutStore, ExerciseEntry } from '../store/useStore';
+import { useUiStore } from '../store/useUiStore';
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -27,6 +28,17 @@ export function useSessionActions() {
   const startSession = useWorkoutStore(s => s.startSession);
   const addExercises = useWorkoutStore(s => s.addExercises);
   const setExercisePrevBest = useWorkoutStore(s => s.setExercisePrevBest);
+  const setEditTarget = useUiStore(s => s.setEditTarget);
+
+  // 운동 탭의 편집 화면으로 이동해 과거 세션을 수정
+  const edit = (session: SessionSummary) => {
+    if (useWorkoutStore.getState().activeSessionId) {
+      Alert.alert('수정 불가', '진행 중인 운동이 있어 수정할 수 없습니다. 먼저 마치거나 취소해주세요.');
+      return;
+    }
+    setEditTarget(session);
+    router.push('/(tabs)/workout');
+  };
 
   // 과거 세션을 오늘 새 세션으로 그대로 시작 (입력칸 미완료 상태로 프리필)
   const startAsIs = async (session: SessionSummary) => {
@@ -143,5 +155,5 @@ export function useSessionActions() {
     ]);
   };
 
-  return { startAsIs, saveAsTemplate, rename, remove };
+  return { startAsIs, saveAsTemplate, rename, remove, edit };
 }

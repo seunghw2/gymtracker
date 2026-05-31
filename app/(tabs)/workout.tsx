@@ -56,6 +56,7 @@ import {
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
 import SessionCard from '../../components/SessionCard';
+import { useUiStore } from '../../store/useUiStore';
 import { formatDateWithDay } from '../../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -232,6 +233,16 @@ export default function WorkoutScreen() {
       getTemplates().then(setTemplates).catch(() => {});
     }
   }, [activeSessionId]);
+
+  // 세션 카드 "운동 수정" → 운동 탭으로 넘어와 편집 화면 열기
+  const editTarget = useUiStore(s => s.editTarget);
+  const clearEditTarget = useUiStore(s => s.clearEditTarget);
+  useEffect(() => {
+    if (editTarget && !activeSessionId) {
+      openDetail(editTarget);
+      clearEditTarget();
+    }
+  }, [editTarget, activeSessionId]);
 
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
@@ -1201,7 +1212,6 @@ export default function WorkoutScreen() {
                 <SessionCard
                   key={session.id}
                   session={session}
-                  onPress={() => openDetail(session)}
                   onChanged={() => { getSessionHistory().then(setHistory); getTemplates().then(setTemplates); }}
                 />
               ))}
