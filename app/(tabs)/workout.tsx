@@ -787,6 +787,7 @@ export default function WorkoutScreen() {
 
   const handleCompleteSet = async (exIdx: number, setIdx: number) => {
     if (!activeSessionId) return;
+    Keyboard.dismiss(); // 메모 등 시스템 키보드가 떠 있으면 닫기
     const ex = exercises[exIdx];
     const s = ex.sets[setIdx];
     const timed = !!ex.timeBased;
@@ -1575,7 +1576,7 @@ export default function WorkoutScreen() {
                   onPress={() => { setEdit(null); setMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] })); }}
                 >
                   <Text style={[styles.memoChipText, !ex.note?.trim() && styles.memoChipPlaceholder]} numberOfLines={1}>
-                    {ex.note?.trim() ? ex.note.trim() : '종목 메모'}
+                    📌 종목 메모
                   </Text>
                 </Pressable>
               </View>
