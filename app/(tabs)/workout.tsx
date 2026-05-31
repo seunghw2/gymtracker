@@ -55,6 +55,7 @@ import {
   Gym,
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
+import SessionCard from '../../components/SessionCard';
 import { formatDateWithDay } from '../../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -309,55 +310,6 @@ export default function WorkoutScreen() {
     const autoTitle = next.join('·');
     setSessionTitle(autoTitle);
     if (activeSessionId) updateSession(activeSessionId, { tags: next.join(','), title: autoTitle }).catch(() => {});
-  };
-
-  // 지난 세션을 그대로 새 운동으로 불러와 시작
-  const handleRepeatSession = async (session: SessionSummary) => {
-    if (repeatLoading) return;
-    setRepeatLoading(true);
-    try {
-      const [sets, trained] = await Promise.all([
-        getSessionSets(session.id),
-        getTrainedExercises().catch(() => [] as TrainedExercise[]),
-      ]);
-      if (sets.length === 0) {
-        Alert.alert('불러올 수 없음', '이 운동에는 기록된 세트가 없습니다.');
-        return;
-      }
-      const noteMap = new Map(trained.map(t => [t.id, t.note]));
-      const typeMap = new Map(trained.map(t => [t.id, t.tracking_type]));
-      const order: number[] = [];
-      const groups: Record<number, ExerciseEntry> = {};
-      for (const s of sets) {
-        if (!groups[s.exercise_id]) {
-          order.push(s.exercise_id);
-          groups[s.exercise_id] = {
-            exerciseId: s.exercise_id, exerciseName: s.exercise_name, brand: s.brand,
-            sets: [], lastSets: [], note: noteMap.get(s.exercise_id) ?? null, sessionNote: '',
-            timeBased: typeMap.get(s.exercise_id) === 'TIME',
-          };
-        }
-        const g = groups[s.exercise_id];
-        g.sets.push({ setOrder: g.sets.length + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: s.set_type, durationSec: s.duration_sec ?? undefined });
-        g.lastSets!.push({ weight_kg: s.weight_kg, reps: s.reps });
-      }
-      const date = getTodayStr();
-      const name = session.title || '';
-      const newId = await createWorkoutSession(date, null, name);
-      startSession(newId, date, name || null, null);
-      setSessionNote('');
-      const entries = order.map(id => groups[id]);
-      addExercises(entries);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // PR 기준이 되는 역대 최고 1RM을 비동기로 채움
-      const bests = await Promise.all(order.map(id => get1RMHistory(id).catch(() => [])));
-      bests.forEach((hist, idx) => {
-        const best = hist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
-        if (best > 0) setExercisePrevBest(idx, best);
-      });
-    } finally {
-      setRepeatLoading(false);
-    }
   };
 
   // 루틴(템플릿)으로 새 운동 시작
@@ -1246,42 +1198,12 @@ export default function WorkoutScreen() {
             <>
               <Text style={styles.historyTitle}>지난 운동</Text>
               {history.map(session => (
-                <Pressable key={session.id} style={styles.historyCard} onPress={() => openDetail(session)}>
-                  <View style={styles.historyCardTop}>
-                    <Text style={styles.historyDate}>{session.title?.trim() || formatDate(session.date)}</Text>
-                    {session.duration_sec ? (
-                      <Text style={styles.historyDuration}>{formatDuration(session.duration_sec)}</Text>
-                    ) : null}
-                  </View>
-                  {session.title?.trim() ? (
-                    <Text style={styles.historySubDate}>{formatDate(session.date)}</Text>
-                  ) : null}
-                  <Text style={styles.historyExercises} numberOfLines={1}>
-                    {session.exercise_names || '운동 없음'}
-                  </Text>
-                  {session.tags ? (
-                    <View style={styles.tagBadgeRow}>
-                      {session.tags.split(',').filter(Boolean).map(t => (
-                        <Text key={t} style={styles.tagBadge}>{t}</Text>
-                      ))}
-                    </View>
-                  ) : null}
-                  <View style={styles.historyBottom}>
-                    <Text style={styles.historyMeta}>
-                      {session.exercise_count}가지 운동 · {session.set_count}세트
-                    </Text>
-                    {session.set_count > 0 && (
-                      <Pressable
-                        style={styles.repeatBtn}
-                        onPress={() => handleRepeatSession(session)}
-                        disabled={repeatLoading}
-                        hitSlop={6}
-                      >
-                        <Text style={styles.repeatBtnText}>🔁 이대로 시작</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                </Pressable>
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  onPress={() => openDetail(session)}
+                  onChanged={() => { getSessionHistory().then(setHistory); getTemplates().then(setTemplates); }}
+                />
               ))}
             </>
           )}

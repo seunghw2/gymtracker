@@ -12,6 +12,7 @@ import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, 
 import { formatShortWithDay, formatDateWithDay } from '../../lib/date';
 import { useSettingsStore } from '../../store/useStore';
 import { toDisplay, unitLabel } from '../../lib/units';
+import SessionCard from '../../components/SessionCard';
 
 const SET_TYPE_BADGE: Record<string, { label: string; color: string }> = {
   WARMUP: { label: 'W', color: '#FF9F0A' },
@@ -112,23 +113,7 @@ export default function CalendarScreen() {
   }, [year, month]);
 
   const renderSessionCard = (s: SessionSummary) => (
-    <Pressable key={s.id} style={styles.sessionCard} onPress={() => openSessionDetail(s)}>
-      <Text style={styles.sessionDateTop}>{formatShortWithDay(s.date)}</Text>
-      <View style={styles.sessionCardTop}>
-        <Text style={styles.sessionTitle} numberOfLines={1}>
-          {s.title?.trim() || '운동'}
-        </Text>
-        <Text style={styles.sessionMeta}>
-          {s.exercise_count}종목·{s.set_count}세트{s.duration_sec ? `·${formatDuration(s.duration_sec)}` : ''}
-        </Text>
-      </View>
-      {s.tags ? (
-        <View style={styles.tagBadgeRow}>
-          {s.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{t}</Text>)}
-        </View>
-      ) : null}
-      {s.exercise_names ? <Text style={styles.sessionExercises} numberOfLines={1}>{s.exercise_names}</Text> : null}
-    </Pressable>
+    <SessionCard key={s.id} session={s} onPress={() => openSessionDetail(s)} onChanged={load} />
   );
 
   useEffect(() => { load(); }, [load]);

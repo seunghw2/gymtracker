@@ -22,3 +22,9 @@ export function formatShortWithDay(dateStr: string): string {
   const d = parseLocalDate(dateStr);
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdayKo(d)})`;
 }
+
+/** "5월 30일 금요일" — 요일 전체 표기 */
+export function formatShortWithWeekday(dateStr: string): string {
+  const d = parseLocalDate(dateStr);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${weekdayKo(d)}요일`;
+}
