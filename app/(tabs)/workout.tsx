@@ -215,7 +215,6 @@ export default function WorkoutScreen() {
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
-  const [sessMemoOpen, setSessMemoOpen] = useState<Record<number, boolean>>({});
   // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
@@ -574,6 +573,7 @@ export default function WorkoutScreen() {
   const beginEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration') => {
     const s = exercises[exIdx]?.sets[setIdx];
     if (!s) return;
+    Keyboard.dismiss(); // 메모 등 시스템 키보드 닫고 앱 내 숫자패드 표시
     setEdit({ exIdx, setIdx, kind });
     setEditValue(fieldValueStr(s, kind));
     Haptics.selectionAsync();
@@ -1568,39 +1568,26 @@ export default function WorkoutScreen() {
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
-              {/* 메모 — 종목/오늘 각각 버튼, 누르면 해당 입력칸 펼침 */}
+              {/* 메모 — 종목 메모 버튼, 누르면 입력칸 펼침 */}
               <View style={styles.memoBtnRow}>
-                <Pressable style={[styles.memoChip, memoOpen[exIdx] && styles.memoChipOn]} onPress={() => setMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] }))}>
+                <Pressable
+                  style={[styles.memoChip, memoOpen[exIdx] && styles.memoChipOn]}
+                  onPress={() => { setEdit(null); setMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] })); }}
+                >
                   <Text style={[styles.memoChipText, !ex.note?.trim() && styles.memoChipPlaceholder]} numberOfLines={1}>
-                    📌 {ex.note?.trim() ? ex.note.trim() : '종목 메모'}
-                  </Text>
-                </Pressable>
-                <Pressable style={[styles.memoChip, sessMemoOpen[exIdx] && styles.memoChipOn]} onPress={() => setSessMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] }))}>
-                  <Text style={[styles.memoChipText, !ex.sessionNote?.trim() && styles.memoChipPlaceholder]} numberOfLines={1}>
-                    📝 {ex.sessionNote?.trim() ? ex.sessionNote.trim() : '오늘 메모'}
+                    {ex.note?.trim() ? ex.note.trim() : '종목 메모'}
                   </Text>
                 </Pressable>
               </View>
               {memoOpen[exIdx] && (
                 <TextInput
                   style={styles.exNoteInput}
-                  placeholder="📌 종목 메모 (항상 표시)"
+                  placeholder="종목 메모 (항상 표시)"
                   placeholderTextColor="#48484A"
                   value={ex.note ?? ''}
                   onChangeText={t => setExerciseNote(exIdx, t)}
+                  onFocus={() => setEdit(null)}
                   onEndEditing={() => handleExerciseNoteBlur(exIdx)}
-                  multiline
-                  autoFocus
-                />
-              )}
-              {sessMemoOpen[exIdx] && (
-                <TextInput
-                  style={styles.exSessionNoteInput}
-                  placeholder="📝 오늘 메모 (이 세션만)"
-                  placeholderTextColor="#48484A"
-                  value={ex.sessionNote ?? ''}
-                  onChangeText={t => setExerciseSessionNote(exIdx, t)}
-                  onEndEditing={() => handleExerciseSessionNoteBlur(exIdx)}
                   multiline
                   autoFocus
                 />
@@ -2356,8 +2343,8 @@ const styles = StyleSheet.create({
   },
   detailTemplateText: { color: '#FF9F0A', fontSize: 15, fontWeight: '600' },
   timeBadge: { color: '#0A84FF', fontSize: 12, fontWeight: '700', marginBottom: 6 },
-  memoBtnRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  memoChip: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  memoBtnRow: { flexDirection: 'row', marginBottom: 8 },
+  memoChip: { alignSelf: 'flex-start', backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '100%' },
   memoChipOn: { backgroundColor: '#14331F', borderWidth: 1, borderColor: '#30D158' },
   memoChipText: { color: '#E5C07B', fontSize: 13, fontWeight: '600' },
   memoChipPlaceholder: { color: '#8E8E93', fontWeight: '500' },
