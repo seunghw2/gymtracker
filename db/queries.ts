@@ -488,6 +488,16 @@ export async function setExerciseRest(exerciseId: number, sec: number): Promise<
   await setSetting(`rest_ex_${exerciseId}`, String(sec));
 }
 
+export async function getExerciseWarmupRest(exerciseId: number, fallback: number): Promise<number> {
+  const raw = await getSetting(`rest_warmup_ex_${exerciseId}`, '');
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+export async function setExerciseWarmupRest(exerciseId: number, sec: number): Promise<void> {
+  await setSetting(`rest_warmup_ex_${exerciseId}`, String(sec));
+}
+
 // ─── 운동 루틴(템플릿) ──────────────────────────────────────────────────
 
 export type TemplateSummary = { id: number; name: string; exercise_count: number; exercise_names: string[] };

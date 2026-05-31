@@ -30,6 +30,8 @@ import {
   getSessionSets,
   getExerciseRest,
   setExerciseRest,
+  getExerciseWarmupRest,
+  setExerciseWarmupRest,
   deleteWorkoutSet,
   deleteSession,
   updateSession,
@@ -58,6 +60,7 @@ import {
 } from '../../db/queries';
 import DatePickerSheet from '../../components/DatePickerSheet';
 import SessionCard from '../../components/SessionCard';
+import RulerPicker from '../../components/RulerPicker';
 import { useUiStore } from '../../store/useUiStore';
 import { formatDateWithDay } from '../../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../../lib/units';
@@ -114,6 +117,12 @@ function formatDuration(sec: number): string {
   const m = Math.floor((sec % 3600) / 60);
   if (h > 0) return `${h}시간 ${m}분`;
   return `${m}분`;
+}
+
+// 휴식 시간 표기: 60초 미만은 "Ns", 이상은 "m:ss"
+function fmtRest(sec: number): string {
+  if (sec < 60) return `${sec}초`;
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
 function useElapsedTime(startTime: number | null) {
@@ -205,10 +214,12 @@ export default function WorkoutScreen() {
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
-  // 운동 카드 액션 메뉴 + 휴식 시간 프리셋 시트
+  // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
-  const [restCurrent, setRestCurrent] = useState<number>(0);
+  const [restMain, setRestMain] = useState<number>(90);
+  const [restWarm, setRestWarm] = useState<number>(30);
+  const [restTab, setRestTab] = useState<'main' | 'warm'>('main');
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [selectedToAdd, setSelectedToAdd] = useState<Record<number, SelectableExercise>>({});
   const [detailSaving, setDetailSaving] = useState(false);
@@ -484,23 +495,31 @@ export default function WorkoutScreen() {
     }
   };
 
-  // 휴식 시간 프리셋 시트 열기 (현재값 로드)
+  // 휴식 시간 다이얼 시트 열기 (본세트·워밍업 현재값 로드)
   const openRestPicker = async (exIdx: number) => {
     const ex = exercises[exIdx];
     if (!ex) return;
-    const cur = await getExerciseRest(ex.exerciseId, restDurationSec).catch(() => restDurationSec);
-    setRestCurrent(cur);
+    const [main, warm] = await Promise.all([
+      getExerciseRest(ex.exerciseId, restDurationSec).catch(() => restDurationSec),
+      getExerciseWarmupRest(ex.exerciseId, 30).catch(() => 30),
+    ]);
+    setRestMain(main);
+    setRestWarm(warm);
+    setRestTab('main');
     setRestPickerIdx(exIdx);
   };
 
-  // 종목 휴식 시간 저장 (다음 세트 완료부터 적용)
-  const applyRest = async (exIdx: number, sec: number) => {
-    const ex = exercises[exIdx];
-    if (!ex || !(sec > 0)) return;
-    setRestCurrent(sec);
-    await setExerciseRest(ex.exerciseId, sec).catch(() => {});
-    Haptics.selectionAsync();
+  // 휴식 시간 저장 후 닫기 (네트워크 저장은 닫을 때 한 번)
+  const closeRestPicker = async () => {
+    const idx = restPickerIdx;
     setRestPickerIdx(null);
+    if (idx == null) return;
+    const ex = exercises[idx];
+    if (!ex) return;
+    await Promise.all([
+      setExerciseRest(ex.exerciseId, restMain).catch(() => {}),
+      setExerciseWarmupRest(ex.exerciseId, restWarm).catch(() => {}),
+    ]);
   };
 
   // 워밍업 설정 모달 열기 (기준 무게 + 단계별 %/횟수)
@@ -797,8 +816,10 @@ export default function WorkoutScreen() {
 
     const nextSet = ex.sets[setIdx + 1];
     const nextLabel = nextSet ? `${toDisplay(nextSet.weight_kg, unitKg)}${u} × ${nextSet.reps}회` : undefined;
-    // 워밍업 세트는 짧은 휴식(30초), 그 외는 종목 기본값
-    const restSec = (s.setType ?? 'NORMAL') === 'WARMUP' ? 30 : await getExerciseRest(ex.exerciseId, restDurationSec);
+    // 워밍업/본세트 휴식을 종목별로 따로 적용
+    const restSec = (s.setType ?? 'NORMAL') === 'WARMUP'
+      ? await getExerciseWarmupRest(ex.exerciseId, 30)
+      : await getExerciseRest(ex.exerciseId, restDurationSec);
     startRestTimer(restSec, { nextLabel });
   };
 
@@ -1730,40 +1751,59 @@ export default function WorkoutScreen() {
         </Pressable>
       </Modal>
 
-      {/* 휴식 시간 프리셋 시트 */}
-      <Modal visible={restPickerIdx != null} transparent animationType="fade" onRequestClose={() => setRestPickerIdx(null)}>
-        <Pressable style={styles.menuOverlay} onPress={() => setRestPickerIdx(null)}>
+      {/* 휴식 시간 다이얼 시트 */}
+      <Modal visible={restPickerIdx != null} transparent animationType="fade" onRequestClose={closeRestPicker}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+        <Pressable style={styles.menuOverlay} onPress={closeRestPicker}>
           <Pressable style={styles.menuSheet} onPress={() => {}}>
             <Text style={styles.menuHeader} numberOfLines={1}>
               휴식 시간 · {restPickerIdx != null ? exercises[restPickerIdx]?.exerciseName : ''}
             </Text>
-            <View style={styles.restPresetRow}>
-              {[30, 45, 60, 90, 120, 150, 180].map(p => {
-                const on = restCurrent === p;
-                return (
-                  <Pressable key={p} style={[styles.restPreset, on && styles.restPresetOn]} onPress={() => { if (restPickerIdx != null) applyRest(restPickerIdx, p); }}>
-                    <Text style={[styles.restPresetText, on && styles.restPresetTextOn]}>{p >= 60 ? `${Math.floor(p / 60)}:${String(p % 60).padStart(2, '0')}` : `${p}초`}</Text>
-                  </Pressable>
-                );
-              })}
+
+            <View style={styles.restSeg}>
+              {(['main', 'warm'] as const).map(t => (
+                <Pressable key={t} style={[styles.restSegBtn, restTab === t && styles.restSegBtnOn]} onPress={() => setRestTab(t)}>
+                  <Text style={[styles.restSegText, restTab === t && styles.restSegTextOn]}>{t === 'main' ? '본세트' : '워밍업'}</Text>
+                </Pressable>
+              ))}
             </View>
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => {
-                const i = restPickerIdx;
-                if (i == null) return;
-                if (Alert.prompt) {
-                  Alert.prompt('휴식 시간 (초)', '초 단위로 입력', (v?: string) => { const n = parseInt(v ?? '', 10); if (Number.isFinite(n) && n > 0) applyRest(i, n); }, 'plain-text', String(restCurrent), 'number-pad');
-                }
-              }}
-            >
-              <Text style={styles.menuItemText}>✏️ 직접 입력</Text>
-            </Pressable>
-            <Pressable style={styles.menuCancel} onPress={() => setRestPickerIdx(null)}>
-              <Text style={styles.menuCancelText}>닫기</Text>
+
+            <Text style={styles.restReadout}>{fmtRest(restTab === 'main' ? restMain : restWarm)}</Text>
+
+            <RulerPicker
+              initial={restTab === 'main' ? restMain : restWarm}
+              onChange={v => (restTab === 'main' ? setRestMain(v) : setRestWarm(v))}
+              min={0}
+              max={600}
+              step={5}
+              majorEvery={30}
+              midEvery={15}
+              format={fmtRest}
+            />
+
+            <View style={styles.restAdjRow}>
+              {[-30, -10, 10, 30].map(d => (
+                <Pressable
+                  key={d}
+                  style={styles.restAdjBtn}
+                  onPress={() => {
+                    const cur = restTab === 'main' ? restMain : restWarm;
+                    const next = Math.max(0, Math.min(600, cur + d));
+                    (restTab === 'main' ? setRestMain : setRestWarm)(next);
+                    Haptics.selectionAsync();
+                  }}
+                >
+                  <Text style={styles.restAdjText}>{d > 0 ? `+${d}` : `${d}`}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable style={styles.menuCancel} onPress={closeRestPicker}>
+              <Text style={styles.menuCancelText}>완료</Text>
             </Pressable>
           </Pressable>
         </Pressable>
+        </GestureHandlerRootView>
       </Modal>
 
       {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
@@ -2136,11 +2176,15 @@ const styles = StyleSheet.create({
   menuItemText: { color: '#FFFFFF', fontSize: 17 },
   menuCancel: { marginTop: 8, paddingVertical: 16, alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 12 },
   menuCancelText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  restPresetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  restPreset: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, backgroundColor: '#2C2C2E' },
-  restPresetOn: { backgroundColor: '#30D158' },
-  restPresetText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  restPresetTextOn: { color: '#0A1F12' },
+  restSeg: { flexDirection: 'row', backgroundColor: '#2C2C2E', borderRadius: 10, padding: 4, marginHorizontal: 12, marginTop: 4 },
+  restSegBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center' },
+  restSegBtnOn: { backgroundColor: '#30D158' },
+  restSegText: { color: '#8E8E93', fontSize: 15, fontWeight: '600' },
+  restSegTextOn: { color: '#0A1F12' },
+  restReadout: { color: '#FFFFFF', fontSize: 44, fontWeight: '800', textAlign: 'center', marginTop: 14, fontVariant: ['tabular-nums'] },
+  restAdjRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginTop: 4 },
+  restAdjBtn: { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: '#2C2C2E', alignItems: 'center' },
+  restAdjText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
 
   setHeader: { flexDirection: 'row', marginBottom: 4 },
   setCol: { flex: 1, color: '#8E8E93', fontSize: 12, textAlign: 'center' },

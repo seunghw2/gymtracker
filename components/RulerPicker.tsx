@@ -14,11 +14,17 @@ type Props = {
   max?: number;
   step?: number;
   unitLabel?: string;
+  /** 큰 눈금/라벨 간격(값 단위). 기본 1 */
+  majorEvery?: number;
+  /** 중간 눈금 간격(값 단위). 기본 majorEvery/2 */
+  midEvery?: number;
+  /** 라벨 표기. 기본 반올림 정수 */
+  format?: (v: number) => string;
 };
 
 const ITEM_W = 9; // 눈금 간격(px) — 드래그 민감도
 
-export default function RulerPicker({ initial, onChange, min = 30, max = 200, step = 0.1 }: Props) {
+export default function RulerPicker({ initial, onChange, min = 30, max = 200, step = 0.1, majorEvery = 1, midEvery, format }: Props) {
   const [width, setWidth] = useState(0);
   const [value, setValue] = useState(initial);
   const startVal = useRef(initial);
@@ -26,12 +32,13 @@ export default function RulerPicker({ initial, onChange, min = 30, max = 200, st
   useEffect(() => { setValue(initial); }, [initial]);
 
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
-  const round1 = (v: number) => Math.round(v * 10) / 10;
+  // step 단위로 스냅(부동소수 보정)
+  const snap = (v: number) => Math.round(Math.round(v / step) * step * 1000) / 1000;
 
   const onGesture = (e: PanGestureHandlerGestureEvent) => {
     const dx = e.nativeEvent.translationX;
     // 왼쪽으로 끌면(dx<0) 값 증가
-    const v = round1(clamp(startVal.current - (dx / ITEM_W) * step));
+    const v = snap(clamp(startVal.current - (dx / ITEM_W) * step));
     setValue(v);
     onChange(v);
   };
@@ -45,8 +52,8 @@ export default function RulerPicker({ initial, onChange, min = 30, max = 200, st
   // 현재 값 기준으로 화면에 보이는 눈금만 그린다
   const ticks: React.ReactNode[] = [];
   if (width > 0) {
-    const perUnit = Math.round(1 / step);     // 1단위(=1kg)마다 큰 눈금/라벨
-    const perHalf = Math.round(0.5 / step);   // 0.5단위 중간 눈금
+    const perUnit = Math.max(1, Math.round(majorEvery / step));            // 큰 눈금/라벨
+    const perHalf = Math.max(1, Math.round((midEvery ?? majorEvery / 2) / step)); // 중간 눈금
     const centerPos = (value - min) / step;   // 현재 값의 인덱스 위치
     const half = Math.ceil((width / ITEM_W) / 2) + 2;
     const startIdx = Math.max(0, Math.floor(centerPos - half));
@@ -55,10 +62,11 @@ export default function RulerPicker({ initial, onChange, min = 30, max = 200, st
       const x = width / 2 + (i - centerPos) * ITEM_W;
       const isMajor = i % perUnit === 0;
       const isMid = i % perHalf === 0;
+      const labelVal = min + i * step;
       ticks.push(
         <View key={i} style={[styles.tickCol, { left: x - 0.75 }]} pointerEvents="none">
           <View style={[styles.tick, isMajor ? styles.tickMajor : isMid ? styles.tickMid : styles.tickMinor]} />
-          {isMajor ? <Text style={styles.tickLabel}>{Math.round(min + i * step)}</Text> : null}
+          {isMajor ? <Text style={styles.tickLabel}>{format ? format(labelVal) : String(Math.round(labelVal))}</Text> : null}
         </View>
       );
     }
