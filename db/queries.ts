@@ -419,6 +419,14 @@ export async function getMuscleFrequency(weeks = 4, range?: { from: string; to: 
   return list.map(m => ({ muscle_group: m.muscleGroup, set_count: m.setCount, session_count: m.sessionCount }));
 }
 
+export type PeriodSummary = { set_count: number; session_count: number; total_duration_sec: number };
+
+export async function getPeriodSummary(from: string, to: string): Promise<PeriodSummary> {
+  type Api = { setCount: number; sessionCount: number; totalDurationSec: number };
+  const r = await apiRequest<Api>(`/api/v1/stats/period-summary?from=${from}&to=${to}`);
+  return { set_count: r.setCount, session_count: r.sessionCount, total_duration_sec: r.totalDurationSec };
+}
+
 // ─── 신체 기록 ─────────────────────────────────────────────────────────
 
 export async function getTodayBodyLog(date: string): Promise<BodyLog | null> {

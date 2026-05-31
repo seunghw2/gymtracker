@@ -12,12 +12,28 @@ import {
   TextInput,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, upsertBodyLog, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, VolumeRange } from '../../db/queries';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
 
-type Chip = '1RM 성장' | 'PR' | '체중' | '체지방' | '볼륨';
+type Chip = '부위별' | '1RM 성장' | 'PR' | '체중' | '체지방' | '볼륨';
+
+// 부위(영어 저장값) → 한글 표기 + 표시 순서
+const MUSCLE_KO: Record<string, string> = { Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체', Arms: '팔', Core: '코어', Cardio: '유산소' };
+const MUSCLE_ORDER = ['Chest', 'Back', 'Shoulder', 'Legs', 'Arms', 'Core'];
+const REC_MIN = 10;   // 권장 주당 최소 세트
+const REC_MAX = 20;   // 권장 주당 최대 세트
+const BAR_MAX = 24;   // 막대 채움 기준 최대치
+
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+function fmtMD(d: Date) { return `${d.getMonth() + 1}월 ${d.getDate()}일`; }
+function fmtHM(sec: number) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  if (h > 0) return `${h}시간${m > 0 ? ` ${m}분` : ''}`;
+  return `${m}분`;
+}
 
 const RANGE_LABELS: { key: VolumeRange; label: string }[] = [
   { key: 'recent', label: '최근' },
@@ -33,15 +49,36 @@ function formatVolume(v: number): string {
   return String(Math.round(v));
 }
 
+const iso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+function mondayOf(date: Date): Date {
+  const d = new Date(date);
+  d.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// 이번/지난 주 (월~일), 이번/지난 달 범위 + 표시 라벨 + 환산용 주 수
+function periodRange(period: 'week' | 'month', offset = 0): { from: Date; to: Date; label: string; weeks: number } {
+  const now = new Date();
+  if (period === 'week') {
+    const mon = mondayOf(now);
+    mon.setDate(mon.getDate() + offset * 7);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    return { from: mon, to: sun, label: `${fmtMD(mon)} – ${fmtMD(sun)}`, weeks: 1 };
+  }
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  // 평균 환산 기준: 현재 달은 오늘까지 경과 주수, 지난 달은 전체 주수
+  const endForWeeks = offset === 0 ? now : last;
+  const days = Math.max(1, Math.round((endForWeeks.getTime() - first.getTime()) / 86400000) + 1);
+  return { from: first, to: last, label: `${first.getMonth() + 1}월`, weeks: Math.max(1, days / 7) };
+}
+
 // 이번 주 월요일~일요일 (ISO 날짜)
 function thisWeekRange(): { from: string; to: string } {
-  const today = new Date();
-  const day = today.getDay();
-  const mon = new Date(today);
-  mon.setDate(today.getDate() - ((day + 6) % 7));
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
+  const r = periodRange('week', 0);
+  return { from: iso(r.from), to: iso(r.to) };
 }
 
 const volumeChartConfig = {
@@ -58,7 +95,10 @@ const volumeChartConfig = {
 };
 
 export default function StatsScreen() {
-  const [activeChip, setActiveChip] = useState<Chip>('1RM 성장');
+  const [activeChip, setActiveChip] = useState<Chip>('부위별');
+  const [summaryPeriod, setSummaryPeriod] = useState<'week' | 'month'>('week');
+  const [periodCur, setPeriodCur] = useState<PeriodSummary | null>(null);
+  const [periodPrev, setPeriodPrev] = useState<PeriodSummary | null>(null);
   const [trainedExercises, setTrainedExercises] = useState<TrainedExercise[] | null>(null);
   const [selectedEx, setSelectedEx] = useState<TrainedExercise | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -106,12 +146,18 @@ export default function StatsScreen() {
     }
     if (activeChip === '볼륨') {
       getVolumeStats(volumeRange).then(setVolume).catch(() => setVolume({ daily: [], byMuscle: [] }));
-      getMuscleFrequency(8, thisWeekRange()).then(setMuscleFreq).catch(() => setMuscleFreq([]));
+    }
+    if (activeChip === '부위별') {
+      const cur = periodRange(summaryPeriod, 0);
+      const prev = periodRange(summaryPeriod, -1);
+      getMuscleFrequency(8, { from: iso(cur.from), to: iso(cur.to) }).then(setMuscleFreq).catch(() => setMuscleFreq([]));
+      getPeriodSummary(iso(cur.from), iso(cur.to)).then(setPeriodCur).catch(() => setPeriodCur(null));
+      getPeriodSummary(iso(prev.from), iso(prev.to)).then(setPeriodPrev).catch(() => setPeriodPrev(null));
     }
     if (activeChip === 'PR' && !records) {
       getRecords().then(setRecords).catch(() => setRecords([]));
     }
-  }, [activeChip, trainedExercises, volumeRange, records]);
+  }, [activeChip, trainedExercises, volumeRange, records, summaryPeriod]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -121,7 +167,7 @@ export default function StatsScreen() {
     }
   }, [selectedEx]);
 
-  const chips: Chip[] = ['1RM 성장', 'PR', '체중', '체지방', '볼륨'];
+  const chips: Chip[] = ['부위별', '1RM 성장', 'PR', '체중', '체지방', '볼륨'];
 
   const currentWeight = bodyLogs.length > 0 ? bodyLogs[bodyLogs.length - 1].weight_kg ?? 0 : 0;
   const goalProgress = goalWeightKg > 0
@@ -432,21 +478,85 @@ export default function StatsScreen() {
                   </>
                 )}
 
-                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>이번 주 부위별 세트 (워밍업 제외)</Text>
-                {muscleFreq.length > 0 ? (
-                  muscleFreq.map(m => (
-                    <View key={m.muscle_group} style={styles.freqRow}>
-                      <Text style={styles.freqMuscle}>{m.muscle_group}</Text>
-                      <Text style={styles.freqValue}>{m.set_count}세트 · {m.session_count}일</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.placeholderText}>이번 주 기록이 없습니다</Text>
-                )}
               </>
             )}
           </View>
         )}
+
+        {activeChip === '부위별' && (() => {
+          const cur = periodRange(summaryPeriod, 0);
+          const byMuscle: Record<string, number> = {};
+          for (const m of muscleFreq) byMuscle[m.muscle_group] = m.set_count;
+          const perWeek = (raw: number) => summaryPeriod === 'month' ? Math.round(raw / cur.weeks) : raw;
+          const totalSets = periodCur?.set_count ?? 0;
+          const dSets = totalSets - (periodPrev?.set_count ?? 0);
+          const dDur = (periodCur?.total_duration_sec ?? 0) - (periodPrev?.total_duration_sec ?? 0);
+          const dCnt = (periodCur?.session_count ?? 0) - (periodPrev?.session_count ?? 0);
+          const delta = (n: number, fmt?: (x: number) => string) =>
+            n === 0 ? null : (
+              <Text style={[styles.deltaText, { color: n > 0 ? '#30D158' : '#FF453A' }]}>
+                {n > 0 ? '▲' : '▼'} {fmt ? fmt(Math.abs(n)) : Math.abs(n)}
+              </Text>
+            );
+          return (
+            <View>
+              <Text style={styles.rangeLabel}>{cur.label}</Text>
+              <View style={styles.segment}>
+                {(['week', 'month'] as const).map(p => (
+                  <Pressable key={p} style={[styles.segmentBtn, summaryPeriod === p && styles.segmentBtnOn]} onPress={() => setSummaryPeriod(p)}>
+                    <Text style={[styles.segmentText, summaryPeriod === p && styles.segmentTextOn]}>{p === 'week' ? '이번주' : '이번달'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryCardHead}>
+                  <View>
+                    <Text style={styles.summaryTitle}>부위별 세트</Text>
+                    <Text style={styles.summarySub}>{summaryPeriod === 'week' ? '이번 주에 부위별로 수행한 총 세트 수' : '이번 달 주당 평균 세트 수'}</Text>
+                  </View>
+                  <View style={styles.summaryBadge}><Text style={styles.summaryBadgeText}>{summaryPeriod === 'week' ? '주간 합계' : '주당 평균'}</Text></View>
+                </View>
+
+                {MUSCLE_ORDER.map(g => {
+                  const val = perWeek(byMuscle[g] ?? 0);
+                  const low = val < REC_MIN;
+                  const fill = Math.max(0.04, Math.min(1, val / BAR_MAX));
+                  return (
+                    <View key={g} style={styles.barRow}>
+                      <Text style={styles.barLabel}>{MUSCLE_KO[g] ?? g}</Text>
+                      <View style={styles.barTrack}>
+                        <View style={[styles.barFill, { width: `${fill * 100}%`, backgroundColor: low ? '#FF9F0A' : '#30D158' }]} />
+                        <View style={[styles.barMarker, { left: `${(REC_MIN / BAR_MAX) * 100}%` }]} />
+                        <View style={[styles.barMarker, { left: `${(REC_MAX / BAR_MAX) * 100}%` }]} />
+                      </View>
+                      <Text style={styles.barValue}>{val}</Text>
+                    </View>
+                  );
+                })}
+                <Text style={styles.recHint}>⌷ 권장 범위 (주당 {REC_MIN}–{REC_MAX}세트)</Text>
+              </View>
+
+              <View style={styles.statCardsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardLabel}>총 세트</Text>
+                  <Text style={styles.statCardValue}>{totalSets}</Text>
+                  {delta(dSets)}
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardLabel}>운동 시간</Text>
+                  <Text style={styles.statCardValue}>{fmtHM(periodCur?.total_duration_sec ?? 0)}</Text>
+                  {delta(dDur, fmtHM)}
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardLabel}>운동 횟수</Text>
+                  <Text style={styles.statCardValue}>{periodCur?.session_count ?? 0}<Text style={styles.statCardUnit}>회</Text></Text>
+                  {delta(dCnt, n => `${n}`)}
+                </View>
+              </View>
+            </View>
+          );
+        })()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -467,6 +577,34 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#30D158' },
   chipText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
   chipTextActive: { color: '#000000' },
+
+  rangeLabel: { color: '#8E8E93', fontSize: 14, fontWeight: '600', marginBottom: 10 },
+  segment: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, marginBottom: 16 },
+  segmentBtn: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+  segmentBtnOn: { backgroundColor: '#2C2C2E' },
+  segmentText: { color: '#8E8E93', fontSize: 15, fontWeight: '700' },
+  segmentTextOn: { color: '#FFFFFF' },
+
+  summaryCard: { backgroundColor: '#161616', borderRadius: 20, borderLeftWidth: 3, borderLeftColor: '#30D158', padding: 20, marginBottom: 16 },
+  summaryCardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  summaryTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
+  summarySub: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
+  summaryBadge: { backgroundColor: '#173A26', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  summaryBadgeText: { color: '#30D158', fontSize: 13, fontWeight: '700' },
+  barRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 7 },
+  barLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', width: 44 },
+  barTrack: { flex: 1, height: 22, backgroundColor: '#2C2C2E', borderRadius: 11, marginHorizontal: 12, overflow: 'hidden', justifyContent: 'center' },
+  barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 11 },
+  barMarker: { position: 'absolute', top: 3, bottom: 3, width: 0, borderLeftWidth: 1, borderColor: '#6E6E73', borderStyle: 'dashed' },
+  barValue: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', width: 30, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  recHint: { color: '#6E6E73', fontSize: 13, marginTop: 14 },
+
+  statCardsRow: { flexDirection: 'row', gap: 10 },
+  statCard: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16 },
+  statCardLabel: { color: '#8E8E93', fontSize: 13, marginBottom: 8 },
+  statCardValue: { color: '#FFFFFF', fontSize: 26, fontWeight: '800' },
+  statCardUnit: { color: '#8E8E93', fontSize: 15, fontWeight: '600' },
+  deltaText: { fontSize: 13, fontWeight: '700', marginTop: 6 },
 
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 10 },
 
