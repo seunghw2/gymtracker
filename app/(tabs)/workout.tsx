@@ -229,6 +229,7 @@ export default function WorkoutScreen() {
   const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const listRef = useRef<FlatList<ExerciseEntry>>(null);
+  const noteDraftRef = useRef(''); // 종목 메모 입력 중 임시값(타이핑마다 스토어 갱신 방지)
   const rowRefs = useRef<Map<string, View>>(new Map());
 
   const loadExercises = useCallback(async () => {
@@ -1582,15 +1583,19 @@ export default function WorkoutScreen() {
               </View>
               {memoOpen[exIdx] && (
                 <TextInput
+                  key={`note-${ex.exerciseId}`}
                   style={styles.exNoteInput}
                   placeholder="종목 메모 (항상 표시)"
                   placeholderTextColor="#48484A"
-                  value={ex.note ?? ''}
-                  onChangeText={t => setExerciseNote(exIdx, t)}
-                  onFocus={() => setEdit(null)}
-                  onEndEditing={() => handleExerciseNoteBlur(exIdx)}
+                  defaultValue={ex.note ?? ''}
+                  onFocus={() => { setEdit(null); noteDraftRef.current = ex.note ?? ''; }}
+                  onChangeText={t => { noteDraftRef.current = t; }}
+                  onEndEditing={() => {
+                    const t = noteDraftRef.current;
+                    setExerciseNote(exIdx, t);
+                    updateExerciseNote(ex.exerciseId, t).catch(() => {});
+                  }}
                   multiline
-                  autoFocus
                 />
               )}
 
