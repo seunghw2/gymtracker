@@ -33,6 +33,17 @@ function formatVolume(v: number): string {
   return String(Math.round(v));
 }
 
+// 이번 주 월요일~일요일 (ISO 날짜)
+function thisWeekRange(): { from: string; to: string } {
+  const today = new Date();
+  const day = today.getDay();
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - ((day + 6) % 7));
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
+}
+
 const volumeChartConfig = {
   backgroundColor: '#1C1C1E',
   backgroundGradientFrom: '#1C1C1E',
@@ -95,7 +106,7 @@ export default function StatsScreen() {
     }
     if (activeChip === '볼륨') {
       getVolumeStats(volumeRange).then(setVolume).catch(() => setVolume({ daily: [], byMuscle: [] }));
-      getMuscleFrequency(8).then(setMuscleFreq).catch(() => setMuscleFreq([]));
+      getMuscleFrequency(8, thisWeekRange()).then(setMuscleFreq).catch(() => setMuscleFreq([]));
     }
     if (activeChip === 'PR' && !records) {
       getRecords().then(setRecords).catch(() => setRecords([]));
@@ -421,16 +432,16 @@ export default function StatsScreen() {
                   </>
                 )}
 
-                {muscleFreq.length > 0 && (
-                  <>
-                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>부위별 운동 빈도 (최근 8주)</Text>
-                    {muscleFreq.map(m => (
-                      <View key={m.muscle_group} style={styles.freqRow}>
-                        <Text style={styles.freqMuscle}>{m.muscle_group}</Text>
-                        <Text style={styles.freqValue}>{m.session_count}일 · {m.set_count}세트</Text>
-                      </View>
-                    ))}
-                  </>
+                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>이번 주 부위별 세트 (워밍업 제외)</Text>
+                {muscleFreq.length > 0 ? (
+                  muscleFreq.map(m => (
+                    <View key={m.muscle_group} style={styles.freqRow}>
+                      <Text style={styles.freqMuscle}>{m.muscle_group}</Text>
+                      <Text style={styles.freqValue}>{m.set_count}세트 · {m.session_count}일</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.placeholderText}>이번 주 기록이 없습니다</Text>
                 )}
               </>
             )}

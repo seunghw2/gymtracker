@@ -412,9 +412,10 @@ export async function getRecords(): Promise<ExerciseRecord[]> {
 
 export type MuscleFrequency = { muscle_group: string; set_count: number; session_count: number };
 
-export async function getMuscleFrequency(weeks = 4): Promise<MuscleFrequency[]> {
+export async function getMuscleFrequency(weeks = 4, range?: { from: string; to: string }): Promise<MuscleFrequency[]> {
   type Api = { muscleGroup: string; setCount: number; sessionCount: number };
-  const list = await apiRequest<Api[]>(`/api/v1/stats/muscle-frequency?weeks=${weeks}`);
+  const qs = range ? `from=${range.from}&to=${range.to}` : `weeks=${weeks}`;
+  const list = await apiRequest<Api[]>(`/api/v1/stats/muscle-frequency?${qs}`);
   return list.map(m => ({ muscle_group: m.muscleGroup, set_count: m.setCount, session_count: m.sessionCount }));
 }
 
