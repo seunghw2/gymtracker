@@ -486,6 +486,23 @@ export async function setBodyTags(tags: string[]): Promise<void> {
   await setSetting('body_tags', tags.join(','));
 }
 
+// 종목별 통계 기준 RM(반복수). 미설정 시 1.
+export async function getExerciseRmBasis(exerciseId: number): Promise<number> {
+  const raw = await getSetting(`rm_basis_${exerciseId}`, '1');
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+export async function setExerciseRmBasis(exerciseId: number, reps: number): Promise<void> {
+  await setSetting(`rm_basis_${exerciseId}`, String(reps));
+}
+
+// Epley 추정 1RM → N-RM 무게 환산 (N=1이면 그대로).
+export function convertRm(estimated1rm: number, reps: number): number {
+  if (reps <= 1) return estimated1rm;
+  return Math.round((estimated1rm / (1 + reps / 30)) * 10) / 10;
+}
+
 // 종목별 휴식시간(초). 미설정 시 fallback 반환.
 export async function getExerciseRest(exerciseId: number, fallback: number): Promise<number> {
   const raw = await getSetting(`rest_ex_${exerciseId}`, '');

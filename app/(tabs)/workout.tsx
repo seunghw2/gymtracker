@@ -51,6 +51,8 @@ import {
   setSetting,
   getBodyTags,
   setBodyTags,
+  getExerciseRmBasis,
+  convertRm,
   Exercise,
   SessionSummary,
   SessionSetRow,
@@ -233,6 +235,7 @@ export default function WorkoutScreen() {
   const noteDraftRef = useRef(''); // 종목 메모 입력 중 임시값(타이핑마다 스토어 갱신 방지)
   const rowRefs = useRef<Map<string, View>>(new Map());
   const scrollY = useRef(0);
+  const [rmBasisMap, setRmBasisMap] = useState<Record<number, number>>({});
 
   const loadExercises = useCallback(async () => {
     const list = await getExercises(
@@ -270,6 +273,15 @@ export default function WorkoutScreen() {
     getSetting('auto_tag_prompt', '1').then(v => setAutoTagPrompt(v !== '0')).catch(() => {});
     getBodyTags().then(setBodyTagsState).catch(() => {});
   }, []);
+
+  // 세션 운동들의 종목별 기준 RM 로드
+  useEffect(() => {
+    Array.from(new Set(exercises.map(e => e.exerciseId))).forEach(id => {
+      if (rmBasisMap[id] === undefined) {
+        getExerciseRmBasis(id).then(n => setRmBasisMap(m => ({ ...m, [id]: n }))).catch(() => {});
+      }
+    });
+  }, [exercises]);
 
   const addBodyTag = () => {
     const t = newTag.trim();
@@ -1554,13 +1566,14 @@ export default function WorkoutScreen() {
                   <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                   {ex.brand && <Text style={styles.exerciseBrand}>{ex.brand}</Text>}
                   {(() => {
-                    const curD = toDisplay(bestORM, unitKg);
-                    const prevD = toDisplay(ex.prevBest1rm ?? 0, unitKg);
+                    const basisN = rmBasisMap[ex.exerciseId] ?? 1;
+                    const curD = toDisplay(convertRm(bestORM, basisN), unitKg);
+                    const prevD = toDisplay(convertRm(ex.prevBest1rm ?? 0, basisN), unitKg);
                     if (bestORM > 0) {
                       const diff = Math.round((curD - prevD) * 10) / 10;
                       return (
                         <Text style={styles.exVolume}>
-                          1RM {curD}{u}
+                          {basisN}RM {curD}{u}
                           {(ex.prevBest1rm ?? 0) > 0 && diff !== 0 ? (
                             <Text style={{ color: diff > 0 ? '#30D158' : '#FF453A', fontWeight: '700' }}>{'  '}{diff > 0 ? '▲' : '▼'}{Math.abs(diff)}{u}</Text>
                           ) : null}
@@ -1568,7 +1581,7 @@ export default function WorkoutScreen() {
                       );
                     }
                     if ((ex.prevBest1rm ?? 0) > 0) {
-                      return <Text style={styles.exVolume}>이전 1RM {prevD}{u}</Text>;
+                      return <Text style={styles.exVolume}>이전 {basisN}RM {prevD}{u}</Text>;
                     }
                     return null;
                   })()}

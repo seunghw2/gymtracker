@@ -12,7 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
@@ -111,6 +111,7 @@ export default function StatsScreen() {
   const [recordSort, setRecordSort] = useState<'1rm' | 'name'>('1rm');
   const [muscleFreq, setMuscleFreq] = useState<MuscleFrequency[]>([]);
   const [fatInput, setFatInput] = useState('');
+  const [rmBasis, setRmBasis] = useState(1);
   const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
 
@@ -164,8 +165,16 @@ export default function StatsScreen() {
   useEffect(() => {
     if (selectedEx) {
       get1RMHistory(selectedEx.id).then(setOrmData);
+      getExerciseRmBasis(selectedEx.id).then(setRmBasis).catch(() => setRmBasis(1));
     }
   }, [selectedEx]);
+
+  const changeRmBasis = (n: number) => {
+    setRmBasis(n);
+    if (selectedEx) setExerciseRmBasis(selectedEx.id, n).catch(() => {});
+  };
+
+  const RM_OPTIONS = [1, 3, 5, 8, 10, 12];
 
   const chips: Chip[] = ['부위별', '1RM 성장', 'PR', '체중', '체지방', '볼륨'];
 
@@ -216,7 +225,25 @@ export default function StatsScreen() {
                 </Pressable>
 
                 {selectedEx ? (
-                  <OneRMChart data={ormData} title={`${selectedEx.name} 추정 1RM`} unitKg={unitKg} />
+                  <>
+                    <View style={styles.rmRow}>
+                      <Text style={styles.rmLabel}>기준</Text>
+                      {RM_OPTIONS.map(n => (
+                        <Pressable
+                          key={n}
+                          style={[styles.rmChip, rmBasis === n && styles.rmChipOn]}
+                          onPress={() => changeRmBasis(n)}
+                        >
+                          <Text style={[styles.rmChipText, rmBasis === n && styles.rmChipTextOn]}>{n}RM</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <OneRMChart
+                      data={ormData.map(d => ({ ...d, estimated_1rm: convertRm(d.estimated_1rm, rmBasis) }))}
+                      title={`${selectedEx.name} 추정 ${rmBasis}RM`}
+                      unitKg={unitKg}
+                    />
+                  </>
                 ) : (
                   <View style={styles.placeholder}>
                     <Text style={styles.placeholderText}>종목을 선택하면 그래프가 표시됩니다</Text>
@@ -608,6 +635,12 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 10 },
 
+  rmRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  rmLabel: { color: '#8E8E93', fontSize: 13, marginRight: 4 },
+  rmChip: { backgroundColor: '#1C1C1E', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
+  rmChipOn: { backgroundColor: '#30D158' },
+  rmChipText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  rmChipTextOn: { color: '#000000' },
   exSelectBtn: {
     flexDirection: 'row',
     alignItems: 'center',
