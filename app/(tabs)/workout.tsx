@@ -29,6 +29,7 @@ import {
   getSessionHistory,
   getSessionSets,
   getExerciseRest,
+  setExerciseRest,
   deleteWorkoutSet,
   deleteSession,
   updateSession,
@@ -204,6 +205,10 @@ export default function WorkoutScreen() {
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
+  // 운동 카드 액션 메뉴 + 휴식 시간 프리셋 시트
+  const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
+  const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
+  const [restCurrent, setRestCurrent] = useState<number>(0);
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [selectedToAdd, setSelectedToAdd] = useState<Record<number, SelectableExercise>>({});
   const [detailSaving, setDetailSaving] = useState(false);
@@ -477,6 +482,25 @@ export default function WorkoutScreen() {
     if (s.done && s.setId) {
       updateWorkoutSet(s.setId, s.weight_kg, s.reps, next).catch(() => {});
     }
+  };
+
+  // 휴식 시간 프리셋 시트 열기 (현재값 로드)
+  const openRestPicker = async (exIdx: number) => {
+    const ex = exercises[exIdx];
+    if (!ex) return;
+    const cur = await getExerciseRest(ex.exerciseId, restDurationSec).catch(() => restDurationSec);
+    setRestCurrent(cur);
+    setRestPickerIdx(exIdx);
+  };
+
+  // 종목 휴식 시간 저장 (다음 세트 완료부터 적용)
+  const applyRest = async (exIdx: number, sec: number) => {
+    const ex = exercises[exIdx];
+    if (!ex || !(sec > 0)) return;
+    setRestCurrent(sec);
+    await setExerciseRest(ex.exerciseId, sec).catch(() => {});
+    Haptics.selectionAsync();
+    setRestPickerIdx(null);
   };
 
   // 워밍업 설정 모달 열기 (기준 무게 + 단계별 %/횟수)
@@ -1499,8 +1523,8 @@ export default function WorkoutScreen() {
                   >
                     <Text style={styles.dragHandleText}>≡</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleRemoveExercise(exIdx)} hitSlop={8} style={styles.exDeleteBtn}>
-                    <Text style={styles.exDeleteText}>✕</Text>
+                  <Pressable onPress={() => setCardMenuIdx(exIdx)} hitSlop={8} style={styles.exMenuBtn}>
+                    <Text style={styles.exMenuText}>⋯</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1629,14 +1653,9 @@ export default function WorkoutScreen() {
                 );
               })}
 
-              <View style={styles.setActionsRow}>
-                <Pressable style={[styles.addSetBtn, { flex: 1 }]} onPress={() => addSetToExercise(exIdx)}>
-                  <Text style={styles.addSetText}>+ 세트 추가</Text>
-                </Pressable>
-                <Pressable style={styles.warmupBtn} onPress={() => handleAddWarmup(exIdx)}>
-                  <Text style={styles.warmupBtnText}>🔥 워밍업</Text>
-                </Pressable>
-              </View>
+              <Pressable style={[styles.addSetBtn, { marginTop: 4 }]} onPress={() => addSetToExercise(exIdx)}>
+                <Text style={styles.addSetText}>+ 세트 추가</Text>
+              </Pressable>
             </View>
           );
         }}
@@ -1683,6 +1702,65 @@ export default function WorkoutScreen() {
             )}
             <Pressable style={styles.tagDoneBtn} onPress={() => { setShowTags(false); setTagEdit(false); }}>
               <Text style={styles.tagDoneText}>{sessionTags.length > 0 ? '완료' : '건너뛰기'}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 운동 카드 액션 메뉴 */}
+      <Modal visible={cardMenuIdx != null} transparent animationType="fade" onRequestClose={() => setCardMenuIdx(null)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setCardMenuIdx(null)}>
+          <Pressable style={styles.menuSheet} onPress={() => {}}>
+            <Text style={styles.menuHeader} numberOfLines={1}>
+              {cardMenuIdx != null ? exercises[cardMenuIdx]?.exerciseName : ''}
+            </Text>
+            <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => openRestPicker(i), 180); }}>
+              <Text style={styles.menuItemText}>⏱ 휴식 시간 설정</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => handleAddWarmup(i), 180); }}>
+              <Text style={styles.menuItemText}>🔥 워밍업 추가</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => handleRemoveExercise(i), 180); }}>
+              <Text style={[styles.menuItemText, { color: '#FF453A' }]}>🗑 운동 삭제</Text>
+            </Pressable>
+            <Pressable style={styles.menuCancel} onPress={() => setCardMenuIdx(null)}>
+              <Text style={styles.menuCancelText}>닫기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 휴식 시간 프리셋 시트 */}
+      <Modal visible={restPickerIdx != null} transparent animationType="fade" onRequestClose={() => setRestPickerIdx(null)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setRestPickerIdx(null)}>
+          <Pressable style={styles.menuSheet} onPress={() => {}}>
+            <Text style={styles.menuHeader} numberOfLines={1}>
+              휴식 시간 · {restPickerIdx != null ? exercises[restPickerIdx]?.exerciseName : ''}
+            </Text>
+            <View style={styles.restPresetRow}>
+              {[30, 45, 60, 90, 120, 150, 180].map(p => {
+                const on = restCurrent === p;
+                return (
+                  <Pressable key={p} style={[styles.restPreset, on && styles.restPresetOn]} onPress={() => { if (restPickerIdx != null) applyRest(restPickerIdx, p); }}>
+                    <Text style={[styles.restPresetText, on && styles.restPresetTextOn]}>{p >= 60 ? `${Math.floor(p / 60)}:${String(p % 60).padStart(2, '0')}` : `${p}초`}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                const i = restPickerIdx;
+                if (i == null) return;
+                if (Alert.prompt) {
+                  Alert.prompt('휴식 시간 (초)', '초 단위로 입력', (v?: string) => { const n = parseInt(v ?? '', 10); if (Number.isFinite(n) && n > 0) applyRest(i, n); }, 'plain-text', String(restCurrent), 'number-pad');
+                }
+              }}
+            >
+              <Text style={styles.menuItemText}>✏️ 직접 입력</Text>
+            </Pressable>
+            <Pressable style={styles.menuCancel} onPress={() => setRestPickerIdx(null)}>
+              <Text style={styles.menuCancelText}>닫기</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -2041,6 +2119,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   exDeleteText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
+  exMenuBtn: {
+    width: 34,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#2C2C2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exMenuText: { color: '#8E8E93', fontSize: 18, fontWeight: '700', marginTop: -4 },
+
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  menuSheet: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 12, paddingBottom: 32 },
+  menuHeader: { color: '#8E8E93', fontSize: 13, fontWeight: '600', paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8 },
+  menuItem: { paddingVertical: 16, paddingHorizontal: 12 },
+  menuItemText: { color: '#FFFFFF', fontSize: 17 },
+  menuCancel: { marginTop: 8, paddingVertical: 16, alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 12 },
+  menuCancelText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
+  restPresetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  restPreset: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, backgroundColor: '#2C2C2E' },
+  restPresetOn: { backgroundColor: '#30D158' },
+  restPresetText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  restPresetTextOn: { color: '#0A1F12' },
 
   setHeader: { flexDirection: 'row', marginBottom: 4 },
   setCol: { flex: 1, color: '#8E8E93', fontSize: 12, textAlign: 'center' },
