@@ -358,6 +358,13 @@ export async function get1RMHistory(exercise_id: number): Promise<{ date: string
   return list.map(r => ({ date: String(r.date), estimated_1rm: r.oneRm }));
 }
 
+// 특정 반복수(reps)로 실제 수행한 세트의 날짜별 최고 무게
+export async function getActualRmHistory(exercise_id: number, reps: number): Promise<{ date: string; estimated_1rm: number }[]> {
+  type ApiOneRm = { date: string; oneRm: number };
+  const list = await apiRequest<ApiOneRm[]>(`/api/v1/stats/actual-rm?exerciseId=${exercise_id}&reps=${reps}`);
+  return list.map(r => ({ date: String(r.date), estimated_1rm: r.oneRm }));
+}
+
 export type TrainedExercise = {
   id: number;
   name: string;

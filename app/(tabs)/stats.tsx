@@ -12,7 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, getActualRmHistory, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
@@ -112,6 +112,8 @@ export default function StatsScreen() {
   const [muscleFreq, setMuscleFreq] = useState<MuscleFrequency[]>([]);
   const [fatInput, setFatInput] = useState('');
   const [rmBasis, setRmBasis] = useState(1);
+  const [rmMode, setRmMode] = useState<'est' | 'actual'>('est');
+  const [actualData, setActualData] = useState<{ date: string; estimated_1rm: number }[]>([]);
   const { goalWeightKg, goalBodyFatPct, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
 
@@ -174,6 +176,13 @@ export default function StatsScreen() {
     if (selectedEx) setExerciseRmBasis(selectedEx.id, n).catch(() => {});
   };
 
+  // 실제 모드: 선택 종목·반복수의 실제 최고무게 로드
+  useEffect(() => {
+    if (rmMode === 'actual' && selectedEx) {
+      getActualRmHistory(selectedEx.id, rmBasis).then(setActualData).catch(() => setActualData([]));
+    }
+  }, [rmMode, rmBasis, selectedEx]);
+
   const RM_OPTIONS = [1, 3, 5, 8, 10, 12];
 
   const chips: Chip[] = ['부위별', '1RM 성장', 'PR', '체중', '체지방', '볼륨'];
@@ -226,8 +235,20 @@ export default function StatsScreen() {
 
                 {selectedEx ? (
                   <>
-                    <View style={styles.rmRow}>
-                      <Text style={styles.rmLabel}>기준</Text>
+                    <View style={styles.rmModeRow}>
+                      {(['est', 'actual'] as const).map(m => (
+                        <Pressable
+                          key={m}
+                          style={[styles.rmModeBtn, rmMode === m && styles.rmModeBtnOn]}
+                          onPress={() => setRmMode(m)}
+                        >
+                          <Text style={[styles.rmModeText, rmMode === m && styles.rmModeTextOn]}>
+                            {m === 'est' ? '추정' : '실제'}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rmRow}>
                       {RM_OPTIONS.map(n => (
                         <Pressable
                           key={n}
@@ -237,12 +258,20 @@ export default function StatsScreen() {
                           <Text style={[styles.rmChipText, rmBasis === n && styles.rmChipTextOn]}>{n}RM</Text>
                         </Pressable>
                       ))}
-                    </View>
-                    <OneRMChart
-                      data={ormData.map(d => ({ ...d, estimated_1rm: convertRm(d.estimated_1rm, rmBasis) }))}
-                      title={`${selectedEx.name} 추정 ${rmBasis}RM`}
-                      unitKg={unitKg}
-                    />
+                    </ScrollView>
+                    {rmMode === 'est' ? (
+                      <OneRMChart
+                        data={ormData.map(d => ({ ...d, estimated_1rm: convertRm(d.estimated_1rm, rmBasis) }))}
+                        title={`${selectedEx.name} 추정 ${rmBasis}RM`}
+                        unitKg={unitKg}
+                      />
+                    ) : actualData.length > 0 ? (
+                      <OneRMChart data={actualData} title={`${selectedEx.name} 실제 ${rmBasis}RM`} unitKg={unitKg} />
+                    ) : (
+                      <View style={styles.placeholder}>
+                        <Text style={styles.placeholderText}>{rmBasis}회로 실제 수행한 기록이 없습니다</Text>
+                      </View>
+                    )}
                   </>
                 ) : (
                   <View style={styles.placeholder}>
@@ -635,9 +664,13 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 10 },
 
-  rmRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 12 },
-  rmLabel: { color: '#8E8E93', fontSize: 13, marginRight: 4 },
-  rmChip: { backgroundColor: '#1C1C1E', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
+  rmModeRow: { flexDirection: 'row', gap: 6, marginTop: 12, marginBottom: 8 },
+  rmModeBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 12, backgroundColor: '#1C1C1E' },
+  rmModeBtnOn: { backgroundColor: '#2C2C2E', borderWidth: 1, borderColor: '#30D158' },
+  rmModeText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  rmModeTextOn: { color: '#30D158' },
+  rmRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8 },
+  rmChip: { backgroundColor: '#1C1C1E', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
   rmChipOn: { backgroundColor: '#30D158' },
   rmChipText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
   rmChipTextOn: { color: '#000000' },
