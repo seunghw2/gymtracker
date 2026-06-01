@@ -166,6 +166,7 @@ export default function WorkoutScreen() {
     addSetToExercise,
     prependWarmupSets,
     markSetDone,
+    unmarkSetDone,
     reorderExercise,
     toggleTimeBased,
     removeSet,
@@ -828,6 +829,15 @@ export default function WorkoutScreen() {
     } finally {
       setDetailSaving(false);
     }
+  };
+
+  // 완료 체크 해제: DB에서 세트 삭제 후 미완료로 되돌림
+  const handleUncompleteSet = async (exIdx: number, setIdx: number) => {
+    const s = exercises[exIdx]?.sets[setIdx];
+    if (!s?.done) return;
+    if (s.setId) await deleteWorkoutSet(s.setId).catch(() => {});
+    unmarkSetDone(exIdx, setIdx);
+    Haptics.selectionAsync();
   };
 
   const handleCompleteSet = async (exIdx: number, setIdx: number) => {
@@ -1495,24 +1505,6 @@ export default function WorkoutScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe}>
-      {/* 헤더 */}
-      <View style={styles.sessionHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.sessionTitleInput} numberOfLines={1}>
-            {sessionTitle?.trim() || (sessionDate ? formatDate(sessionDate) : '운동')}
-          </Text>
-          <Text style={styles.sessionElapsed}>
-            {sessionDate ? `${formatDate(sessionDate)} · ` : ''}{elapsed}
-          </Text>
-        </View>
-        <Pressable style={styles.cancelBtn} onPress={handleCancelWorkout}>
-          <Text style={styles.cancelBtnText}>취소</Text>
-        </Pressable>
-        <Pressable style={styles.finishBtn} onPress={handleFinishWorkout}>
-          <Text style={styles.finishBtnText}>완료</Text>
-        </Pressable>
-      </View>
-
       <DragList
         ref={listRef}
         data={exercises}
@@ -1525,6 +1517,23 @@ export default function WorkoutScreen() {
         onScrollToIndexFailed={() => {}}
         ListHeaderComponent={(
           <>
+        {/* 헤더(제목·날짜·취소·완료) — 스크롤 시 함께 사라짐 */}
+        <View style={styles.sessionHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sessionTitleInput} numberOfLines={1}>
+              {sessionTitle?.trim() || (sessionDate ? formatDate(sessionDate) : '운동')}
+            </Text>
+            <Text style={styles.sessionElapsed}>
+              {sessionDate ? `${formatDate(sessionDate)} · ` : ''}{elapsed}
+            </Text>
+          </View>
+          <Pressable style={styles.cancelBtn} onPress={handleCancelWorkout}>
+            <Text style={styles.cancelBtnText}>취소</Text>
+          </Pressable>
+          <Pressable style={styles.finishBtn} onPress={handleFinishWorkout}>
+            <Text style={styles.finishBtnText}>완료</Text>
+          </Pressable>
+        </View>
         <View style={styles.metaRow}>
           <Pressable style={styles.metaChip} onPress={() => setShowTags(true)}>
             <Text style={[styles.metaChipText, sessionTags.length === 0 && styles.tagButtonPlaceholder]} numberOfLines={1}>
@@ -1724,7 +1733,7 @@ export default function WorkoutScreen() {
                       </View>
                       <Pressable
                         style={[styles.checkBtn, { flex: 0.6 }]}
-                        onPress={() => !s.done && handleCompleteSet(exIdx, setIdx)}
+                        onPress={() => s.done ? handleUncompleteSet(exIdx, setIdx) : handleCompleteSet(exIdx, setIdx)}
                       >
                         <View style={[styles.checkCircle, s.done && styles.checkCircleDone, s.isPR && styles.checkCirclePR]}>
                           {s.isPR ? <Text style={styles.checkTrophy}>🏆</Text> : s.done ? <Text style={styles.checkMark}>✓</Text> : null}
@@ -2157,9 +2166,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 8,
     paddingBottom: 12,
+    marginBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#1C1C1E',
   },

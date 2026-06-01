@@ -73,6 +73,7 @@ type WorkoutState = {
   addSetToExercise: (exIdx: number) => void;
   prependWarmupSets: (exIdx: number, warmups: { weight_kg: number; reps: number }[]) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number, isPR?: boolean) => void;
+  unmarkSetDone: (exIdx: number, setIdx: number) => void;
   reorderExercise: (from: number, to: number) => void;
   toggleTimeBased: (exIdx: number) => void;
   removeSet: (exIdx: number, setIdx: number) => void;
@@ -210,6 +211,16 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
         // PR이면 종목 기준 최고치도 갱신
         const prevBest1rm = isPR ? estimated_1rm : ex.prevBest1rm;
         return { ...ex, sets, prevBest1rm };
+      });
+      return { exercises };
+    }),
+
+  unmarkSetDone: (exIdx, setIdx) =>
+    set((state) => {
+      const exercises = state.exercises.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        const sets = ex.sets.map((s, j) => j === setIdx ? { ...s, done: false, setId: undefined, isPR: false } : s);
+        return { ...ex, sets };
       });
       return { exercises };
     }),
