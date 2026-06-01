@@ -666,9 +666,9 @@ const styles = StyleSheet.create({
 
   rmModeRow: { flexDirection: 'row', gap: 6, marginTop: 12, marginBottom: 8 },
   rmModeBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 12, backgroundColor: '#1C1C1E' },
-  rmModeBtnOn: { backgroundColor: '#2C2C2E', borderWidth: 1, borderColor: '#30D158' },
+  rmModeBtnOn: { backgroundColor: '#30D158' },
   rmModeText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-  rmModeTextOn: { color: '#30D158' },
+  rmModeTextOn: { color: '#000000' },
   rmRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8 },
   rmChip: { backgroundColor: '#1C1C1E', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
   rmChipOn: { backgroundColor: '#30D158' },
