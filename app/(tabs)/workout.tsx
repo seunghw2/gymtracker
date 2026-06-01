@@ -1544,6 +1544,7 @@ export default function WorkoutScreen() {
             value={sessionNote}
             onChangeText={setSessionNote}
             onEndEditing={handleSessionNoteBlur}
+            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
             multiline
             autoFocus
           />
@@ -1625,6 +1626,7 @@ export default function WorkoutScreen() {
                 placeholder="📌 종목 메모"
                 placeholderTextColor="#48484A"
                 defaultValue={ex.note ?? ''}
+                inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
                 onFocus={() => { setEdit(null); noteDraftRef.current = ex.note ?? ''; }}
                 onChangeText={t => { noteDraftRef.current = t; }}
                 onEndEditing={() => {
