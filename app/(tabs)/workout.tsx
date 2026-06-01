@@ -221,7 +221,6 @@ export default function WorkoutScreen() {
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
-  const [memoOpen, setMemoOpen] = useState<Record<number, boolean>>({});
   // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
   const [rmPickerIdx, setRmPickerIdx] = useState<number | null>(null);
@@ -1619,34 +1618,22 @@ export default function WorkoutScreen() {
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
-              {/* 메모 — 종목 메모 버튼, 누르면 입력칸 펼침 */}
-              <View style={styles.memoBtnRow}>
-                <Pressable
-                  style={[styles.memoChip, memoOpen[exIdx] && styles.memoChipOn]}
-                  onPress={() => { setEdit(null); setMemoOpen(m => ({ ...m, [exIdx]: !m[exIdx] })); }}
-                >
-                  <Text style={[styles.memoChipText, !ex.note?.trim() && styles.memoChipPlaceholder]} numberOfLines={1}>
-                    📌 종목 메모
-                  </Text>
-                </Pressable>
-              </View>
-              {memoOpen[exIdx] && (
-                <TextInput
-                  key={`note-${ex.exerciseId}`}
-                  style={styles.exNoteInput}
-                  placeholder="종목 메모 (항상 표시)"
-                  placeholderTextColor="#48484A"
-                  defaultValue={ex.note ?? ''}
-                  onFocus={() => { setEdit(null); noteDraftRef.current = ex.note ?? ''; }}
-                  onChangeText={t => { noteDraftRef.current = t; }}
-                  onEndEditing={() => {
-                    const t = noteDraftRef.current;
-                    setExerciseNote(exIdx, t);
-                    updateExerciseNote(ex.exerciseId, t).catch(() => {});
-                  }}
-                  multiline
-                />
-              )}
+              {/* 종목 메모 — 버튼 없이 항상 표시 */}
+              <TextInput
+                key={`note-${ex.exerciseId}`}
+                style={styles.exNoteInput}
+                placeholder="📌 종목 메모"
+                placeholderTextColor="#48484A"
+                defaultValue={ex.note ?? ''}
+                onFocus={() => { setEdit(null); noteDraftRef.current = ex.note ?? ''; }}
+                onChangeText={t => { noteDraftRef.current = t; }}
+                onEndEditing={() => {
+                  const t = noteDraftRef.current;
+                  setExerciseNote(exIdx, t);
+                  updateExerciseNote(ex.exerciseId, t).catch(() => {});
+                }}
+                multiline
+              />
 
               <View style={styles.setHeader}>
                 <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
