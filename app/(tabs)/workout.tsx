@@ -91,7 +91,6 @@ import {
   EquipmentType,
 } from '../../constants/exercises';
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
-import RestTimer from '../../components/RestTimer';
 import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 
@@ -271,6 +270,13 @@ export default function WorkoutScreen() {
       clearEditTarget();
     }
   }, [editTarget, activeSessionId]);
+
+  // 숫자패드 열림 상태를 전역에 알려 전역 휴식 타이머가 위로 비켜서게 함
+  const setNumPadOpen = useUiStore(s => s.setNumPadOpen);
+  useEffect(() => {
+    setNumPadOpen(edit != null);
+    return () => setNumPadOpen(false);
+  }, [edit, setNumPadOpen]);
 
   useEffect(() => {
     getGyms().then(setGyms).catch(() => {});
@@ -1874,10 +1880,7 @@ export default function WorkoutScreen() {
         </GestureHandlerRootView>
       </Modal>
 
-      {/* 하단 고정 휴식 타이머 (활성 시에만 렌더) */}
-      <View style={[styles.restDock, edit && styles.restDockEditing]} pointerEvents="box-none">
-        <RestTimer />
-      </View>
+      {/* 휴식 타이머는 탭 레이아웃(전역)에서 렌더 — 모든 탭에서 보임 */}
 
       {/* 앱 자체 숫자패드 */}
       {edit && (

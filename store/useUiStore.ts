@@ -9,10 +9,15 @@ type UiState = {
   editTarget: SessionSummary | null;
   setEditTarget: (session: SessionSummary) => void;
   clearEditTarget: () => void;
+  /** 운동 탭에서 앱 내 숫자패드가 떠 있는지 — 전역 휴식 타이머가 위로 비켜서기 위함 */
+  numPadOpen: boolean;
+  setNumPadOpen: (open: boolean) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
   editTarget: null,
   setEditTarget: (session) => set({ editTarget: session }),
   clearEditTarget: () => set({ editTarget: null }),
+  numPadOpen: false,
+  setNumPadOpen: (open) => set({ numPadOpen: open }),
 }));
