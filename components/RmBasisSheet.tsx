@@ -51,8 +51,9 @@ export default function RmBasisSheet({ visible, exerciseName, initialReps = 10, 
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable style={styles.overlay} onPress={close}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+      <View style={styles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+        <View style={styles.sheet}>
           <View style={styles.grip} />
           {exerciseName ? <Text style={styles.exName} numberOfLines={1}>{exerciseName}</Text> : null}
           <Text style={styles.title}>기준 RM</Text>
@@ -110,8 +111,8 @@ export default function RmBasisSheet({ visible, exerciseName, initialReps = 10, 
           <Pressable style={styles.closeBtn} onPress={close}>
             <Text style={styles.closeText}>닫기</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

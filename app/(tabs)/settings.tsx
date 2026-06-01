@@ -60,6 +60,18 @@ export default function SettingsScreen() {
   const [newBodyTag, setNewBodyTag] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const toggle = (id: string) => setOpen(o => (o === id ? null : id));
+  const Cat = (id: string, icon: string, title: string) => {
+    const on = open === id;
+    return (
+      <Pressable style={[styles.catRow, on && styles.catRowOpen]} onPress={() => toggle(id)}>
+        <View style={styles.catLeft}>
+          <Text style={styles.catIcon}>{icon}</Text>
+          <Text style={styles.catTitle}>{title}</Text>
+        </View>
+        <Text style={[styles.catChevron, on && styles.catChevronOpen]}>{on ? '⌄' : '›'}</Text>
+      </Pressable>
+    );
+  };
 
   const load = useCallback(async () => {
     const [gymList, exList, allEx] = await Promise.all([getGyms(), getCustomExercises(), getExercises()]);
@@ -216,10 +228,7 @@ export default function SettingsScreen() {
         {/* 계정 */}
         {user && (
           <>
-            <Pressable style={styles.catRow} onPress={() => toggle('account')}>
-              <Text style={styles.catTitle}>계정</Text>
-              <Text style={styles.catChevron}>{open === 'account' ? '⌄' : '›'}</Text>
-            </Pressable>
+            {Cat('account', '👤', '계정')}
             {open === 'account' && (
             <View style={styles.card}>
               <View style={styles.row}>
@@ -240,10 +249,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 목표 설정 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('goals')}>
-          <Text style={styles.catTitle}>목표 설정</Text>
-          <Text style={styles.catChevron}>{open === 'goals' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('goals', '🎯', '목표 설정')}
         {open === 'goals' && (
         <View style={styles.card}>
           <View style={styles.row}>
@@ -285,10 +291,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 단위 설정 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('unit')}>
-          <Text style={styles.catTitle}>단위</Text>
-          <Text style={styles.catChevron}>{open === 'unit' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('unit', '⚖️', '단위')}
         {open === 'unit' && (
         <View style={styles.card}>
           <View style={styles.row}>
@@ -304,10 +307,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 표시·동작 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('display')}>
-          <Text style={styles.catTitle}>표시·동작</Text>
-          <Text style={styles.catChevron}>{open === 'display' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('display', '🎚', '표시·동작')}
         {open === 'display' && (
         <View style={styles.card}>
           <View style={styles.row}>
@@ -356,10 +356,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 알림 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('rest')}>
-          <Text style={styles.catTitle}>휴식 알림</Text>
-          <Text style={styles.catChevron}>{open === 'rest' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('rest', '🔔', '휴식 알림')}
         {open === 'rest' && (
         <View style={styles.card}>
           <View style={styles.row}>
@@ -380,10 +377,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 종목별 휴식시간 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('exRest')}>
-          <Text style={styles.catTitle}>종목별 휴식시간</Text>
-          <Text style={styles.catChevron}>{open === 'exRest' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('exRest', '⏱', '종목별 휴식시간')}
         {open === 'exRest' && (
         <View style={styles.card}>
           <Text style={[styles.listItemSub, { marginBottom: 4 }]}>
@@ -419,10 +413,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 헬스장 관리 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('gym')}>
-          <Text style={styles.catTitle}>헬스장 관리</Text>
-          <Text style={styles.catChevron}>{open === 'gym' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('gym', '📍', '헬스장 관리')}
         {open === 'gym' && (
         <View style={styles.card}>
           <TextInput
@@ -460,10 +451,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 부위 관리 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('bodyTags')}>
-          <Text style={styles.catTitle}>부위 관리</Text>
-          <Text style={styles.catChevron}>{open === 'bodyTags' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('bodyTags', '🏷', '부위 관리')}
         {open === 'bodyTags' && (
         <View style={styles.card}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -495,10 +483,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 데이터 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('data')}>
-          <Text style={styles.catTitle}>데이터</Text>
-          <Text style={styles.catChevron}>{open === 'data' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('data', '💾', '데이터')}
         {open === 'data' && (
         <View style={styles.card}>
           <Pressable style={styles.addBtn} onPress={handleExport} disabled={exporting}>
@@ -508,10 +493,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 커스텀 운동 관리 */}
-        <Pressable style={styles.catRow} onPress={() => toggle('custom')}>
-          <Text style={styles.catTitle}>커스텀 운동</Text>
-          <Text style={styles.catChevron}>{open === 'custom' ? '⌄' : '›'}</Text>
-        </Pressable>
+        {Cat('custom', '🏋️', '커스텀 운동')}
         {open === 'custom' && (
         <View style={styles.card}>
           {customExercises.map(ex => (
@@ -549,11 +531,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E',
     borderRadius: 14,
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginTop: 8,
+    paddingVertical: 15,
+    marginTop: 10,
   },
+  catRowOpen: { backgroundColor: '#242426', borderColor: '#30D158', borderWidth: 1, marginBottom: 2 },
+  catLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  catIcon: { fontSize: 18, width: 24, textAlign: 'center' },
   catTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  catChevron: { color: '#8E8E93', fontSize: 20, fontWeight: '700' },
+  catChevron: { color: '#8E8E93', fontSize: 22, fontWeight: '700' },
+  catChevronOpen: { color: '#30D158' },
 
   card: {
     backgroundColor: '#1C1C1E',
