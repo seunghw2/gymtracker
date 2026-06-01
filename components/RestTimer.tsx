@@ -1,18 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useWorkoutStore, useSettingsStore } from '../store/useStore';
 import { scheduleRestEnd, cancelRest } from '../lib/notifications';
 import { playRestDoneSound, startRestKeepAlive, stopRestKeepAlive } from '../lib/sound';
 
-const PRESETS = [60, 90, 120];
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function Ring({ progress, size, stroke }: { progress: number; size: number; stroke: number }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <Svg width={size} height={size}>
+      <Circle cx={size / 2} cy={size / 2} r={r} stroke="#2C2C2E" strokeWidth={stroke} fill="none" />
+      <Circle
+        cx={size / 2} cy={size / 2} r={r}
+        stroke="#30D158" strokeWidth={stroke} fill="none"
+        strokeDasharray={c} strokeDashoffset={c * (1 - progress)} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </Svg>
+  );
+}
 
 export default function RestTimer() {
   const {
     restTimerActive, restTimerEnd, restTotalSec, restNextLabel,
-    stopRestTimer, adjustRestTimer, setRestTimer,
+    stopRestTimer, adjustRestTimer,
   } = useWorkoutStore();
   const [remaining, setRemaining] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const notifId = useRef<string | null>(null);
 
@@ -23,7 +43,6 @@ export default function RestTimer() {
       stopRestKeepAlive();
       return;
     }
-    // 백그라운드에서도 앱·타이머가 살아있게(무음+잠금에서도 종료음). 설정 ON일 때만.
     if (useSettingsStore.getState().soundOnSilent) startRestKeepAlive();
     const tick = () => {
       const rem = Math.ceil((restTimerEnd - Date.now()) / 1000);
@@ -31,10 +50,9 @@ export default function RestTimer() {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRemaining(0);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // 무음에도 들리는 사운드 (설정 ON일 때). 최신값 직접 조회로 stale 방지.
         if (useSettingsStore.getState().soundOnSilent) playRestDoneSound();
         stopRestKeepAlive();
-        stopRestTimer(); // 예약 알림은 취소하지 않음 → 포그라운드 소리/백그라운드 알림 발화
+        stopRestTimer();
       } else {
         setRemaining(rem);
       }
@@ -44,7 +62,7 @@ export default function RestTimer() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [restTimerActive, restTimerEnd]);
 
-  // 알림 (재)예약: 활성/종료시각 변경 시
+  // 알림 (재)예약
   useEffect(() => {
     if (!restTimerActive || !restTimerEnd) return;
     let cancelled = false;
@@ -62,106 +80,108 @@ export default function RestTimer() {
 
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
+  const timeStr = `${mins}:${String(secs).padStart(2, '0')}`;
   const progress = restTotalSec > 0 ? Math.max(0, Math.min(1, remaining / restTotalSec)) : 0;
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    setExpanded(e => !e);
+  };
 
   const handleSkip = () => {
     cancelRest(notifId.current);
     notifId.current = null;
     stopRestKeepAlive();
+    setExpanded(false);
     stopRestTimer();
   };
 
-  return (
-    <View style={styles.bar}>
-      {/* 진행 바 */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
-
-      {/* 본문 */}
-      <View style={styles.row}>
-        <View style={styles.left}>
-          <Text style={styles.label}>휴식 중</Text>
-          {restNextLabel ? (
-            <Text style={styles.next} numberOfLines={1}>다음: {restNextLabel}</Text>
-          ) : null}
-        </View>
-        <Text style={styles.time}>{`${mins}:${String(secs).padStart(2, '0')}`}</Text>
-        <Pressable onPress={handleSkip} style={styles.skipBtn} hitSlop={8}>
-          <Text style={styles.skipText}>건너뛰기</Text>
+  // 접힌 상태: 작은 알약
+  if (!expanded) {
+    return (
+      <View style={styles.dockCenter} pointerEvents="box-none">
+        <Pressable style={styles.pill} onPress={toggle}>
+          <Ring progress={progress} size={34} stroke={4} />
+          <Text style={styles.pillTime}>{timeStr}</Text>
+          <Pressable style={styles.skipPrimary} onPress={handleSkip} hitSlop={8}>
+            <Text style={styles.skipPrimaryText}>건너뛰기</Text>
+          </Pressable>
         </Pressable>
       </View>
+    );
+  }
 
-      {/* 조정 + 프리셋 */}
-      <View style={styles.controls}>
-        <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(-30)}><Text style={styles.adjText}>-30</Text></Pressable>
-        <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(-10)}><Text style={styles.adjText}>-10</Text></Pressable>
-        <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(10)}><Text style={styles.adjText}>+10</Text></Pressable>
-        <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(30)}><Text style={styles.adjText}>+30</Text></Pressable>
-        <View style={styles.divider} />
-        {PRESETS.map(p => (
-          <Pressable key={p} style={styles.presetBtn} onPress={() => setRestTimer(p)}>
-            <Text style={styles.presetText}>{p}</Text>
+  // 펼친 상태: 카드
+  return (
+    <View style={styles.dockCenter} pointerEvents="box-none">
+      <Pressable style={styles.card} onPress={toggle}>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+        <View style={styles.cardRow}>
+          <Ring progress={progress} size={64} stroke={6} />
+          <View style={styles.cardCenter}>
+            <Text style={styles.bigTime}>{timeStr}</Text>
+            <Text style={styles.restLabel} numberOfLines={1}>
+              휴식 중{restNextLabel ? ` · 다음 ${restNextLabel}` : ''}
+            </Text>
+          </View>
+          <Pressable style={styles.skipSecondary} onPress={handleSkip} hitSlop={8}>
+            <Text style={styles.skipSecondaryText}>건너뛰기</Text>
           </Pressable>
-        ))}
-      </View>
+        </View>
+        <View style={styles.controls}>
+          <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(-10)}><Text style={styles.adjText}>−10</Text></Pressable>
+          <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(10)}><Text style={styles.adjText}>+10</Text></Pressable>
+        </View>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
+  dockCenter: { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10 },
+
+  // 접힘
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#1C1C1E',
-    borderTopWidth: 1,
+    borderRadius: 30,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#2C2C2E',
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+  },
+  pillTime: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  skipPrimary: { backgroundColor: '#30D158', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  skipPrimaryText: { color: '#000000', fontSize: 14, fontWeight: '700' },
+
+  // 펼침
+  card: {
+    alignSelf: 'stretch',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 20,
+    borderWidth: 1,
     borderColor: '#30D158',
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 14,
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 2 },
   },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#2C2C2E',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
+  progressTrack: { height: 5, backgroundColor: '#2C2C2E', borderRadius: 3, overflow: 'hidden', marginBottom: 12 },
   progressFill: { height: '100%', backgroundColor: '#30D158', borderRadius: 3 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 },
+  cardCenter: { flex: 1 },
+  bigTime: { color: '#FFFFFF', fontSize: 34, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  restLabel: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
+  skipSecondary: { backgroundColor: '#2C2C2E', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10 },
+  skipSecondaryText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
 
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  left: { flex: 1 },
-  label: { color: '#30D158', fontSize: 13, fontWeight: '600' },
-  next: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
-  time: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    marginHorizontal: 12,
-  },
-  skipBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#2C2C2E',
-  },
-  skipText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  adjBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#2C2C2E',
-    alignItems: 'center',
-  },
-  adjText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  divider: { width: 1, height: 24, backgroundColor: '#3A3A3C', marginHorizontal: 4 },
-  presetBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#1A3D27',
-    alignItems: 'center',
-  },
-  presetText: { color: '#30D158', fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  controls: { flexDirection: 'row', gap: 10 },
+  adjBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#2C2C2E', alignItems: 'center' },
+  adjText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });
