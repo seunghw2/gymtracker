@@ -236,29 +236,32 @@ export default function StatsScreen() {
                 {selectedEx ? (
                   <>
                     <View style={styles.rmModeRow}>
-                      {(['est', 'actual'] as const).map(m => (
-                        <Pressable
-                          key={m}
-                          style={[styles.rmModeBtn, rmMode === m && styles.rmModeBtnOn]}
-                          onPress={() => setRmMode(m)}
-                        >
-                          <Text style={[styles.rmModeText, rmMode === m && styles.rmModeTextOn]}>
-                            {m === 'est' ? '추정' : '실제'}
-                          </Text>
-                        </Pressable>
-                      ))}
+                      <Text style={styles.rmModeLabel}>표시 기준</Text>
+                      <View style={styles.rmModeSeg}>
+                        {(['est', 'actual'] as const).map(m => (
+                          <Pressable
+                            key={m}
+                            style={[styles.rmModeCell, rmMode === m && styles.rmCellOn]}
+                            onPress={() => setRmMode(m)}
+                          >
+                            <Text style={[styles.rmText, rmMode === m && styles.rmTextOn]}>
+                              {m === 'est' ? '추정' : '실제'}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
                     </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rmRow}>
+                    <View style={styles.rmGrid}>
                       {RM_OPTIONS.map(n => (
                         <Pressable
                           key={n}
-                          style={[styles.rmChip, rmBasis === n && styles.rmChipOn]}
+                          style={[styles.rmGridCell, rmBasis === n && styles.rmCellOn]}
                           onPress={() => changeRmBasis(n)}
                         >
-                          <Text style={[styles.rmChipText, rmBasis === n && styles.rmChipTextOn]}>{n}RM</Text>
+                          <Text style={[styles.rmText, rmBasis === n && styles.rmTextOn]}>{n}RM</Text>
                         </Pressable>
                       ))}
-                    </ScrollView>
+                    </View>
                     {rmMode === 'est' ? (
                       <OneRMChart
                         data={ormData.map(d => ({ ...d, estimated_1rm: convertRm(d.estimated_1rm, rmBasis) }))}
@@ -664,16 +667,15 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 10 },
 
-  rmModeRow: { flexDirection: 'row', gap: 6, marginTop: 12, marginBottom: 8 },
-  rmModeBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 12, backgroundColor: '#1C1C1E' },
-  rmModeBtnOn: { backgroundColor: '#30D158' },
-  rmModeText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-  rmModeTextOn: { color: '#000000' },
-  rmRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8 },
-  rmChip: { backgroundColor: '#1C1C1E', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
-  rmChipOn: { backgroundColor: '#30D158' },
-  rmChipText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-  rmChipTextOn: { color: '#000000' },
+  rmModeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 10 },
+  rmModeLabel: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
+  rmModeSeg: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4 },
+  rmModeCell: { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
+  rmGrid: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, marginBottom: 22 },
+  rmGridCell: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
+  rmCellOn: { backgroundColor: '#30D158' },
+  rmText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
+  rmTextOn: { color: '#000000' },
   exSelectBtn: {
     flexDirection: 'row',
     alignItems: 'center',
