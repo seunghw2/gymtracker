@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager, Animated, PanResponder, Dimensions } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useWorkoutStore, useSettingsStore } from '../store/useStore';
@@ -35,6 +35,29 @@ export default function RestTimer() {
   const [expanded, setExpanded] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const notifId = useRef<string | null>(null);
+
+  // 드래그로 위치 이동
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const panVal = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const id = pan.addListener(v => { panVal.current = v; });
+    return () => pan.removeListener(id);
+  }, [pan]);
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
+      onPanResponderGrant: () => { pan.setOffset(panVal.current); pan.setValue({ x: 0, y: 0 }); },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+        // 화면 밖으로 사라지지 않게 클램프
+        const { width, height } = Dimensions.get('window');
+        const x = Math.max(-(width / 2 - 60), Math.min(width / 2 - 60, panVal.current.x));
+        const y = Math.max(-(height - 200), Math.min(40, panVal.current.y));
+        Animated.spring(pan, { toValue: { x, y }, useNativeDriver: false, friction: 7 }).start();
+      },
+    })
+  ).current;
 
   // 카운트다운
   useEffect(() => {
@@ -96,45 +119,48 @@ export default function RestTimer() {
     stopRestTimer();
   };
 
-  // 접힌 상태: 작은 알약
-  if (!expanded) {
-    return (
-      <View style={styles.dockCenter} pointerEvents="box-none">
-        <Pressable style={styles.pill} onPress={toggle}>
-          <Ring progress={progress} size={34} stroke={4} />
-          <Text style={styles.pillTime}>{timeStr}</Text>
-          <Pressable style={styles.skipPrimary} onPress={handleSkip} hitSlop={8}>
-            <Text style={styles.skipPrimaryText}>건너뛰기</Text>
-          </Pressable>
+  const inner = !expanded ? (
+    // 접힌 상태: 작은 알약
+    <Pressable style={styles.pill} onPress={toggle}>
+      <Ring progress={progress} size={34} stroke={4} />
+      <Text style={styles.pillTime}>{timeStr}</Text>
+      <Pressable style={styles.skipPrimary} onPress={handleSkip} hitSlop={8}>
+        <Text style={styles.skipPrimaryText}>건너뛰기</Text>
+      </Pressable>
+    </Pressable>
+  ) : (
+    // 펼친 상태: 카드
+    <Pressable style={styles.card} onPress={toggle}>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+      </View>
+      <View style={styles.cardRow}>
+        <Ring progress={progress} size={64} stroke={6} />
+        <View style={styles.cardCenter}>
+          <Text style={styles.bigTime}>{timeStr}</Text>
+          <Text style={styles.restLabel} numberOfLines={1}>
+            휴식 중{restNextLabel ? ` · 다음 ${restNextLabel}` : ''}
+          </Text>
+        </View>
+        <Pressable style={styles.skipSecondary} onPress={handleSkip} hitSlop={8}>
+          <Text style={styles.skipSecondaryText}>건너뛰기</Text>
         </Pressable>
       </View>
-    );
-  }
+      <View style={styles.controls}>
+        <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(-10)}><Text style={styles.adjText}>−10</Text></Pressable>
+        <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(10)}><Text style={styles.adjText}>+10</Text></Pressable>
+      </View>
+    </Pressable>
+  );
 
-  // 펼친 상태: 카드
   return (
     <View style={styles.dockCenter} pointerEvents="box-none">
-      <Pressable style={styles.card} onPress={toggle}>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-        </View>
-        <View style={styles.cardRow}>
-          <Ring progress={progress} size={64} stroke={6} />
-          <View style={styles.cardCenter}>
-            <Text style={styles.bigTime}>{timeStr}</Text>
-            <Text style={styles.restLabel} numberOfLines={1}>
-              휴식 중{restNextLabel ? ` · 다음 ${restNextLabel}` : ''}
-            </Text>
-          </View>
-          <Pressable style={styles.skipSecondary} onPress={handleSkip} hitSlop={8}>
-            <Text style={styles.skipSecondaryText}>건너뛰기</Text>
-          </Pressable>
-        </View>
-        <View style={styles.controls}>
-          <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(-10)}><Text style={styles.adjText}>−10</Text></Pressable>
-          <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(10)}><Text style={styles.adjText}>+10</Text></Pressable>
-        </View>
-      </Pressable>
+      <Animated.View
+        style={{ alignSelf: 'stretch', alignItems: 'center', transform: pan.getTranslateTransform() }}
+        {...panResponder.panHandlers}
+      >
+        {inner}
+      </Animated.View>
     </View>
   );
 }
