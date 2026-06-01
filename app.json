@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.seunghw2.gymtracker",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {

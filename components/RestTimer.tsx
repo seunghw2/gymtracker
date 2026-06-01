@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useWorkoutStore, useSettingsStore } from '../store/useStore';
 import { scheduleRestEnd, cancelRest } from '../lib/notifications';
-import { playRestDoneSound } from '../lib/sound';
+import { playRestDoneSound, startRestKeepAlive, stopRestKeepAlive } from '../lib/sound';
 
 const PRESETS = [60, 90, 120];
 
@@ -20,16 +20,20 @@ export default function RestTimer() {
   useEffect(() => {
     if (!restTimerActive || !restTimerEnd) {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      stopRestKeepAlive();
       return;
     }
+    // 백그라운드에서도 앱·타이머가 살아있게(무음+잠금에서도 종료음). 설정 ON일 때만.
+    if (useSettingsStore.getState().soundOnSilent) startRestKeepAlive();
     const tick = () => {
       const rem = Math.ceil((restTimerEnd - Date.now()) / 1000);
       if (rem <= 0) {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRemaining(0);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // 무음에도 들리는 포그라운드 사운드 (설정 ON일 때). 최신값 직접 조회로 stale 방지.
+        // 무음에도 들리는 사운드 (설정 ON일 때). 최신값 직접 조회로 stale 방지.
         if (useSettingsStore.getState().soundOnSilent) playRestDoneSound();
+        stopRestKeepAlive();
         stopRestTimer(); // 예약 알림은 취소하지 않음 → 포그라운드 소리/백그라운드 알림 발화
       } else {
         setRemaining(rem);
@@ -63,6 +67,7 @@ export default function RestTimer() {
   const handleSkip = () => {
     cancelRest(notifId.current);
     notifId.current = null;
+    stopRestKeepAlive();
     stopRestTimer();
   };
 
