@@ -172,6 +172,7 @@ export default function WorkoutScreen() {
     removeSet,
     removeExercise,
     startRestTimer,
+    stopRestTimer,
     restTimerActive,
   } = useWorkoutStore();
   const { restDurationSec, unitKg } = useSettingsStore();
@@ -837,6 +838,7 @@ export default function WorkoutScreen() {
     if (!s?.done) return;
     if (s.setId) await deleteWorkoutSet(s.setId).catch(() => {});
     unmarkSetDone(exIdx, setIdx);
+    stopRestTimer(); // 완료로 시작된 휴식 타이머 취소
     Haptics.selectionAsync();
   };
 

@@ -78,6 +78,9 @@ export default function RestTimer() {
     if (!restTimerActive || !restTimerEnd) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       stopRestKeepAlive();
+      // 외부에서 휴식이 취소(예: 세트 체크 해제)되면 예약 알림도 취소
+      cancelRest(notifId.current);
+      notifId.current = null;
       return;
     }
     if (useSettingsStore.getState().soundOnSilent) startRestKeepAlive();
