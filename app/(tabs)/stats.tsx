@@ -203,7 +203,12 @@ export default function StatsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.header}>통계</Text>
 
-        <View style={styles.chips}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsScroll}
+          contentContainerStyle={styles.chipsRow}
+        >
           {chips.map(c => (
             <Pressable
               key={c}
@@ -213,7 +218,7 @@ export default function StatsScreen() {
               <Text style={[styles.chipText, activeChip === c && styles.chipTextActive]}>{c}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         {activeChip === '1RM 성장' && (
           <View>
@@ -626,7 +631,8 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },
 
-  chips: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  chipsScroll: { marginHorizontal: -20, marginBottom: 20 },
+  chipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
