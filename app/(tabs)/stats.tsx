@@ -12,7 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, getActualRmHistory, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
+import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, getActualRmHistory, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
@@ -22,6 +22,7 @@ type Chip = '부위별' | '1RM 성장' | 'PR' | '체중' | '체지방' | '볼륨
 // 부위(영어 저장값) → 한글 표기 + 표시 순서
 const MUSCLE_KO: Record<string, string> = { Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체', Arms: '팔', Core: '코어', Cardio: '유산소' };
 const MUSCLE_ORDER = ['Chest', 'Back', 'Shoulder', 'Legs', 'Arms', 'Core'];
+const MUSCLE_COLOR: Record<string, string> = { Chest: '#FF453A', Back: '#0A84FF', Shoulder: '#FFD60A', Legs: '#BF5AF2', Arms: '#30D158', Core: '#FF9F0A', Cardio: '#64D2FF' };
 const REC_MIN = 10;   // 권장 주당 최소 세트
 const REC_MAX = 20;   // 권장 주당 최대 세트
 const BAR_MAX = 24;   // 막대 채움 기준 최대치
@@ -102,6 +103,9 @@ export default function StatsScreen() {
   const [trainedExercises, setTrainedExercises] = useState<TrainedExercise[] | null>(null);
   const [selectedEx, setSelectedEx] = useState<TrainedExercise | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerPart, setPickerPart] = useState<string>('ALL');
+  const [exMuscle, setExMuscle] = useState<Record<number, string>>({});
   const [ormData, setOrmData] = useState<{ date: string; estimated_1rm: number }[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
   const [volume, setVolume] = useState<VolumeStats | null>(null);
@@ -146,6 +150,12 @@ export default function StatsScreen() {
           if (list.length > 0) setSelectedEx(prev => prev ?? list[0]);
         })
         .catch(() => setTrainedExercises([]));
+      // 종목별 부위(색·필터용) 매핑
+      getExercises().then(all => {
+        const m: Record<number, string> = {};
+        for (const e of all) m[e.id] = e.muscle_group;
+        setExMuscle(m);
+      }).catch(() => {});
     }
     if (activeChip === '볼륨') {
       getVolumeStats(volumeRange).then(setVolume).catch(() => setVolume({ daily: [], byMuscle: [] }));
@@ -229,7 +239,7 @@ export default function StatsScreen() {
             ) : (
               <>
                 <Text style={styles.sectionTitle}>종목</Text>
-                <Pressable style={styles.exSelectBtn} onPress={() => setPickerOpen(true)}>
+                <Pressable style={styles.exSelectBtn} onPress={() => { setPickerSearch(''); setPickerPart('ALL'); setPickerOpen(true); }}>
                   <Text style={styles.exSelectText} numberOfLines={1}>
                     {selectedEx
                       ? `${selectedEx.name}${selectedEx.brand ? ` (${selectedEx.brand})` : ''}`
@@ -298,26 +308,58 @@ export default function StatsScreen() {
                   <Text style={styles.modalTitle}>종목 선택</Text>
                   <View style={{ width: 60 }} />
                 </View>
-                <FlatList
-                  data={trainedExercises ?? []}
-                  keyExtractor={item => String(item.id)}
-                  contentContainerStyle={styles.modalContent}
-                  renderItem={({ item }) => (
-                    <Pressable
-                      style={[styles.exItem, selectedEx?.id === item.id && styles.exItemActive]}
-                      onPress={() => { setSelectedEx(item); setPickerOpen(false); }}
-                    >
-                      <View>
-                        <Text style={styles.exItemName}>{item.name}</Text>
-                        {item.brand && <Text style={styles.exItemBrand}>{item.brand}</Text>}
+                {(() => {
+                  const all = trainedExercises ?? [];
+                  const parts = MUSCLE_ORDER.filter(p => all.some(e => exMuscle[e.id] === p));
+                  const q = pickerSearch.trim().toLowerCase();
+                  const list = all.filter(e =>
+                    (pickerPart === 'ALL' || exMuscle[e.id] === pickerPart) &&
+                    (!q || e.name.toLowerCase().includes(q))
+                  );
+                  return (
+                    <>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partRow}>
+                        <Pressable style={[styles.partChip, pickerPart === 'ALL' && styles.partChipOn]} onPress={() => setPickerPart('ALL')}>
+                          <Text style={[styles.partChipText, pickerPart === 'ALL' && styles.partChipTextOn]}>전체</Text>
+                        </Pressable>
+                        {parts.map(p => (
+                          <Pressable key={p} style={[styles.partChip, pickerPart === p && styles.partChipOn]} onPress={() => setPickerPart(p)}>
+                            <View style={[styles.partDot, { backgroundColor: MUSCLE_COLOR[p] }]} />
+                            <Text style={[styles.partChipText, pickerPart === p && styles.partChipTextOn]}>{MUSCLE_KO[p] ?? p}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                      <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+                        <TextInput
+                          style={styles.recordSearch}
+                          placeholder="종목 검색"
+                          placeholderTextColor="#48484A"
+                          value={pickerSearch}
+                          onChangeText={setPickerSearch}
+                          clearButtonMode="while-editing"
+                        />
                       </View>
-                      {selectedEx?.id === item.id && <Text style={styles.exItemCheck}>✓</Text>}
-                    </Pressable>
-                  )}
-                  ListEmptyComponent={
-                    <Text style={styles.placeholderText}>기록된 운동이 없습니다</Text>
-                  }
-                />
+                      <FlatList
+                        data={list}
+                        keyExtractor={item => String(item.id)}
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={styles.modalContent}
+                        renderItem={({ item }) => (
+                          <Pressable
+                            style={styles.exRow}
+                            onPress={() => { setSelectedEx(item); setPickerOpen(false); }}
+                          >
+                            <View style={[styles.partDot, { backgroundColor: MUSCLE_COLOR[exMuscle[item.id]] ?? '#8E8E93' }]} />
+                            <Text style={styles.exRowName} numberOfLines={1}>{item.name}</Text>
+                            {item.brand && <Text style={styles.exRowBrand} numberOfLines={1}> · {item.brand}</Text>}
+                            {selectedEx?.id === item.id && <Text style={styles.exItemCheck}>✓</Text>}
+                          </Pressable>
+                        )}
+                        ListEmptyComponent={<Text style={[styles.placeholderText, { textAlign: 'center', marginTop: 24 }]}>종목이 없습니다</Text>}
+                      />
+                    </>
+                  );
+                })()}
               </SafeAreaView>
             </Modal>
           </View>
@@ -719,7 +761,18 @@ const styles = StyleSheet.create({
   exItemActive: { borderColor: '#30D158', borderWidth: 1 },
   exItemName: { color: '#FFFFFF', fontSize: 16 },
   exItemBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
-  exItemCheck: { color: '#30D158', fontSize: 18, fontWeight: '700' },
+  exItemCheck: { color: '#30D158', fontSize: 18, fontWeight: '700', marginLeft: 6 },
+
+  // 시안 C — 부위 필터 + 평면 리스트
+  partRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  partChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1C1C1E', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
+  partChipOn: { backgroundColor: '#30D158' },
+  partChipText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
+  partChipTextOn: { color: '#000000' },
+  partDot: { width: 8, height: 8, borderRadius: 4 },
+  exRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#1C1C1E' },
+  exRowName: { color: '#FFFFFF', fontSize: 16 },
+  exRowBrand: { color: '#8E8E93', fontSize: 13, flexShrink: 1 },
 
   placeholder: {
     height: 200,
