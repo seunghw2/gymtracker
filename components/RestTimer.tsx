@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager, Animated, PanResponder, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useWorkoutStore, useSettingsStore } from '../store/useStore';
@@ -35,43 +35,6 @@ export default function RestTimer() {
   const [expanded, setExpanded] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const notifId = useRef<string | null>(null);
-
-  // 드래그로 위치 이동
-  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const panVal = useRef({ x: 0, y: 0 });
-  const contentRef = useRef<View>(null);
-  useEffect(() => {
-    const id = pan.addListener(v => { panVal.current = v; });
-    return () => pan.removeListener(id);
-  }, [pan]);
-  // 놓을 때, 실제 요소 위치를 측정해 화면 밖으로 나간 만큼만 안으로 보정
-  const clampIntoScreen = () => {
-    contentRef.current?.measureInWindow((mx, my, mw, mh) => {
-      if (!mw || !mh) return;
-      const { width: W, height: H } = Dimensions.get('window');
-      const padX = 8, padTop = 56, padBottom = 8;
-      let dx = 0, dy = 0;
-      if (mx < padX) dx = padX - mx;
-      else if (mx + mw > W - padX) dx = (W - padX) - (mx + mw);
-      if (my < padTop) dy = padTop - my;
-      else if (my + mh > H - padBottom) dy = (H - padBottom) - (my + mh);
-      if (dx !== 0 || dy !== 0) {
-        Animated.spring(pan, {
-          toValue: { x: panVal.current.x + dx, y: panVal.current.y + dy },
-          useNativeDriver: false, friction: 7,
-        }).start();
-      }
-    });
-  };
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
-      onPanResponderGrant: () => { pan.setOffset(panVal.current); pan.setValue({ x: 0, y: 0 }); },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: () => { pan.flattenOffset(); requestAnimationFrame(clampIntoScreen); },
-      onPanResponderTerminate: () => { pan.flattenOffset(); requestAnimationFrame(clampIntoScreen); },
-    })
-  ).current;
 
   // 카운트다운
   useEffect(() => {
@@ -126,7 +89,6 @@ export default function RestTimer() {
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.create(200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setExpanded(e => !e);
-    setTimeout(clampIntoScreen, 240); // 펼침/접힘으로 크기 바뀐 뒤 화면 안으로 보정
   };
 
   const handleSkip = () => {
@@ -173,14 +135,9 @@ export default function RestTimer() {
 
   return (
     <View style={styles.dockCenter} pointerEvents="box-none">
-      <Animated.View
-        style={{ alignSelf: 'stretch', alignItems: 'center', transform: pan.getTranslateTransform() }}
-        {...panResponder.panHandlers}
-      >
-        <View ref={contentRef} collapsable={false} style={expanded ? { alignSelf: 'stretch' } : undefined}>
-          {inner}
-        </View>
-      </Animated.View>
+      <View style={expanded ? { alignSelf: 'stretch' } : undefined}>
+        {inner}
+      </View>
     </View>
   );
 }

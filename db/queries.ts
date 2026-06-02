@@ -255,6 +255,14 @@ export async function updateSessionDuration(sessionId: number, duration_sec: num
   });
 }
 
+// 운동 완료 표시 — completedAt이 찍힌 세션만 통계에 집계된다
+export async function completeSession(sessionId: number, duration_sec: number): Promise<void> {
+  await apiRequest(`/api/v1/workouts/sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: { durationSec: duration_sec, completed: true },
+  });
+}
+
 export async function addWorkoutSet(
   session_id: number,
   exercise_id: number,

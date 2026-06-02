@@ -26,7 +26,7 @@ import {
   createWorkoutSession,
   addWorkoutSet,
   getLastSessionSets,
-  updateSessionDuration,
+  completeSession,
   getSessionHistory,
   getSessionSets,
   getExerciseRest,
@@ -236,6 +236,7 @@ export default function WorkoutScreen() {
   // 앱 자체 숫자패드 편집 상태
   const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const replaceOnNextRef = useRef(true); // 숫자패드 첫 입력 시 기존 값 교체
   const listRef = useRef<FlatList<ExerciseEntry>>(null);
   const noteDraftRef = useRef(''); // 종목 메모 입력 중 임시값(타이핑마다 스토어 갱신 방지)
   const rowRefs = useRef<Map<string, View>>(new Map());
@@ -470,8 +471,8 @@ export default function WorkoutScreen() {
       {
         text: '완료', onPress: async () => {
           const durationSec = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
-          if (activeSessionId && sessionStartTime) {
-            await updateSessionDuration(activeSessionId, durationSec).catch(() => {});
+          if (activeSessionId) {
+            await completeSession(activeSessionId, durationSec).catch(() => {});
           }
           // 종료 전 요약 계산
           const doneSets = exercises.flatMap(e => e.sets.filter(s => s.done));
@@ -615,6 +616,7 @@ export default function WorkoutScreen() {
     Keyboard.dismiss(); // 메모 등 시스템 키보드 닫고 앱 내 숫자패드 표시
     setEdit({ exIdx, setIdx, kind });
     setEditValue(fieldValueStr(s, kind));
+    replaceOnNextRef.current = true; // 첫 키 입력 시 기존 값 비우고 새로 입력
     Haptics.selectionAsync();
     // 편집하는 세트 행이 숫자패드 위에 보이도록 스크롤(행 기준 정밀)
     setTimeout(() => {
@@ -648,6 +650,7 @@ export default function WorkoutScreen() {
     if (!edit) return;
     const allowDecimal = edit.kind === 'weight';
     let next = editValue;
+    if (replaceOnNextRef.current) { next = ''; replaceOnNextRef.current = false; }
     if (d === '.') {
       if (!allowDecimal || next.includes('.')) return;
       next = next === '' ? '0.' : next + '.';
@@ -661,6 +664,7 @@ export default function WorkoutScreen() {
 
   const handleNumBackspace = () => {
     if (!edit) return;
+    replaceOnNextRef.current = false;
     const next = editValue.slice(0, -1);
     setEditValue(next);
     commitEdit(edit.exIdx, edit.setIdx, edit.kind, next);
@@ -668,6 +672,7 @@ export default function WorkoutScreen() {
 
   const handleNumStep = (delta: 1 | -1) => {
     if (!edit) return;
+    replaceOnNextRef.current = false;
     const s = exercises[edit.exIdx]?.sets[edit.setIdx];
     if (!s) return;
     let nv: string;

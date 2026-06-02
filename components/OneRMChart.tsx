@@ -90,14 +90,14 @@ export default function OneRMChart({ data, title, unitKg = true }: Props) {
         ))}
 
         {/* 마지막 값 라벨 */}
-        <SvgText x={x(n - 1)} y={Math.max(PAD.top + 10, y(last) - 12)} fill="#FFFFFF" fontSize={15} fontWeight="700" textAnchor="end">
-          {last}{u}
+        <SvgText x={x(n - 1)} y={Math.max(PAD.top + 10, y(last) - 12)} fill="#FFFFFF" fontSize={15} fontWeight="700" textAnchor={n === 1 ? 'middle' : 'end'}>
+          {`${last}${u}`}
         </SvgText>
 
         {/* X 라벨 */}
         {labelIdx.map(i => (
           <SvgText key={i} x={x(i)} y={HEIGHT - 8} fill="#8E8E93" fontSize={11}
-            textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>{dates[i]}</SvgText>
+            textAnchor={n === 1 ? 'middle' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>{dates[i]}</SvgText>
         ))}
       </Svg>
 
