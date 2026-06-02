@@ -96,6 +96,11 @@ import NumPad from '../../components/NumPad';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
 
+// 부위(영어 저장값) → 한글 + 색 점 + 필터 표시 순서
+const MUSCLE_KO: Record<string, string> = { Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체', Arms: '팔', Core: '코어', Cardio: '유산소' };
+const MUSCLE_COLOR: Record<string, string> = { Chest: '#FF453A', Back: '#0A84FF', Shoulder: '#FFD60A', Legs: '#BF5AF2', Arms: '#30D158', Core: '#FF9F0A', Cardio: '#64D2FF' };
+const PART_ORDER = ['Chest', 'Back', 'Shoulder', 'Legs', 'Arms', 'Core'];
+
 /** 세트 타입별 짧은 표시(W/D/F) + 색상. NORMAL은 표시 없음. */
 const SET_TYPE_META: Record<SetType, { label: string; color: string } | null> = {
   NORMAL: null,
@@ -216,6 +221,7 @@ export default function WorkoutScreen() {
   const [modalSearch, setModalSearch] = useState('');
   const [searchAll, setSearchAll] = useState<Exercise[]>([]);
   const [favIds, setFavIds] = useState<number[]>([]);
+  const [partFilter, setPartFilter] = useState<string>('ALL');
   const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
   const [repeatLoading, setRepeatLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
@@ -741,7 +747,11 @@ export default function WorkoutScreen() {
     setSelectedEquipment(null);
     setSelectedBrand(null);
     setSearchText('');
+    setModalSearch('');
+    setPartFilter('ALL');
     setSelectedToAdd({});
+    getExercises().then(setSearchAll).catch(() => {});
+    getTrainedExercises().then(setRecents).catch(() => {});
     setShowExerciseModal(true);
   };
 
@@ -890,11 +900,15 @@ export default function WorkoutScreen() {
 
   const saveCustomExercise = async () => {
     if (!customName.trim() || !selectedMuscle || !selectedEquipment) return;
-    await addCustomExercise(customName.trim(), selectedMuscle, selectedEquipment, selectedBrand ?? undefined, customTracking);
+    const id = await addCustomExercise(customName.trim(), selectedMuscle, selectedEquipment, customBrandInput.trim() || undefined, customTracking);
+    const list = await getExercises().catch(() => [] as Exercise[]);
+    setSearchAll(list);
+    const created = list.find(e => e.id === id);
+    if (created) setSelectedToAdd(prev => ({ ...prev, [id]: created }));
     setCustomName('');
+    setCustomBrandInput('');
     setCustomTracking('REPS');
-    setSelectStep('list');
-    loadExercises();
+    setSelectStep('muscle');
   };
 
   const openDetail = async (session: SessionSummary) => {
@@ -1025,34 +1039,44 @@ export default function WorkoutScreen() {
     </Modal>
   );
 
-  const renderExerciseModal = () => (
+  const renderExerciseModal = () => {
+    const q = modalSearch.trim().toLowerCase();
+    const browseList = searchAll
+      .filter(e => (partFilter === 'ALL' || e.muscle_group === partFilter) && (!q || e.name.toLowerCase().includes(q)))
+      .sort((a, b) => (favIds.includes(b.id) ? 1 : 0) - (favIds.includes(a.id) ? 1 : 0));
+    const hasSel = Object.keys(selectedToAdd).length > 0;
+    return (
     <Modal visible={showExerciseModal} animationType="slide">
       <SafeAreaView style={styles.modalSafe}>
         <View style={styles.modalHeader}>
           <Pressable onPress={() => {
-            if (selectStep === 'muscle') { setShowExerciseModal(false); }
-            else if (selectStep === 'equipment') setSelectStep('muscle');
-            else if (selectStep === 'brand') setSelectStep('equipment');
-            else if (selectStep === 'custom-brand') setSelectStep('brand');
-            else if (selectStep === 'list') setSelectStep(selectedEquipment === 'Machine' ? 'brand' : 'equipment');
-            else if (selectStep === 'custom') setSelectStep('list');
+            if (selectStep === 'custom') setSelectStep('muscle');
+            else setShowExerciseModal(false);
           }}>
-            <Text style={styles.modalBack}>← 뒤로</Text>
+            <Text style={styles.modalBack}>{selectStep === 'custom' ? '← 뒤로' : '✕ 닫기'}</Text>
           </Pressable>
-          <Text style={styles.modalTitle}>
-            {selectStep === 'muscle' && '부위 선택'}
-            {selectStep === 'equipment' && '장비 선택'}
-            {selectStep === 'brand' && '브랜드 선택'}
-            {selectStep === 'custom-brand' && '브랜드 직접 입력'}
-            {selectStep === 'list' && '운동 선택'}
-            {selectStep === 'custom' && '직접 등록'}
-          </Text>
+          <Text style={styles.modalTitle}>{selectStep === 'custom' ? '직접 등록' : '종목 선택'}</Text>
           <View style={{ width: 60 }} />
         </View>
 
         {selectStep === 'muscle' && (
           <View style={{ flex: 1 }}>
-            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            {/* 부위 필터 */}
+            <View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partRow}>
+                <Pressable style={[styles.partChip, partFilter === 'ALL' && styles.partChipOn]} onPress={() => setPartFilter('ALL')}>
+                  <Text style={[styles.partChipText, partFilter === 'ALL' && styles.partChipTextOn]}>전체</Text>
+                </Pressable>
+                {PART_ORDER.map(p => (
+                  <Pressable key={p} style={[styles.partChip, partFilter === p && styles.partChipOn]} onPress={() => setPartFilter(p)}>
+                    <View style={[styles.partDot, { backgroundColor: MUSCLE_COLOR[p] }]} />
+                    <Text style={[styles.partChipText, partFilter === p && styles.partChipTextOn]}>{MUSCLE_KO[p] ?? p}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+            {/* 검색 */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
               <TextInput
                 style={styles.searchInput}
                 placeholder="종목 검색"
@@ -1062,175 +1086,40 @@ export default function WorkoutScreen() {
                 clearButtonMode="while-editing"
               />
             </View>
-            {modalSearch.trim() ? (
-              <FlatList
-                data={searchAll.filter(e => e.name.toLowerCase().includes(modalSearch.trim().toLowerCase()))}
-                keyExtractor={item => String(item.id)}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={[styles.modalContent, Object.keys(selectedToAdd).length > 0 && { paddingBottom: 110 }]}
-                renderItem={({ item }) => {
-                  const on = !!selectedToAdd[item.id];
-                  return (
-                    <View style={[styles.exItem, on && styles.exItemOn]}>
-                      <Pressable style={styles.exItemMain} onPress={() => toggleSelect(item)}>
-                        <Text style={styles.exName} numberOfLines={1}>{on ? '✓ ' : ''}{item.name}</Text>
-                        {item.brand && <Text style={styles.exBrand} numberOfLines={1}>{item.brand}</Text>}
-                      </Pressable>
-                      <Pressable onPress={() => toggleFav(item.id)} hitSlop={8}>
-                        <Text style={styles.favStar}>{favIds.includes(item.id) ? '⭐' : '☆'}</Text>
-                      </Pressable>
-                    </View>
-                  );
-                }}
-              />
-            ) : (
-              <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-                {searchAll.filter(e => favIds.includes(e.id)).length > 0 && (
-                  <View style={{ marginBottom: 20 }}>
-                    <Text style={styles.quickAddTitle}>⭐ 즐겨찾기</Text>
-                    <View style={styles.chipWrap}>
-                      {searchAll.filter(e => favIds.includes(e.id)).map(f => {
-                        const on = !!selectedToAdd[f.id];
-                        return (
-                          <Pressable key={f.id} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleSelect(f)}>
-                            <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>{on ? '✓ ' : ''}{f.name}</Text>
-                            {f.brand && <Text style={styles.chipBrand} numberOfLines={1}>{f.brand}</Text>}
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
-                {recents.length > 0 && (
-                  <View style={{ marginBottom: 20 }}>
-                    <Text style={styles.quickAddTitle}>최근 종목 · 빠른 추가</Text>
-                    <View style={styles.chipWrap}>
-                      {recents.slice(0, 6).map(r => {
-                        const on = !!selectedToAdd[r.id];
-                        return (
-                          <Pressable key={r.id} style={[styles.chip, on && styles.chipOn]} onPress={() => toggleSelect(r)}>
-                            <Text style={[styles.chipText, on && styles.chipTextOn]} numberOfLines={1}>{on ? '✓ ' : ''}{r.name}</Text>
-                            {r.brand && <Text style={styles.chipBrand} numberOfLines={1}>{r.brand}</Text>}
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
-                <Text style={styles.quickAddTitle}>부위로 찾기</Text>
-                <View style={styles.muscleGrid}>
-                  {MUSCLE_GROUPS.map(mg => (
-                    <Pressable key={mg} style={styles.muscleBtn} onPress={() => { setSelectedMuscle(mg); setSelectStep('equipment'); }}>
-                      <Text style={styles.muscleBtnText}>{mg}</Text>
+            {/* 전체 종목 평면 리스트 */}
+            <FlatList
+              data={browseList}
+              keyExtractor={item => String(item.id)}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={[styles.modalContent, hasSel && { paddingBottom: 110 }]}
+              renderItem={({ item }) => {
+                const on = !!selectedToAdd[item.id];
+                return (
+                  <View style={[styles.exRow, on && styles.exRowOn]}>
+                    <Pressable style={styles.exRowMain} onPress={() => toggleSelect(item)}>
+                      <View style={[styles.partDot, { backgroundColor: MUSCLE_COLOR[item.muscle_group] ?? '#8E8E93' }]} />
+                      <Text style={styles.exName} numberOfLines={1}>{item.name}</Text>
+                      {item.brand && <Text style={styles.exBrandInline} numberOfLines={1}> · {item.brand}</Text>}
                     </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        )}
-
-        {selectStep === 'equipment' && (
-          <View style={styles.modalContent}>
-            {EQUIPMENT_TYPES.map(eq => (
-              <Pressable key={eq} style={styles.choiceBtn} onPress={() => {
-                setSelectedEquipment(eq);
-                setSelectStep(eq === 'Machine' ? 'brand' : 'list');
-              }}>
-                <Text style={styles.choiceText}>{eq}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {selectStep === 'brand' && (
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            {[...MACHINE_BRANDS, ...extraBrands].map(b => (
-              <Pressable
-                key={b}
-                style={styles.choiceBtn}
-                onPress={() => { setSelectedBrand(b); setSelectStep('list'); }}
-              >
-                <Text style={styles.choiceText}>{b}</Text>
-              </Pressable>
-            ))}
-            <Pressable
-              style={[styles.choiceBtn, styles.choiceBtnOutline]}
-              onPress={() => { setCustomBrandInput(''); setSelectStep('custom-brand'); }}
-            >
-              <Text style={[styles.choiceText, { color: '#30D158' }]}>+ 직접 등록</Text>
-            </Pressable>
-          </ScrollView>
-        )}
-
-        {selectStep === 'custom-brand' && (
-          <View style={styles.modalContent}>
-            <Text style={styles.customFormLabel}>브랜드 이름</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="예: Technogym, Matrix..."
-              placeholderTextColor="#48484A"
-              value={customBrandInput}
-              onChangeText={setCustomBrandInput}
-              autoFocus
-            />
-            <Pressable
-              style={[styles.saveBtn, { marginTop: 16 }, !customBrandInput.trim() && { opacity: 0.4 }]}
-              onPress={() => {
-                const brand = customBrandInput.trim();
-                if (!brand) return;
-                setExtraBrands(prev => [...prev, brand]);
-                setCustomBrandInput('');
-                setSelectStep('brand');
-                Alert.alert('브랜드 추가', `${brand} 브랜드가 추가되었습니다.`);
-              }}
-              disabled={!customBrandInput.trim()}
-            >
-              <Text style={styles.saveBtnText}>저장</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {selectStep === 'list' && (
-          <FlatList
-            data={exerciseList.filter(e =>
-              e.name.toLowerCase().includes(searchText.trim().toLowerCase())
-            )}
-            keyExtractor={item => String(item.id)}
-            contentContainerStyle={[styles.modalContent, Object.keys(selectedToAdd).length > 0 && { paddingBottom: 110 }]}
-            keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={
-              <TextInput
-                style={styles.searchInput}
-                placeholder="종목 검색"
-                placeholderTextColor="#48484A"
-                value={searchText}
-                onChangeText={setSearchText}
-                clearButtonMode="while-editing"
-              />
-            }
-            renderItem={({ item }) => {
-              const on = !!selectedToAdd[item.id];
-              return (
-                <Pressable style={[styles.exItem, on && styles.exItemOn]} onPress={() => toggleSelect(item)}>
-                  <View>
-                    <Text style={styles.exName}>{item.name}</Text>
-                    {item.brand && <Text style={styles.exBrand}>{item.brand}</Text>}
+                    <Pressable onPress={() => toggleFav(item.id)} hitSlop={8} style={{ paddingHorizontal: 6 }}>
+                      <Text style={styles.favStar}>{favIds.includes(item.id) ? '⭐' : '☆'}</Text>
+                    </Pressable>
+                    {on ? <Text style={styles.exCheck}>✓</Text> : null}
                   </View>
-                  <Text style={[styles.exArrow, on && styles.exCheck]}>{on ? '✓' : '＋'}</Text>
+                );
+              }}
+              ListEmptyComponent={<Text style={[styles.placeholderText, { textAlign: 'center', marginTop: 24 }]}>종목이 없습니다</Text>}
+              ListFooterComponent={
+                <Pressable style={styles.customBtn} onPress={() => { setCustomName(''); setCustomBrandInput(''); setSelectStep('custom'); }}>
+                  <Text style={styles.customBtnText}>+ 직접 등록</Text>
                 </Pressable>
-              );
-            }}
-            ListFooterComponent={
-              <Pressable style={styles.customBtn} onPress={() => { setCustomName(''); setSelectStep('custom'); }}>
-                <Text style={styles.customBtnText}>+ 직접 등록</Text>
-              </Pressable>
-            }
-          />
+              }
+            />
+          </View>
         )}
 
         {selectStep === 'custom' && (
-          <View style={styles.modalContent}>
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.customFormLabel}>운동 이름</Text>
             <TextInput
               style={styles.input}
@@ -1238,11 +1127,31 @@ export default function WorkoutScreen() {
               placeholderTextColor="#48484A"
               value={customName}
               onChangeText={setCustomName}
-              autoFocus
             />
-            <Text style={styles.customFormSub}>
-              부위: {selectedMuscle}  |  장비: {selectedEquipment}{selectedBrand ? `  |  브랜드: ${selectedBrand}` : ''}
-            </Text>
+            <Text style={styles.customFormLabel}>부위</Text>
+            <View style={styles.chipWrap}>
+              {MUSCLE_GROUPS.map(mg => (
+                <Pressable key={mg} style={[styles.choiceChip, selectedMuscle === mg && styles.choiceChipOn]} onPress={() => setSelectedMuscle(mg)}>
+                  <Text style={[styles.choiceChipText, selectedMuscle === mg && styles.choiceChipTextOn]}>{MUSCLE_KO[mg] ?? mg}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.customFormLabel}>장비</Text>
+            <View style={styles.chipWrap}>
+              {EQUIPMENT_TYPES.map(eq => (
+                <Pressable key={eq} style={[styles.choiceChip, selectedEquipment === eq && styles.choiceChipOn]} onPress={() => setSelectedEquipment(eq)}>
+                  <Text style={[styles.choiceChipText, selectedEquipment === eq && styles.choiceChipTextOn]}>{eq}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.customFormLabel}>브랜드 (선택)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="예: Hammer Strength"
+              placeholderTextColor="#48484A"
+              value={customBrandInput}
+              onChangeText={setCustomBrandInput}
+            />
             <Text style={styles.customFormLabel}>측정 방식</Text>
             <View style={styles.trackingRow}>
               {(['REPS', 'TIME'] as const).map(t => (
@@ -1258,13 +1167,13 @@ export default function WorkoutScreen() {
               ))}
             </View>
             <Pressable
-              style={[styles.saveBtn, !customName.trim() && { opacity: 0.4 }]}
+              style={[styles.saveBtn, (!customName.trim() || !selectedMuscle || !selectedEquipment) && { opacity: 0.4 }]}
               onPress={saveCustomExercise}
-              disabled={!customName.trim()}
+              disabled={!customName.trim() || !selectedMuscle || !selectedEquipment}
             >
               <Text style={styles.saveBtnText}>저장하고 추가</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         )}
 
         {/* 다중 선택 일괄 추가 바 */}
@@ -1277,7 +1186,8 @@ export default function WorkoutScreen() {
         )}
       </SafeAreaView>
     </Modal>
-  );
+    );
+  };
 
   if (!activeSessionId) {
     return (
@@ -2587,7 +2497,24 @@ const styles = StyleSheet.create({
   exName: { color: '#FFFFFF', fontSize: 16 },
   exBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
   exArrow: { color: '#8E8E93', fontSize: 24 },
-  exCheck: { color: '#30D158', fontWeight: '800' },
+  exCheck: { color: '#30D158', fontWeight: '800', fontSize: 18, marginLeft: 4 },
+
+  // 시안 C — 부위 필터 + 평면 리스트
+  partRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  partChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1C1C1E', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
+  partChipOn: { backgroundColor: '#30D158' },
+  partChipText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
+  partChipTextOn: { color: '#000000' },
+  partDot: { width: 8, height: 8, borderRadius: 4 },
+  exRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#1C1C1E' },
+  exRowOn: { backgroundColor: '#16301F' },
+  exRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  exBrandInline: { color: '#8E8E93', fontSize: 13, flexShrink: 1 },
+  choiceChip: { backgroundColor: '#1C1C1E', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 9 },
+  choiceChipOn: { backgroundColor: '#30D158' },
+  choiceChipText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
+  choiceChipTextOn: { color: '#000000' },
+  placeholderText: { color: '#48484A', fontSize: 14 },
   addBar: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
