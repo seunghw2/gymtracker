@@ -535,6 +535,13 @@ export async function getExerciseRest(exerciseId: number, fallback: number): Pro
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+export type ExerciseUsage = { exercise_id: number; count: number; last_date: string | null };
+
+export async function getExerciseUsage(): Promise<ExerciseUsage[]> {
+  const list = await apiRequest<{ exerciseId: number; count: number; lastDate: string | null }[]>('/api/v1/stats/exercise-usage');
+  return list.map(r => ({ exercise_id: r.exerciseId, count: r.count, last_date: r.lastDate }));
+}
+
 export async function setExerciseRest(exerciseId: number, sec: number): Promise<void> {
   await setSetting(`rest_ex_${exerciseId}`, String(sec));
 }
