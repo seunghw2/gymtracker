@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -144,6 +145,7 @@ function useElapsedTime(startTime: number | null) {
 }
 
 export default function WorkoutScreen() {
+  const router = useRouter();
   const {
     activeSessionId,
     sessionDate,
@@ -1580,7 +1582,7 @@ export default function WorkoutScreen() {
           </>
         )}
         ListFooterComponent={(
-          <Pressable style={styles.addExerciseBtn} onPress={() => openExerciseSelect('active')}>
+          <Pressable style={styles.addExerciseBtn} onPress={() => router.push('/exercise-add')}>
             <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
           </Pressable>
         )}
