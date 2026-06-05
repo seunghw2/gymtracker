@@ -1,23 +1,26 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Home, Dumbbell, BarChart3, Calendar, Settings, type LucideIcon } from 'lucide-react-native';
 
 const ACTIVE = '#27E06A';
 const INACTIVE = '#7E7E83';
 
-const META: Record<string, { Icon: LucideIcon; label: string }> = {
-  index: { Icon: Home, label: '홈' },
-  workout: { Icon: Dumbbell, label: '운동' },
-  stats: { Icon: BarChart3, label: '통계' },
-  calendar: { Icon: Calendar, label: '캘린더' },
-  settings: { Icon: Settings, label: '설정' },
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// 활성 탭은 채움(solid) 아이콘 + 초록으로, 비활성은 outline + 회색으로 강조 구분.
+const META: Record<string, { active: IoniconName; inactive: IoniconName; label: string }> = {
+  index: { active: 'home', inactive: 'home-outline', label: '홈' },
+  workout: { active: 'barbell', inactive: 'barbell-outline', label: '운동' },
+  stats: { active: 'stats-chart', inactive: 'stats-chart-outline', label: '통계' },
+  calendar: { active: 'calendar', inactive: 'calendar-outline', label: '캘린더' },
+  settings: { active: 'settings', inactive: 'settings-outline', label: '설정' },
 };
 
 /**
- * 방식 A 하단 탭바 — 벡터 아이콘(lucide) + 초록 활성 스타일.
- * 활성 탭은 아이콘 위에 짧은 초록 인디케이터 바가 뜨고, 아이콘/라벨이 초록·굵게.
+ * 방식 A 하단 탭바 — 벡터 아이콘(Ionicons) + 초록 활성 스타일.
+ * 활성 탭은 아이콘 위에 짧은 초록 인디케이터 바가 뜨고, 채움 아이콘 + 초록·굵은 라벨.
  * 하단 safe area는 insets.bottom을 paddingBottom에 더해 홈 인디케이터와 안 겹침.
  */
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
@@ -30,7 +33,6 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
         if (!meta) return null;
         const focused = state.index === idx;
         const color = focused ? ACTIVE : INACTIVE;
-        const { Icon, label } = meta;
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -48,11 +50,11 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             onLongPress={onLongPress}
             accessibilityRole="button"
             accessibilityState={{ selected: focused }}
-            accessibilityLabel={label}
+            accessibilityLabel={meta.label}
           >
             <View style={[styles.indicator, focused && styles.indicatorOn]} />
-            <Icon size={26} color={color} strokeWidth={focused ? 2.2 : 1.9} />
-            <Text style={[styles.label, { color }, focused && styles.labelOn]}>{label}</Text>
+            <Ionicons name={focused ? meta.active : meta.inactive} size={26} color={color} />
+            <Text style={[styles.label, { color }, focused && styles.labelOn]}>{meta.label}</Text>
           </Pressable>
         );
       })}
