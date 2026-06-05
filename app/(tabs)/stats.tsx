@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, getActualRmHistory, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
-import { useSettingsStore } from '../../store/useStore';
+import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
 
@@ -208,9 +208,11 @@ export default function StatsScreen() {
   const hasFatData = fatChartData.length >= 2;
   const currentFat = fatChartData.length > 0 ? fatChartData[fatChartData.length - 1].body_fat_pct ?? 0 : 0;
 
+  const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
+
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
         <Text style={styles.header}>통계</Text>
 
         <ScrollView
@@ -671,6 +673,7 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
   content: { padding: 20, paddingBottom: 40 },
+  bannerPad: { paddingBottom: 100 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },
 
   chipsScroll: { marginHorizontal: -20, marginBottom: 20 },

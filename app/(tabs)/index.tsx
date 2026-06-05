@@ -18,7 +18,7 @@ import {
   getAllWorkoutDates,
   getSetting,
 } from '../../db/queries';
-import { useSettingsStore } from '../../store/useStore';
+import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -129,10 +129,11 @@ export default function HomeScreen() {
   const goalFraction = Math.max(0, Math.min(1, 1 - Math.abs(goalDiff) / 10));
 
   const days = ['월', '화', '수', '목', '금', '토', '일'];
+  const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
         <Text style={styles.header}>GymTracker</Text>
 
         {/* 이번주 통계 */}
@@ -224,6 +225,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
+  bannerPad: { paddingBottom: 100 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },
 
   statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 16 },

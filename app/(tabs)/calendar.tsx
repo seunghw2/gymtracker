@@ -10,6 +10,7 @@ import {
 import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, SessionSummary } from '../../db/queries';
 import { formatShortWithDay } from '../../lib/date';
 import SessionCard from '../../components/SessionCard';
+import { useWorkoutStore } from '../../store/useStore';
 
 function getWeekRange(offset = 0) {
   const today = new Date();
@@ -103,10 +104,11 @@ export default function CalendarScreen() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const dayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+  const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
         <Text style={styles.header}>캘린더</Text>
 
         {/* 보기 토글 */}
@@ -215,6 +217,7 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
   content: { padding: 20, paddingBottom: 40 },
+  bannerPad: { paddingBottom: 100 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 16 },
 
   segment: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, marginBottom: 20 },

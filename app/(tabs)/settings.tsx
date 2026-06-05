@@ -26,7 +26,7 @@ import {
   Gym,
   Exercise,
 } from '../../db/queries';
-import { useSettingsStore } from '../../store/useStore';
+import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { exportWorkoutsCsv } from '../../lib/export';
 
@@ -220,9 +220,11 @@ export default function SettingsScreen() {
     }
   };
 
+  const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
+
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
         <Text style={styles.header}>설정</Text>
 
         {/* 계정 */}
@@ -520,6 +522,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
   content: { padding: 20, paddingBottom: 40 },
+  bannerPad: { paddingBottom: 100 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },
 
   sectionTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 16, textTransform: 'uppercase' },
