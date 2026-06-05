@@ -13,6 +13,7 @@ import {
   ScrollView,
   Platform,
   Keyboard,
+  KeyboardAvoidingView,
   InputAccessoryView,
   ActivityIndicator,
   findNodeHandle,
@@ -1056,6 +1057,7 @@ export default function WorkoutScreen() {
   const renderGymPicker = () => (
     <Modal visible={showGymPicker} transparent animationType="slide" onRequestClose={() => { setShowGymPicker(false); setGymEditId(null); }}>
       <Pressable style={styles.gymBackdrop} onPress={() => { setShowGymPicker(false); setGymEditId(null); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.gymSheet} onPress={() => {}}>
           <Text style={styles.gymSheetTitle}>헬스장 선택</Text>
           <Pressable style={styles.gymItem} onPress={() => handlePickSessionGym(null)}>
@@ -1105,6 +1107,7 @@ export default function WorkoutScreen() {
             </Pressable>
           </View>
         </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );

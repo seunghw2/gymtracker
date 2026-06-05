@@ -13,11 +13,11 @@ function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
-  // 운동 진행 중에는 탭 바를 얇게(아이콘만) 해 화면을 넓게 쓴다
   const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
   // 운동 탭 숫자패드가 떠 있으면 휴식 타이머를 그 위로 올림
   const numPadOpen = useUiStore(s => s.numPadOpen);
-  const tabBarH = workoutActive ? 50 : 80;
+  // 탭 바는 운동 중에도 평소 크기(높이 80) 유지
+  const tabBarH = 80;
   // 진행 중 운동이 있고 "운동" 탭이 아닐 때만 전역 배너 표시(운동 탭에선 중복 방지)
   const segments = useSegments();
   const onWorkoutTab = segments[segments.length - 1] === 'workout';
@@ -34,11 +34,11 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#1C1C1E',
           borderTopColor: '#2C2C2E',
-          height: workoutActive ? 50 : 80,
-          paddingBottom: workoutActive ? 6 : 20,
-          paddingTop: workoutActive ? 4 : 0,
+          height: 80,
+          paddingBottom: 20,
+          paddingTop: 0,
         },
-        tabBarShowLabel: !workoutActive,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: '#30D158',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
