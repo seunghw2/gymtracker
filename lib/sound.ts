@@ -2,6 +2,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 
 let player: AudioPlayer | null = null;
 let keepAlive: AudioPlayer | null = null;
+let setPlayer: AudioPlayer | null = null;
 let configured = false;
 
 /**
@@ -47,6 +48,20 @@ export function startRestKeepAlive() {
 export function stopRestKeepAlive() {
   try {
     keepAlive?.pause();
+  } catch {
+    /* 무시 */
+  }
+}
+
+/** 세트 완료 체크 시 짧은 확인음. 휴식 종료음과 같은 음원을 약간 작게 재생. */
+export function playSetDoneSound() {
+  try {
+    if (!setPlayer) {
+      setPlayer = createAudioPlayer(require('../assets/sounds/rest-done.wav'));
+      setPlayer.volume = 0.6;
+    }
+    setPlayer.seekTo(0);
+    setPlayer.play();
   } catch {
     /* 무시 */
   }

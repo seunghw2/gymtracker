@@ -48,6 +48,9 @@ import {
   createTemplate,
   deleteTemplate,
   getGyms,
+  addGym,
+  updateGym,
+  deleteGym,
   getSetting,
   setSetting,
   getBodyTags,
@@ -94,6 +97,7 @@ import {
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
 import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
+import { playSetDoneSound } from '../../lib/sound';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
 
@@ -204,10 +208,14 @@ export default function WorkoutScreen() {
   const [startGymId, setStartGymId] = useState<number | null>(null);
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [showGymPicker, setShowGymPicker] = useState(false);
+  const [gymAddName, setGymAddName] = useState('');
+  const [gymEditId, setGymEditId] = useState<number | null>(null);
+  const [gymEditName, setGymEditName] = useState('');
   const [showTags, setShowTags] = useState(false);
   const [showNote, setShowNote] = useState(true);
   const [noteOpen, setNoteOpen] = useState(false);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
+  const [finishAfterTags, setFinishAfterTags] = useState(false);
   const [bodyTags, setBodyTagsState] = useState<string[]>([]);
   const [tagEdit, setTagEdit] = useState(false);
   const [newTag, setNewTag] = useState('');
@@ -362,7 +370,6 @@ export default function WorkoutScreen() {
     startSession(sessionId, date, null, null);
     setSessionNote('');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (autoTagPrompt) setShowTags(true);
   };
 
   // 진행 중 세션 헬스장 선택
@@ -371,6 +378,37 @@ export default function WorkoutScreen() {
     setShowGymPicker(false);
     if (gymId != null) AsyncStorage.setItem(LAST_GYM_KEY, String(gymId)).catch(() => {});
     if (activeSessionId) updateSession(activeSessionId, { gymId }).catch(() => {});
+  };
+
+  // 헬스장 선택 시트 내 CRUD
+  const refreshGyms = () => getGyms().then(setGyms).catch(() => {});
+  const handleAddGym = async () => {
+    const name = gymAddName.trim();
+    if (!name) return;
+    await addGym(name).catch(() => {});
+    setGymAddName('');
+    await refreshGyms();
+  };
+  const handleRenameGym = async (id: number) => {
+    const name = gymEditName.trim();
+    if (!name) return;
+    await updateGym(id, name).catch(() => {});
+    setGymEditId(null); setGymEditName('');
+    await refreshGyms();
+  };
+  const handleDeleteGym = (g: Gym) => {
+    Alert.alert('헬스장 삭제', `'${g.name}'을(를) 삭제할까요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: async () => {
+        await deleteGym(g.id).catch(() => {});
+        if (sessionGymId === g.id) {
+          setSessionGym(null);
+          if (activeSessionId) updateSession(activeSessionId, { gymId: null }).catch(() => {});
+        }
+        if (gymEditId === g.id) { setGymEditId(null); setGymEditName(''); }
+        await refreshGyms();
+      } },
+    ]);
   };
 
   // 진행 중 세션 부위 태그 토글 — 세션 이름도 선택 부위로 자동 설정
@@ -468,6 +506,16 @@ export default function WorkoutScreen() {
   };
 
   const handleFinishWorkout = () => {
+    // 부위 미선택이면 부위 선택 팝업을 먼저 띄우고, 거기서 마무리
+    if (autoTagPrompt && sessionTags.length === 0) {
+      setFinishAfterTags(true);
+      setShowTags(true);
+      return;
+    }
+    proceedFinish();
+  };
+
+  const proceedFinish = () => {
     Alert.alert('운동 완료', '오늘의 운동을 종료할까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -869,6 +917,7 @@ export default function WorkoutScreen() {
       && (ex.prevBest1rm ?? 0) > 0
       && orm > (ex.prevBest1rm ?? 0);
     markSetDone(exIdx, setIdx, orm, setId, isPR);
+    playSetDoneSound();
     if (isPR) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } else {
@@ -1005,8 +1054,8 @@ export default function WorkoutScreen() {
   );
 
   const renderGymPicker = () => (
-    <Modal visible={showGymPicker} transparent animationType="slide" onRequestClose={() => setShowGymPicker(false)}>
-      <Pressable style={styles.gymBackdrop} onPress={() => setShowGymPicker(false)}>
+    <Modal visible={showGymPicker} transparent animationType="slide" onRequestClose={() => { setShowGymPicker(false); setGymEditId(null); }}>
+      <Pressable style={styles.gymBackdrop} onPress={() => { setShowGymPicker(false); setGymEditId(null); }}>
         <Pressable style={styles.gymSheet} onPress={() => {}}>
           <Text style={styles.gymSheetTitle}>헬스장 선택</Text>
           <Pressable style={styles.gymItem} onPress={() => handlePickSessionGym(null)}>
@@ -1014,14 +1063,47 @@ export default function WorkoutScreen() {
             {sessionGymId === null && <Text style={styles.gymCheck}>✓</Text>}
           </Pressable>
           {gyms.map(g => (
-            <Pressable key={g.id} style={styles.gymItem} onPress={() => handlePickSessionGym(g.id)}>
-              <Text style={styles.gymItemText}>{g.name}</Text>
-              {sessionGymId === g.id && <Text style={styles.gymCheck}>✓</Text>}
-            </Pressable>
+            gymEditId === g.id ? (
+              <View key={g.id} style={styles.gymItem}>
+                <TextInput
+                  style={styles.gymEditInput}
+                  value={gymEditName}
+                  onChangeText={setGymEditName}
+                  autoFocus
+                  onSubmitEditing={() => handleRenameGym(g.id)}
+                  returnKeyType="done"
+                  placeholderTextColor="#48484A"
+                />
+                <Pressable hitSlop={8} onPress={() => handleRenameGym(g.id)}><Text style={styles.gymActionSave}>저장</Text></Pressable>
+                <Pressable hitSlop={8} onPress={() => { setGymEditId(null); setGymEditName(''); }}><Text style={styles.gymActionCancel}>취소</Text></Pressable>
+              </View>
+            ) : (
+              <Pressable key={g.id} style={styles.gymItem} onPress={() => handlePickSessionGym(g.id)}>
+                <Text style={styles.gymItemText} numberOfLines={1}>{g.name}</Text>
+                {sessionGymId === g.id && <Text style={styles.gymCheck}>✓</Text>}
+                <View style={{ flex: 1 }} />
+                <Pressable hitSlop={8} onPress={() => { setGymEditId(g.id); setGymEditName(g.name); }}><Text style={styles.gymActionEdit}>이름수정</Text></Pressable>
+                <Pressable hitSlop={8} onPress={() => handleDeleteGym(g)}><Text style={styles.gymActionDelete}>삭제</Text></Pressable>
+              </Pressable>
+            )
           ))}
           {gyms.length === 0 && (
-            <Text style={styles.gymEmpty}>설정에서 헬스장을 추가하세요</Text>
+            <Text style={styles.gymEmpty}>아래에서 헬스장을 추가하세요</Text>
           )}
+          <View style={styles.gymAddRow}>
+            <TextInput
+              style={styles.gymAddInput}
+              placeholder="헬스장 추가"
+              placeholderTextColor="#48484A"
+              value={gymAddName}
+              onChangeText={setGymAddName}
+              onSubmitEditing={handleAddGym}
+              returnKeyType="done"
+            />
+            <Pressable style={[styles.gymAddBtn, !gymAddName.trim() && { opacity: 0.4 }]} onPress={handleAddGym} disabled={!gymAddName.trim()}>
+              <Text style={styles.gymAddBtnText}>추가</Text>
+            </Pressable>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -1761,8 +1843,8 @@ export default function WorkoutScreen() {
         }}
       />
 
-      <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => { setShowTags(false); setTagEdit(false); }}>
-        <Pressable style={styles.centerBackdrop} onPress={() => { setShowTags(false); setTagEdit(false); }}>
+      <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => { setShowTags(false); setTagEdit(false); setFinishAfterTags(false); }}>
+        <Pressable style={styles.centerBackdrop} onPress={() => { setShowTags(false); setTagEdit(false); setFinishAfterTags(false); }}>
           <Pressable style={styles.centerCard} onPress={() => {}}>
             <View style={styles.tagHeaderRow}>
               <Text style={styles.gymSheetTitle}>부위 선택</Text>
@@ -1800,8 +1882,11 @@ export default function WorkoutScreen() {
                 </Pressable>
               </View>
             )}
-            <Pressable style={styles.tagDoneBtn} onPress={() => { setShowTags(false); setTagEdit(false); }}>
-              <Text style={styles.tagDoneText}>{sessionTags.length > 0 ? '완료' : '건너뛰기'}</Text>
+            <Pressable style={styles.tagDoneBtn} onPress={() => {
+              setShowTags(false); setTagEdit(false);
+              if (finishAfterTags) { setFinishAfterTags(false); proceedFinish(); }
+            }}>
+              <Text style={styles.tagDoneText}>{finishAfterTags ? (sessionTags.length > 0 ? '완료하고 종료' : '건너뛰고 종료') : (sessionTags.length > 0 ? '완료' : '건너뛰기')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -2135,9 +2220,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2C2C2E',
   },
-  gymItemText: { color: '#FFFFFF', fontSize: 16 },
-  gymCheck: { color: '#30D158', fontSize: 16, fontWeight: '700' },
+  gymItemText: { color: '#FFFFFF', fontSize: 16, flexShrink: 1 },
+  gymCheck: { color: '#30D158', fontSize: 16, fontWeight: '700', marginLeft: 8 },
   gymEmpty: { color: '#48484A', fontSize: 14, paddingVertical: 12 },
+  gymActionEdit: { color: '#8E8E93', fontSize: 14, fontWeight: '600', marginLeft: 14 },
+  gymActionDelete: { color: '#FF453A', fontSize: 14, fontWeight: '600', marginLeft: 14 },
+  gymEditInput: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: '#FFFFFF', fontSize: 16 },
+  gymActionSave: { color: '#30D158', fontSize: 14, fontWeight: '700', marginLeft: 14 },
+  gymActionCancel: { color: '#8E8E93', fontSize: 14, fontWeight: '600', marginLeft: 12 },
+  gymAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
+  gymAddInput: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: '#FFFFFF', fontSize: 15 },
+  gymAddBtn: { backgroundColor: '#30D158', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 11 },
+  gymAddBtnText: { color: '#06210F', fontSize: 15, fontWeight: '800' },
 
   historyTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', marginBottom: 12 },
   historyCard: {

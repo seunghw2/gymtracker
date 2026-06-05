@@ -14,7 +14,8 @@ export default function TabLayout() {
   // 운동 탭 숫자패드가 떠 있으면 휴식 타이머를 그 위로 올림
   const numPadOpen = useUiStore(s => s.numPadOpen);
   const tabBarH = workoutActive ? 50 : 80;
-  const restBottom = numPadOpen ? 252 : tabBarH;
+  // 숫자패드(라벨 포함 약 264pt) 위로 휴식 타이머가 확실히 올라오도록 여유를 둠
+  const restBottom = numPadOpen ? 276 : tabBarH;
 
   return (
     <View style={{ flex: 1 }}>
