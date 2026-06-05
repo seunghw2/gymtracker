@@ -16,13 +16,11 @@ import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getExe
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
 import { toDisplay, unitLabel } from '../../lib/units';
+import { MUSCLE_KO, MUSCLE_COLOR } from '../../constants/exercises';
 
 type Chip = '부위별' | '1RM 성장' | 'PR' | '체중' | '체지방' | '볼륨';
 
-// 부위(영어 저장값) → 한글 표기 + 표시 순서
-const MUSCLE_KO: Record<string, string> = { Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체', Arms: '팔', Core: '코어', Cardio: '유산소' };
 const MUSCLE_ORDER = ['Chest', 'Back', 'Shoulder', 'Legs', 'Arms', 'Core'];
-const MUSCLE_COLOR: Record<string, string> = { Chest: '#FF453A', Back: '#0A84FF', Shoulder: '#FFD60A', Legs: '#BF5AF2', Arms: '#30D158', Core: '#FF9F0A', Cardio: '#64D2FF' };
 const REC_MIN = 10;   // 권장 주당 최소 세트
 const REC_MAX = 20;   // 권장 주당 최대 세트
 const BAR_MAX = 24;   // 막대 채움 기준 최대치

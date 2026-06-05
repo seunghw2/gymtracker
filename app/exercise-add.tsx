@@ -3,16 +3,10 @@ import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView,
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, setExerciseTrackingType, Exercise } from '../db/queries';
-import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from '../constants/exercises';
+import { MUSCLE_GROUPS, EQUIPMENT_TYPES, MUSCLE_KO, EQUIP_KO, MUSCLE_COLOR, PART_ORDER } from '../constants/exercises';
+import { GREEN } from '../constants/colors';
 import { useWorkoutStore } from '../store/useStore';
 import { buildExerciseEntry } from '../lib/exerciseEntry';
-
-const GREEN = '#30D158';
-const MUSCLE_KO: Record<string, string> = { Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체', Arms: '팔', Core: '코어', Cardio: '유산소' };
-const MUSCLE_COLOR: Record<string, string> = { Chest: '#E0655F', Back: '#5B9BE0', Shoulder: '#E0A33A', Legs: '#9B7BE0', Arms: '#E07FB0', Core: '#3FB6A8', Cardio: '#64D2FF' };
-const PART_ORDER = ['Chest', 'Back', 'Shoulder', 'Legs', 'Core', 'Arms'];
-const EQUIP_KO: Record<string, string> = { Barbell: '바벨', Dumbbell: '덤벨', Machine: '머신', Cable: '케이블', Bodyweight: '맨몸' };
-const EQUIP_ORDER = ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'Bodyweight'];
 
 function Dot({ group }: { group: string }) {
   return <View style={[styles.dot, { backgroundColor: MUSCLE_COLOR[group] ?? '#8E8E93' }]} />;
@@ -254,7 +248,7 @@ export default function ExerciseAddScreen() {
         <Pressable style={[styles.chip, equip === 'ALL' && styles.chipOn]} onPress={() => { setEquip('ALL'); setBrand('ALL'); }}>
           <Text style={[styles.chipText, equip === 'ALL' && styles.chipTextOn]}>장비 전체</Text>
         </Pressable>
-        {EQUIP_ORDER.map(eq => (
+        {EQUIPMENT_TYPES.map(eq => (
           <Pressable key={eq} style={[styles.chip, equip === eq && styles.chipOn]} onPress={() => onEquip(eq)}>
             <Text style={[styles.chipText, equip === eq && styles.chipTextOn]}>{EQUIP_KO[eq] ?? eq}</Text>
           </Pressable>

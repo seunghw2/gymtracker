@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWorkoutStore } from '../store/useStore';
-
-const GREEN = '#30D158';
+import { GREEN } from '../constants/colors';
 
 /** 경과 초를 mm:ss(1시간 이상이면 h:mm:ss)로 포맷. */
 function formatElapsed(totalSec: number): string {

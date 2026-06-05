@@ -28,3 +28,21 @@ export type EquipmentType = typeof EQUIPMENT_TYPES[number];
 
 export const MACHINE_BRANDS = ['Hammer Strength', 'Panatta', 'Nautilus', 'Life Fitness', 'Focus', 'Cybex', '기타'] as const;
 export type MachineBrand = typeof MACHINE_BRANDS[number];
+
+/** 부위(영문 키) → 한글 라벨. */
+export const MUSCLE_KO: Record<string, string> = {
+  Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체', Arms: '팔', Core: '코어', Cardio: '유산소',
+};
+
+/** 장비(영문 키) → 한글 라벨. */
+export const EQUIP_KO: Record<string, string> = {
+  Barbell: '바벨', Dumbbell: '덤벨', Machine: '머신', Cable: '케이블', Bodyweight: '맨몸',
+};
+
+/** 부위별 식별 색(점·차트 공통). */
+export const MUSCLE_COLOR: Record<string, string> = {
+  Chest: '#E0655F', Back: '#5B9BE0', Shoulder: '#E0A33A', Legs: '#9B7BE0', Arms: '#E07FB0', Core: '#3FB6A8', Cardio: '#64D2FF',
+};
+
+/** 부위 표시 순서(필터·섹션 공통). */
+export const PART_ORDER = ['Chest', 'Back', 'Shoulder', 'Legs', 'Core', 'Arms'] as const;
