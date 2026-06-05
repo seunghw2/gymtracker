@@ -201,6 +201,21 @@ export async function updateExerciseNote(id: number, note: string): Promise<Exer
   return mapExercise(result);
 }
 
+/** 종목 정보 수정(이름·부위·장비·브랜드·측정방식). 소유 종목만 가능. */
+export async function updateExercise(id: number, patch: { name?: string; muscle_group?: string; equipment_type?: string; brand?: string | null; tracking_type?: TrackingType }): Promise<Exercise> {
+  const result = await apiRequest<ApiExercise>(`/api/v1/exercises/${id}`, {
+    method: 'PATCH',
+    body: {
+      name: patch.name,
+      muscleGroup: patch.muscle_group,
+      equipmentType: patch.equipment_type,
+      brand: patch.brand === undefined ? undefined : (patch.brand ?? ''),
+      trackingType: patch.tracking_type,
+    },
+  });
+  return mapExercise(result);
+}
+
 /** 종목 측정 방식(REPS/TIME) 변경. */
 export async function setExerciseTrackingType(id: number, tracking_type: TrackingType): Promise<Exercise> {
   const result = await apiRequest<ApiExercise>(`/api/v1/exercises/${id}`, {
@@ -608,6 +623,13 @@ export async function addGym(name: string, location?: string): Promise<number> {
     body: { name, location: location ?? null },
   });
   return result.id;
+}
+
+export async function updateGym(id: number, name: string, location?: string | null): Promise<void> {
+  await apiRequest(`/api/v1/gyms/${id}`, {
+    method: 'PATCH',
+    body: { name, location: location ?? null },
+  });
 }
 
 export async function deleteGym(id: number): Promise<void> {
