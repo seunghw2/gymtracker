@@ -602,7 +602,7 @@ export default function StatsScreen() {
           const dCnt = (periodCur?.session_count ?? 0) - (periodPrev?.session_count ?? 0);
           const delta = (n: number, fmt?: (x: number) => string) =>
             n === 0 ? null : (
-              <Text style={[styles.deltaText, { color: n > 0 ? '#30D158' : '#FF453A' }]}>
+              <Text style={[styles.deltaText, { color: n > 0 ? '#30D158' : '#FF453A' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {n > 0 ? '▲' : '▼'} {fmt ? fmt(Math.abs(n)) : Math.abs(n)}
               </Text>
             );
@@ -648,17 +648,17 @@ export default function StatsScreen() {
               <View style={styles.statCardsRow}>
                 <View style={styles.statCard}>
                   <Text style={styles.statCardLabel}>총 세트</Text>
-                  <Text style={styles.statCardValue}>{totalSets}</Text>
+                  <Text style={styles.statCardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{totalSets}</Text>
                   {delta(dSets)}
                 </View>
                 <View style={styles.statCard}>
                   <Text style={styles.statCardLabel}>운동 시간</Text>
-                  <Text style={styles.statCardValue}>{fmtHM(periodCur?.total_duration_sec ?? 0)}</Text>
+                  <Text style={styles.statCardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{fmtHM(periodCur?.total_duration_sec ?? 0)}</Text>
                   {delta(dDur, fmtHM)}
                 </View>
                 <View style={styles.statCard}>
                   <Text style={styles.statCardLabel}>운동 횟수</Text>
-                  <Text style={styles.statCardValue}>{periodCur?.session_count ?? 0}<Text style={styles.statCardUnit}>회</Text></Text>
+                  <Text style={styles.statCardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{periodCur?.session_count ?? 0}<Text style={styles.statCardUnit}>회</Text></Text>
                   {delta(dCnt, n => `${n}`)}
                 </View>
               </View>
