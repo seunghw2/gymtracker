@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getExercises, getExerciseUsage, addCustomExercise, Exercise } from '../db/queries';
+import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, setExerciseTrackingType, Exercise } from '../db/queries';
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from '../constants/exercises';
 import { useWorkoutStore } from '../store/useStore';
 import { buildExerciseEntry } from '../lib/exerciseEntry';
@@ -28,7 +28,7 @@ export default function ExerciseAddScreen() {
   const [part, setPart] = useState<string>('ALL');
   const [equip, setEquip] = useState<string>('ALL');
   const [brand, setBrand] = useState<string>('ALL');
-  const [picked, setPicked] = useState<Record<number, Exercise>>({});
+  const [pickedList, setPickedList] = useState<Exercise[]>([]);
   const [mode, setMode] = useState<'browse' | 'custom'>('browse');
 
   // 직접 등록 폼
@@ -37,6 +37,15 @@ export default function ExerciseAddScreen() {
   const [cEquip, setCEquip] = useState<string | null>(null);
   const [cBrand, setCBrand] = useState('');
   const [cTime, setCTime] = useState(false);
+
+  // 종목 편집 시트
+  const [editing, setEditing] = useState<Exercise | null>(null);
+  const [eName, setEName] = useState('');
+  const [ePart, setEPart] = useState<string | null>(null);
+  const [eEquip, setEEquip] = useState<string | null>(null);
+  const [eBrand, setEBrand] = useState('');
+  const [eTime, setETime] = useState(false);
+  const pickedIds = useMemo(() => new Set(pickedList.map(e => e.id)), [pickedList]);
 
   useEffect(() => {
     getExercises().then(setAll).catch(() => {});
@@ -73,25 +82,68 @@ export default function ExerciseAddScreen() {
       .slice(0, 5),
     [all, usage]);
 
-  const pickedCount = Object.keys(picked).length;
+  const pickedCount = pickedList.length;
   const toggle = (e: Exercise) => {
     Haptics.selectionAsync();
-    setPicked(prev => {
-      const next = { ...prev };
-      if (next[e.id]) delete next[e.id]; else next[e.id] = e;
-      return next;
-    });
+    setPickedList(prev => prev.some(x => x.id === e.id) ? prev.filter(x => x.id !== e.id) : [...prev, e]);
   };
 
   const onEquip = (eq: string) => { setEquip(prev => prev === eq ? 'ALL' : eq); setBrand('ALL'); };
 
   const handleDone = async () => {
-    const list = Object.values(picked);
-    if (list.length === 0) return;
-    const entries = await Promise.all(list.map(buildExerciseEntry));
+    if (pickedList.length === 0) return;
+    // 담은 순서대로 (처음 담은 종목이 세션 맨 위)
+    const entries = await Promise.all(pickedList.map(buildExerciseEntry));
     addExercises(entries);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
+  };
+
+  // ── 종목 편집/삭제 ──
+  const openEdit = (e: Exercise) => {
+    Haptics.selectionAsync();
+    setEditing(e);
+    setEName(e.name);
+    setEPart(e.muscle_group);
+    setEEquip(e.equipment_type);
+    setEBrand(e.brand ?? '');
+    setETime(e.tracking_type === 'TIME');
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const isCustom = editing.is_custom === 1;
+    if (isCustom && !eName.trim()) return;
+    try {
+      if (isCustom) {
+        await updateExercise(editing.id, {
+          name: eName.trim(), muscle_group: ePart ?? undefined, equipment_type: eEquip ?? undefined,
+          brand: eBrand.trim() || null, tracking_type: eTime ? 'TIME' : 'REPS',
+        });
+      } else {
+        await setExerciseTrackingType(editing.id, eTime ? 'TIME' : 'REPS');
+      }
+      const list = await getExercises();
+      setAll(list);
+      setPickedList(prev => prev.map(x => list.find(n => n.id === x.id) ?? x));
+      setEditing(null);
+    } catch { Alert.alert('수정 실패', '다시 시도해 주세요.'); }
+  };
+
+  const deleteEdit = () => {
+    if (!editing) return;
+    const target = editing;
+    Alert.alert('종목 삭제', `'${target.name}'을(를) 삭제할까요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: async () => {
+        try {
+          await deleteCustomExercise(target.id);
+          setAll(prev => prev.filter(e => e.id !== target.id));
+          setPickedList(prev => prev.filter(e => e.id !== target.id));
+          setEditing(null);
+        } catch { Alert.alert('삭제 실패', '다시 시도해 주세요.'); }
+      } },
+    ]);
   };
 
   const saveCustom = async () => {
@@ -100,16 +152,16 @@ export default function ExerciseAddScreen() {
     const list = await getExercises().catch(() => all);
     setAll(list);
     const created = list.find(e => e.id === id);
-    if (created) setPicked(prev => ({ ...prev, [id]: created }));
+    if (created) setPickedList(prev => [...prev, created]);
     setCName(''); setCBrand(''); setCPart(null); setCEquip(null); setCTime(false);
     setMode('browse');
   };
 
   const Row = ({ e }: { e: Exercise }) => {
-    const on = !!picked[e.id];
+    const on = pickedIds.has(e.id);
     const sub = [EQUIP_KO[e.equipment_type] ?? e.equipment_type, e.brand].filter(Boolean).join(' · ');
     return (
-      <Pressable style={styles.row} onPress={() => toggle(e)} accessibilityRole="button" accessibilityLabel={`${e.name} 담기`}>
+      <Pressable style={styles.row} onPress={() => toggle(e)} onLongPress={() => openEdit(e)} delayLongPress={300} accessibilityRole="button" accessibilityLabel={`${e.name} 담기`}>
         <Dot group={e.muscle_group} />
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.rowName} numberOfLines={1}>{e.name}</Text>
@@ -185,7 +237,7 @@ export default function ExerciseAddScreen() {
       </View>
 
       {/* 부위 필터 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
         <Pressable style={[styles.chip, part === 'ALL' && styles.chipOn]} onPress={() => setPart('ALL')}>
           <Text style={[styles.chipText, part === 'ALL' && styles.chipTextOn]}>전체</Text>
         </Pressable>
@@ -198,7 +250,7 @@ export default function ExerciseAddScreen() {
       </ScrollView>
 
       {/* 장비 필터 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
         <Pressable style={[styles.chip, equip === 'ALL' && styles.chipOn]} onPress={() => { setEquip('ALL'); setBrand('ALL'); }}>
           <Text style={[styles.chipText, equip === 'ALL' && styles.chipTextOn]}>장비 전체</Text>
         </Pressable>
@@ -211,7 +263,7 @@ export default function ExerciseAddScreen() {
 
       {/* 브랜드 필터 (머신/케이블일 때만) */}
       {brandsForEquip.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
           <Text style={styles.brandLabel}>브랜드</Text>
           <Pressable style={[styles.chip, brand === 'ALL' && styles.chipOn]} onPress={() => setBrand('ALL')}>
             <Text style={[styles.chipText, brand === 'ALL' && styles.chipTextOn]}>전체</Text>
@@ -285,6 +337,72 @@ export default function ExerciseAddScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {/* 종목 편집 시트 (길게 누르기) */}
+      <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setEditing(null)} />
+        <View style={styles.sheet}>
+          {editing && (() => {
+            const isCustom = editing.is_custom === 1;
+            return (
+              <ScrollView keyboardShouldPersistTaps="handled">
+                <View style={styles.sheetGrip} />
+                <Text style={styles.sheetTitle}>{isCustom ? '종목 수정' : '측정 방식 변경'}</Text>
+                {!isCustom && <Text style={styles.sheetHint}>기본 종목은 측정 방식만 바꿀 수 있어요.</Text>}
+
+                {isCustom && (
+                  <>
+                    <Text style={styles.label}>운동 이름</Text>
+                    <TextInput style={styles.input} placeholderTextColor="#48484A" value={eName} onChangeText={setEName} />
+                    <Text style={styles.label}>부위</Text>
+                    <View style={styles.wrap}>
+                      {MUSCLE_GROUPS.map(m => (
+                        <Pressable key={m} style={[styles.choice, ePart === m && styles.choiceOn]} onPress={() => setEPart(m)}>
+                          <Text style={[styles.choiceText, ePart === m && styles.choiceTextOn]}>{MUSCLE_KO[m] ?? m}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text style={styles.label}>장비</Text>
+                    <View style={styles.wrap}>
+                      {EQUIPMENT_TYPES.map(eq => (
+                        <Pressable key={eq} style={[styles.choice, eEquip === eq && styles.choiceOn]} onPress={() => setEEquip(eq)}>
+                          <Text style={[styles.choiceText, eEquip === eq && styles.choiceTextOn]}>{EQUIP_KO[eq] ?? eq}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text style={styles.label}>브랜드 (선택)</Text>
+                    <TextInput style={styles.input} placeholder="없음" placeholderTextColor="#48484A" value={eBrand} onChangeText={setEBrand} />
+                  </>
+                )}
+
+                <Text style={styles.label}>측정 방식</Text>
+                <View style={styles.wrap}>
+                  {([['reps', '횟수·무게'], ['time', '시간(초)']] as const).map(([k, lbl]) => {
+                    const on = (k === 'time') === eTime;
+                    return (
+                      <Pressable key={k} style={[styles.choice, on && styles.choiceOn]} onPress={() => setETime(k === 'time')}>
+                        <Text style={[styles.choiceText, on && styles.choiceTextOn]}>{lbl}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Pressable style={[styles.saveBtn, isCustom && !eName.trim() && { opacity: 0.4 }]} onPress={saveEdit} disabled={isCustom && !eName.trim()}>
+                  <Text style={styles.saveBtnText}>저장</Text>
+                </Pressable>
+                {isCustom && (
+                  <Pressable style={styles.deleteBtn} onPress={deleteEdit}>
+                    <Text style={styles.deleteBtnText}>삭제</Text>
+                  </Pressable>
+                )}
+                <Pressable style={styles.cancelBtn} onPress={() => setEditing(null)}>
+                  <Text style={styles.cancelBtnText}>취소</Text>
+                </Pressable>
+              </ScrollView>
+            );
+          })()}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -297,6 +415,7 @@ const styles = StyleSheet.create({
 
   input: { backgroundColor: '#1C1C1E', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: '#FFFFFF', fontSize: 15 },
 
+  chipScroll: { flexGrow: 0, flexShrink: 0 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 10 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1C1C1E', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, minHeight: 36 },
   chipOn: { backgroundColor: GREEN },
@@ -336,4 +455,14 @@ const styles = StyleSheet.create({
   choiceTextOn: { color: '#06210F' },
   saveBtn: { backgroundColor: GREEN, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
   saveBtnText: { color: '#06210F', fontSize: 16, fontWeight: '800' },
+
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: { backgroundColor: '#161618', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingBottom: 28, maxHeight: '85%' },
+  sheetGrip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#3A3A3C', marginTop: 10, marginBottom: 12 },
+  sheetTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  sheetHint: { color: '#8E8E93', fontSize: 13, marginBottom: 4 },
+  deleteBtn: { borderWidth: 1, borderColor: '#FF453A', borderRadius: 14, paddingVertical: 13, alignItems: 'center', marginTop: 10 },
+  deleteBtnText: { color: '#FF453A', fontSize: 15, fontWeight: '700' },
+  cancelBtn: { paddingVertical: 13, alignItems: 'center', marginTop: 4 },
+  cancelBtnText: { color: '#8E8E93', fontSize: 15, fontWeight: '600' },
 });
