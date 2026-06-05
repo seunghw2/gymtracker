@@ -17,6 +17,7 @@ import {
   getWeeklyWorkoutCount,
   getAllWorkoutDates,
   getSetting,
+  BodyLog,
 } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
@@ -58,7 +59,7 @@ export default function HomeScreen() {
     const today = getTodayStr();
     const { start, end, monday } = getWeekRange();
 
-    let count: number, todayLog: any, latestLog: any, allDates: string[];
+    let count: number, todayLog: BodyLog | null, latestLog: BodyLog | null, allDates: string[];
     try {
       [count, todayLog, latestLog, allDates] = await Promise.all([
         getWeeklyWorkoutCount(start, end),

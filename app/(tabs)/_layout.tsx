@@ -6,11 +6,7 @@ import { useUiStore } from '../../store/useUiStore';
 import RestTimer from '../../components/RestTimer';
 import ActiveWorkoutBanner from '../../components/ActiveWorkoutBanner';
 import CustomTabBar from '../../components/CustomTabBar';
-
-// 배너 한 블록이 차지하는 세로 높이(바 44 + 위아래 여백)
-const BANNER_BLOCK = 60;
-// 커스텀 탭바의 콘텐츠 높이(safe area 제외): paddingTop + 인디케이터 + 아이콘 + 라벨
-const TAB_BAR_CONTENT = 59;
+import { TAB_BAR_CONTENT_HEIGHT, BANNER_BLOCK_HEIGHT, REST_TIMER_OVER_NUMPAD } from '../../constants/layout';
 
 export default function TabLayout() {
   const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
@@ -18,14 +14,14 @@ export default function TabLayout() {
   const numPadOpen = useUiStore(s => s.numPadOpen);
   const insets = useSafeAreaInsets();
   // 탭바 전체 높이(safe area 포함) — 배너/휴식 타이머 위치 계산용
-  const tabBarH = TAB_BAR_CONTENT + Math.max(insets.bottom, 8);
+  const tabBarH = TAB_BAR_CONTENT_HEIGHT + Math.max(insets.bottom, 8);
   // 진행 중 운동이 있고 "운동" 탭이 아닐 때만 전역 배너 표시(운동 탭에선 중복 방지)
   const segments = useSegments();
   const onWorkoutTab = segments[segments.length - 1] === 'workout';
   const bannerVisible = workoutActive && !onWorkoutTab;
   // 배너가 떠 있으면 휴식 타이머는 그 위로 한 단계 더 올림
-  // 숫자패드(라벨 포함 약 264pt) 위로 휴식 타이머가 확실히 올라오도록 여유를 둠
-  const restBottom = numPadOpen ? 276 : tabBarH + (bannerVisible ? BANNER_BLOCK : 0);
+  // 숫자패드가 떠 있으면 그 위로 확실히 올라오도록 여유를 둠
+  const restBottom = numPadOpen ? REST_TIMER_OVER_NUMPAD : tabBarH + (bannerVisible ? BANNER_BLOCK_HEIGHT : 0);
 
   return (
     <View style={{ flex: 1 }}>
