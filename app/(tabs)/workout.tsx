@@ -99,6 +99,7 @@ import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, ne
 import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 import { playSetDoneSound } from '../../lib/sound';
+import { buildExerciseEntry } from '../../lib/exerciseEntry';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
 
@@ -205,8 +206,6 @@ export default function WorkoutScreen() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showDetailPicker, setShowDetailPicker] = useState(false);
   const detailSwipeRefs = useRef<Map<number, Swipeable>>(new Map());
-  const [startName, setStartName] = useState('');
-  const [startGymId, setStartGymId] = useState<number | null>(null);
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [showGymPicker, setShowGymPicker] = useState(false);
   const [gymAddName, setGymAddName] = useState('');
@@ -805,32 +804,6 @@ export default function WorkoutScreen() {
       return next;
     });
     Haptics.selectionAsync();
-  };
-
-  const buildExerciseEntry = async (ex: SelectableExercise): Promise<ExerciseEntry> => {
-    const timeBased = ex.tracking_type === 'TIME';
-    const [prev, rmHist] = await Promise.all([
-      getLastSessionSets(ex.id),
-      get1RMHistory(ex.id).catch(() => []),
-    ]);
-    // 지난 세션 값으로 입력칸 프리필 + 원본은 힌트용으로 보존
-    const initSets: SetEntry[] = prev.length > 0
-      ? prev.map((s, i) => ({ setOrder: i + 1, weight_kg: s.weight_kg, reps: s.reps, done: false, setType: 'NORMAL', durationSec: timeBased ? (s.duration_sec ?? 30) : undefined }))
-      : [{ setOrder: 1, weight_kg: timeBased ? 0 : 60, reps: timeBased ? 0 : 10, done: false, setType: 'NORMAL', durationSec: timeBased ? 30 : undefined }];
-    const lastSets = prev.map(s => ({ weight_kg: s.weight_kg, reps: s.reps }));
-    // PR 판정 기준: 종목 추가 시점까지의 역대 최고 1RM
-    const prevBest1rm = rmHist.reduce((m, r) => Math.max(m, r.estimated_1rm), 0);
-    return {
-      exerciseId: ex.id,
-      exerciseName: ex.name,
-      brand: ex.brand,
-      sets: initSets,
-      lastSets,
-      note: ex.note ?? null,
-      sessionNote: '',
-      prevBest1rm,
-      timeBased,
-    };
   };
 
   const confirmAddExercises = async () => {
@@ -2124,28 +2097,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 28,
   },
-  startNameInput: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-    paddingVertical: 4,
-  },
-  startMetaRow: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 16 },
-  startMetaBtn: {
-    backgroundColor: '#2C2C2E',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  startMetaText: { color: '#FFFFFF', fontSize: 14 },
-  startTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   startDate: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
-  startBtn: {
-    backgroundColor: '#30D158',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
   startBtnText: { color: '#000000', fontSize: 16, fontWeight: '700' },
   startBtnBig: { backgroundColor: '#30D158', borderRadius: 16, paddingVertical: 18, alignItems: 'center', marginBottom: 28 },
 
