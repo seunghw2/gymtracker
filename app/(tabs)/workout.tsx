@@ -100,6 +100,7 @@ import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 import { playSetDoneSound } from '../../lib/sound';
 import { buildExerciseEntry } from '../../lib/exerciseEntry';
+import { epley, formatDuration } from '../../lib/format';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
 
@@ -111,10 +112,6 @@ const SET_TYPE_META: Record<SetType, { label: string; color: string } | null> = 
   FAILURE: { label: 'F', color: '#FF453A' },
 };
 
-function epley(weight: number, reps: number) {
-  return Math.round(weight * (1 + reps / 30) * 10) / 10;
-}
-
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -124,13 +121,6 @@ function formatDate(dateStr: string) {
 }
 
 const KB_ACCESSORY_ID = 'setInputDone';
-
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  if (h > 0) return `${h}시간 ${m}분`;
-  return `${m}분`;
-}
 
 // 휴식 시간 표기: 60초 미만은 "Ns", 이상은 "m:ss"
 function fmtRest(sec: number): string {

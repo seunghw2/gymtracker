@@ -9,19 +9,13 @@ import {
 import { useSettingsStore } from '../store/useStore';
 import { toDisplay, unitLabel } from '../lib/units';
 import { formatDateWithDay } from '../lib/date';
+import { formatDuration } from '../lib/format';
 
 const SET_TYPE_BADGE: Record<string, { label: string; color: string }> = {
   WARMUP: { label: 'W', color: '#FF9F0A' },
   DROP: { label: 'D', color: '#BF5AF2' },
   FAILURE: { label: 'F', color: '#FF453A' },
 };
-
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  if (h > 0) return `${h}시간 ${m}분`;
-  return `${m}분`;
-}
 
 type Props = {
   session: SessionSummary | null;

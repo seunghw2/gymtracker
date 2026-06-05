@@ -2,15 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SessionSummary } from '../db/queries';
 import { formatShortWithWeekday } from '../lib/date';
+import { formatDuration } from '../lib/format';
 import { useSessionActions } from '../hooks/useSessionActions';
 import SessionPreviewSheet from './SessionPreviewSheet';
-
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  if (h > 0) return `${h}시간 ${m}분`;
-  return `${m}분`;
-}
 
 type Props = {
   session: SessionSummary;
