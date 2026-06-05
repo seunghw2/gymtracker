@@ -1,23 +1,24 @@
 import { Tabs, useSegments } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../../store/useStore';
 import { useUiStore } from '../../store/useUiStore';
 import RestTimer from '../../components/RestTimer';
 import ActiveWorkoutBanner from '../../components/ActiveWorkoutBanner';
+import CustomTabBar from '../../components/CustomTabBar';
 
 // 배너 한 블록이 차지하는 세로 높이(바 44 + 위아래 여백)
 const BANNER_BLOCK = 60;
-
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
-}
+// 커스텀 탭바의 콘텐츠 높이(safe area 제외): paddingTop + 인디케이터 + 아이콘 + 라벨
+const TAB_BAR_CONTENT = 59;
 
 export default function TabLayout() {
   const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
   // 운동 탭 숫자패드가 떠 있으면 휴식 타이머를 그 위로 올림
   const numPadOpen = useUiStore(s => s.numPadOpen);
-  // 탭 바는 운동 중에도 평소 크기(높이 80) 유지
-  const tabBarH = 80;
+  const insets = useSafeAreaInsets();
+  // 탭바 전체 높이(safe area 포함) — 배너/휴식 타이머 위치 계산용
+  const tabBarH = TAB_BAR_CONTENT + Math.max(insets.bottom, 8);
   // 진행 중 운동이 있고 "운동" 탭이 아닐 때만 전역 배너 표시(운동 탭에선 중복 방지)
   const segments = useSegments();
   const onWorkoutTab = segments[segments.length - 1] === 'workout';
@@ -29,56 +30,14 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#1C1C1E',
-          borderTopColor: '#2C2C2E',
-          height: 80,
-          paddingBottom: 20,
-          paddingTop: 0,
-        },
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: '#30D158',
-        tabBarInactiveTintColor: '#8E8E93',
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
-      }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: '홈',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="workout"
-        options={{
-          title: '운동',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="💪" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          title: '통계',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          title: '캘린더',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📅" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: '설정',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: '홈' }} />
+      <Tabs.Screen name="workout" options={{ title: '운동' }} />
+      <Tabs.Screen name="stats" options={{ title: '통계' }} />
+      <Tabs.Screen name="calendar" options={{ title: '캘린더' }} />
+      <Tabs.Screen name="settings" options={{ title: '설정' }} />
     </Tabs>
 
     {/* 전역 "운동 중" 배너 — 탭 바 바로 위에 도킹, 운동 탭에선 숨김 */}
