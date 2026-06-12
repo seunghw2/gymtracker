@@ -285,7 +285,6 @@ export default function ExerciseAddScreen() {
           filtered.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyText}>{q ? `'${search.trim()}' 검색 결과가 없어요` : '해당 조건의 종목이 없어요'}</Text>
-              <Pressable style={styles.outlineBtn} onPress={() => openCustom()}><Text style={styles.outlineBtnText}>+ 직접 등록</Text></Pressable>
             </View>
           ) : (
             <View style={styles.card}>
