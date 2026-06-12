@@ -10,7 +10,9 @@ import {
   Modal,
   FlatList,
   TextInput,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, getActualRmHistory, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
@@ -140,8 +142,11 @@ export default function StatsScreen() {
     }
   };
 
+  // 탭 포커스/새로고침 시 칩 데이터 다시 불러오기 위한 틱
+  const [reloadTick, setReloadTick] = useState(0);
+
   useEffect(() => {
-    if (activeChip === '1RM 성장' && !trainedExercises) {
+    if (activeChip === '1RM 성장') {
       getTrainedExercises()
         .then(list => {
           setTrainedExercises(list);
@@ -165,19 +170,31 @@ export default function StatsScreen() {
       getPeriodSummary(iso(cur.from), iso(cur.to)).then(setPeriodCur).catch(() => setPeriodCur(null));
       getPeriodSummary(iso(prev.from), iso(prev.to)).then(setPeriodPrev).catch(() => setPeriodPrev(null));
     }
-    if (activeChip === 'PR' && !records) {
+    if (activeChip === 'PR') {
       getRecords().then(setRecords).catch(() => setRecords([]));
     }
-  }, [activeChip, trainedExercises, volumeRange, records, summaryPeriod]);
+  }, [activeChip, volumeRange, summaryPeriod, reloadTick]);
 
-  useEffect(() => { load(); }, [load]);
+  // 탭에 들어올 때마다 새로고침 (운동 직후 통계 즉시 반영)
+  useFocusEffect(useCallback(() => {
+    load();
+    setReloadTick(t => t + 1);
+  }, [load]));
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setReloadTick(t => t + 1);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     if (selectedEx) {
       get1RMHistory(selectedEx.id).then(setOrmData);
       getExerciseRmBasis(selectedEx.id).then(setRmBasis).catch(() => setRmBasis(1));
     }
-  }, [selectedEx]);
+  }, [selectedEx, reloadTick]);
 
   const changeRmBasis = (n: number) => {
     setRmBasis(n);
@@ -210,7 +227,10 @@ export default function StatsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
+      >
         <Text style={styles.header}>통계</Text>
 
         <ScrollView

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,18 @@ import {
   Pressable,
   Modal,
   SafeAreaView,
+  TextInput,
+  RefreshControl,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   getTodayBodyLog,
   getLatestBodyLog,
+  getBodyLogs,
   upsertBodyLog,
   getWeeklyWorkoutCount,
   getAllWorkoutDates,
@@ -54,22 +60,31 @@ export default function HomeScreen() {
   const [bodyFatInput, setBodyFatInput] = useState('');
   const [todayBodyFat, setTodayBodyFat] = useState<number | null>(null);
   const [weekDots, setWeekDots] = useState<boolean[]>(Array(7).fill(false));
+  const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const today = getTodayStr();
     const { start, end, monday } = getWeekRange();
 
-    let count: number, todayLog: BodyLog | null, latestLog: BodyLog | null, allDates: string[];
+    let count: number, todayLog: BodyLog | null, latestLog: BodyLog | null, allDates: string[], logs: BodyLog[];
     try {
-      [count, todayLog, latestLog, allDates] = await Promise.all([
+      [count, todayLog, latestLog, allDates, logs] = await Promise.all([
         getWeeklyWorkoutCount(start, end),
         getTodayBodyLog(today),
         getLatestBodyLog(),
         getAllWorkoutDates(),
+        getBodyLogs(90).catch(() => [] as BodyLog[]),
       ]);
     } catch {
+      setLoaded(true);
       return;
     }
+
+    // 진행바 기준점: 최근 기록 중 가장 오래된 체중 (감량/증량 실제 진행률 계산용)
+    const oldest = logs.length > 0 ? logs[logs.length - 1] : null;
+    setBaselineWeight(oldest?.weight_kg ?? null);
 
     setWeekCount(count);
     const ym = today.slice(0, 7);
@@ -95,9 +110,17 @@ export default function HomeScreen() {
       dots[i] = allDates.includes(ds);
     }
     setWeekDots(dots);
+    setLoaded(true);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // 탭에 들어올 때마다 새로고침 (운동 완료 후 돌아와도 최신 상태 유지)
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   const openWeightModal = () => {
     setDialValue(todayWeight ?? dialValue);
@@ -105,14 +128,17 @@ export default function HomeScreen() {
     setShowWeightModal(true);
   };
 
-  // 저장 버튼으로 명시 저장 (체지방은 통계 화면에서 별도 입력)
+  // 저장 버튼으로 명시 저장 (체지방도 함께 입력 가능)
   const handleSaveWeight = async () => {
+    const fat = parseFloat(bodyFatInput);
+    const fatValue = Number.isFinite(fat) && fat > 0 ? fat : todayBodyFat ?? undefined;
     try {
-      await upsertBodyLog(getTodayStr(), dialValue, todayBodyFat ?? undefined);
+      await upsertBodyLog(getTodayStr(), dialValue, fatValue);
     } catch {
       // 저장 실패 무시
     }
     setTodayWeight(dialValue);
+    if (fatValue != null) setTodayBodyFat(fatValue);
     AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {});
     setShowWeightModal(false);
   };
@@ -126,15 +152,36 @@ export default function HomeScreen() {
   const currentWeight = todayWeight ?? dialValue;
   const goalDiff = currentWeight - goalWeightKg; // +면 감량 목표, -면 증량 목표
   const goalReached = Math.abs(goalDiff) < 0.1;
-  // 목표 근접도(방향 무관): 10kg 이내일수록 채워짐
-  const goalFraction = Math.max(0, Math.min(1, 1 - Math.abs(goalDiff) / 10));
+  // 진행률: 시작 체중(최근 기록 중 가장 오래된 것) → 목표 체중 사이에서 실제 진행도.
+  // 기준점이 없거나 목표와 같으면 기존 근접도(10kg 이내 채움) 방식으로 폴백.
+  const goalFraction = (() => {
+    if (goalReached) return 1;
+    if (baselineWeight != null && Math.abs(baselineWeight - goalWeightKg) > 0.5) {
+      return Math.max(0, Math.min(1, (baselineWeight - currentWeight) / (baselineWeight - goalWeightKg)));
+    }
+    return Math.max(0, Math.min(1, 1 - Math.abs(goalDiff) / 10));
+  })();
 
   const days = ['월', '화', '수', '목', '금', '토', '일'];
   const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
 
+  if (!loaded) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#30D158" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
+      >
         <Text style={styles.header}>GymTracker</Text>
 
         {/* 이번주 통계 */}
@@ -203,6 +250,7 @@ export default function HomeScreen() {
       {/* 체중 입력 모달 — 눈금자 + 자동 저장, 바깥 탭하면 닫힘 */}
       <Modal visible={showWeightModal} transparent animationType="slide" onRequestClose={closeWeightModal}>
         <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable style={styles.modalOverlay} onPress={closeWeightModal}>
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>오늘의 체중</Text>
@@ -211,11 +259,25 @@ export default function HomeScreen() {
                 initial={dialValue}
                 onChange={v => setDialValue(v)}
               />
+              <View style={styles.fatRow}>
+                <Text style={styles.fatLabel}>체지방</Text>
+                <TextInput
+                  style={styles.fatInput}
+                  value={bodyFatInput}
+                  onChangeText={setBodyFatInput}
+                  placeholder="선택"
+                  placeholderTextColor="#48484A"
+                  keyboardType="decimal-pad"
+                  maxLength={4}
+                />
+                <Text style={styles.fatUnit}>%</Text>
+              </View>
               <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
                 <Text style={styles.saveBtnText}>저장</Text>
               </Pressable>
             </View>
           </Pressable>
+          </KeyboardAvoidingView>
         </GestureHandlerRootView>
       </Modal>
     </SafeAreaView>
@@ -225,6 +287,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
   scroll: { flex: 1 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, paddingBottom: 40 },
   bannerPad: { paddingBottom: 100 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },

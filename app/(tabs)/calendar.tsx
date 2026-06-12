@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,12 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, SessionSummary } from '../../db/queries';
 import { formatShortWithDay } from '../../lib/date';
+import { formatDuration } from '../../lib/format';
 import SessionCard from '../../components/SessionCard';
 import { useWorkoutStore } from '../../store/useStore';
 
@@ -83,7 +86,15 @@ export default function CalendarScreen() {
     <SessionCard key={s.id} session={s} onChanged={load} />
   );
 
-  useEffect(() => { load(); }, [load]);
+  // 탭에 들어올 때마다 새로고침 (방금 끝낸 운동 즉시 반영)
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -108,8 +119,19 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
+      >
         <Text style={styles.header}>캘린더</Text>
+
+        {/* 연속 운동 스트릭 */}
+        {streak > 0 && (
+          <View style={styles.streakBadge}>
+            <Text style={styles.streakEmoji}>🔥</Text>
+            <Text style={styles.streakText}>{streak}일 연속 운동 중</Text>
+          </View>
+        )}
 
         {/* 보기 토글 */}
         <View style={styles.segment}>
@@ -155,7 +177,6 @@ export default function CalendarScreen() {
               <Pressable
                 key={idx}
                 style={styles.cell}
-                disabled={!hasWorkout}
                 onPress={() => setSelectedDate(dateStr)}
               >
                 <View style={[
@@ -175,6 +196,18 @@ export default function CalendarScreen() {
               </Pressable>
             );
           })}
+        </View>
+
+        {/* 이번 달 요약 */}
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryValue}>{stats.count}회</Text>
+            <Text style={styles.summaryLabel}>운동 횟수</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryValue}>{stats.totalSec > 0 ? formatDuration(stats.totalSec) : '-'}</Text>
+            <Text style={styles.summaryLabel}>총 운동 시간</Text>
+          </View>
         </View>
 
         {/* 선택한 날짜 요약 */}
