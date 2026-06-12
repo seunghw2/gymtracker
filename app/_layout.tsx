@@ -25,7 +25,10 @@ export default function RootLayout() {
     const firstSegment = segments[0] as string | undefined;
     const inAuthGroup = firstSegment === '(auth)';
 
-    if (inAuthGroup) {
+    // 미로그인 → 로그인 화면으로, 로그인 완료 → 탭으로
+    if (status === 'guest' && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (status === 'authenticated' && inAuthGroup) {
       router.replace('/(tabs)');
     }
   }, [status, segments]);
