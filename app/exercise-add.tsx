@@ -151,6 +151,15 @@ export default function ExerciseAddScreen() {
     setMode('browse');
   };
 
+  // 직접 등록 진입 — 현재 필터(부위/장비/브랜드)·검색어를 폼에 미리 채움
+  const openCustom = () => {
+    if (part !== 'ALL') setCPart(part);
+    if (equip !== 'ALL') setCEquip(equip);
+    if (brand !== 'ALL') setCBrand(brand);
+    if (q) setCName(search.trim());
+    setMode('custom');
+  };
+
   const Row = ({ e }: { e: Exercise }) => {
     const on = pickedIds.has(e.id);
     const sub = [EQUIP_KO[e.equipment_type] ?? e.equipment_type, e.brand].filter(Boolean).join(' · ');
@@ -276,7 +285,7 @@ export default function ExerciseAddScreen() {
           filtered.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyText}>{q ? `'${search.trim()}' 검색 결과가 없어요` : '해당 조건의 종목이 없어요'}</Text>
-              <Pressable style={styles.outlineBtn} onPress={() => setMode('custom')}><Text style={styles.outlineBtnText}>+ 직접 등록</Text></Pressable>
+              <Pressable style={styles.outlineBtn} onPress={() => openCustom()}><Text style={styles.outlineBtnText}>+ 직접 등록</Text></Pressable>
             </View>
           ) : (
             <View style={styles.card}>
@@ -316,7 +325,7 @@ export default function ExerciseAddScreen() {
             })}
           </>
         )}
-        <Pressable style={styles.outlineBtn} onPress={() => setMode('custom')}><Text style={styles.outlineBtnText}>+ 직접 등록</Text></Pressable>
+        <Pressable style={styles.outlineBtn} onPress={() => openCustom()}><Text style={styles.outlineBtnText}>+ 직접 등록</Text></Pressable>
       </ScrollView>
 
       {/* 하단 완료 바 */}
