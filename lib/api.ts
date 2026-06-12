@@ -104,6 +104,10 @@ export const authApi = {
     apiRequest<TokenResponse>('/api/v1/auth/kakao', {
       method: 'POST', auth: false, body: { accessToken },
     }),
+  apple: (identityToken: string, name?: string | null) =>
+    apiRequest<TokenResponse>('/api/v1/auth/apple', {
+      method: 'POST', auth: false, body: { identityToken, name: name ?? null },
+    }),
   logout: (refreshToken: string) =>
     apiRequest<void>('/api/v1/auth/logout', {
       method: 'POST', auth: false, body: { refreshToken },

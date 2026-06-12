@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Pressable, Alert,
   SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../../store/useAuthStore';
 import { ApiException } from '../../lib/api';
 import { loginWithKakao } from '../../lib/kakaoAuth';
@@ -12,10 +13,39 @@ export default function LoginScreen() {
   const router = useRouter();
   const login = useAuthStore(s => s.login);
   const kakao = useAuthStore(s => s.kakao);
+  const apple = useAuthStore(s => s.apple);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [kakaoLoading, setKakaoLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
+    }
+  }, []);
+
+  const handleApple = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('identityToken 없음');
+      // 이름은 최초 로그인 시에만 내려옴 — 백엔드에 함께 전달
+      const name = [credential.fullName?.familyName, credential.fullName?.givenName]
+        .filter(Boolean).join('') || null;
+      await apple(credential.identityToken, name);
+    } catch (e: unknown) {
+      const err = e as { code?: string };
+      if (err.code === 'ERR_REQUEST_CANCELED') return; // 사용자가 취소
+      const msg = e instanceof ApiException ? e.body.message : 'Apple 로그인에 실패했습니다.';
+      Alert.alert('Apple 로그인 실패', msg);
+    }
+  };
 
   const handleKakao = async () => {
     setKakaoLoading(true);
@@ -102,6 +132,16 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
+          {appleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={14}
+              style={styles.appleBtn}
+              onPress={handleApple}
+            />
+          )}
+
           <Pressable
             style={[styles.kakaoBtn, kakaoLoading && { opacity: 0.5 }]}
             onPress={handleKakao}
@@ -165,6 +205,7 @@ const styles = StyleSheet.create({
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#2C2C2E' },
   dividerText: { color: '#8E8E93', fontSize: 12 },
+  appleBtn: { height: 56, marginBottom: 12 },
   kakaoBtn: {
     backgroundColor: '#FEE500',
     borderRadius: 14,

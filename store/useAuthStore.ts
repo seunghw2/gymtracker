@@ -10,6 +10,7 @@ type AuthState = {
   signup: (email: string, password: string, name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   kakao: (kakaoAccessToken: string) => Promise<void>;
+  apple: (identityToken: string, name?: string | null) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -46,6 +47,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   kakao: async (kakaoAccessToken) => {
     const res = await authApi.kakao(kakaoAccessToken);
+    await tokenStore.saveTokens(res.accessToken, res.refreshToken);
+    set({ status: 'authenticated', user: res.user });
+  },
+
+  apple: async (identityToken, name) => {
+    const res = await authApi.apple(identityToken, name);
     await tokenStore.saveTokens(res.accessToken, res.refreshToken);
     set({ status: 'authenticated', user: res.user });
   },
