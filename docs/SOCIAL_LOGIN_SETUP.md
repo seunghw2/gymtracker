@@ -103,3 +103,8 @@
 - [ ] `app.json`에 Google iOS URL scheme 추가
 - [ ] 출시 빌드 전 백엔드 `app.apple.client-ids`에서 `host.exp.Exponent` 제거
 - [ ] 실기기(개발 빌드)에서 3개 로그인 전부 스모크 테스트
+- [ ] **Apple 토큰 폐기(revocation)**: Apple은 회원탈퇴 시 Sign in with Apple 토큰을
+  `https://appleid.apple.com/auth/revoke`로 폐기하도록 요구(2022.6.30~).
+  이 호출에는 Apple Developer 계정의 **Service Key(.p8)로 서명한 client_secret**이
+  필요해서 Developer Program 가입 후에만 구현 가능 — 가입 후 `UserAccountService.deleteAccount`에
+  APPLE provider일 때 revoke 호출 추가할 것.

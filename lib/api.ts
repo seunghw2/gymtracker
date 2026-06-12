@@ -92,14 +92,6 @@ export async function apiText(path: string): Promise<string> {
 
 // 도메인별 wrapper
 export const authApi = {
-  signup: (email: string, password: string, name: string) =>
-    apiRequest<TokenResponse>('/api/v1/auth/signup', {
-      method: 'POST', auth: false, body: { email, password, name },
-    }),
-  login: (email: string, password: string) =>
-    apiRequest<TokenResponse>('/api/v1/auth/login', {
-      method: 'POST', auth: false, body: { email, password },
-    }),
   kakao: (accessToken: string) =>
     apiRequest<TokenResponse>('/api/v1/auth/kakao', {
       method: 'POST', auth: false, body: { accessToken },
@@ -117,6 +109,8 @@ export const authApi = {
       method: 'POST', auth: false, body: { refreshToken },
     }),
   me: () => apiRequest<UserSummary>('/api/v1/auth/me'),
+  /** 회원탈퇴 — 계정과 모든 데이터 영구 삭제. */
+  deleteAccount: () => apiRequest<void>('/api/v1/auth/me', { method: 'DELETE' }),
 };
 
 export type UserSummary = {

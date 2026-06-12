@@ -7,12 +7,11 @@ type AuthState = {
   user: UserSummary | null;
 
   bootstrap: () => Promise<void>;
-  signup: (email: string, password: string, name: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
   kakao: (kakaoAccessToken: string) => Promise<void>;
   apple: (identityToken: string, name?: string | null) => Promise<void>;
   google: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -32,18 +31,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       await tokenStore.clear();
       set({ status: 'guest', user: null });
     }
-  },
-
-  signup: async (email, password, name) => {
-    const res = await authApi.signup(email, password, name);
-    await tokenStore.saveTokens(res.accessToken, res.refreshToken);
-    set({ status: 'authenticated', user: res.user });
-  },
-
-  login: async (email, password) => {
-    const res = await authApi.login(email, password);
-    await tokenStore.saveTokens(res.accessToken, res.refreshToken);
-    set({ status: 'authenticated', user: res.user });
   },
 
   kakao: async (kakaoAccessToken) => {
@@ -69,6 +56,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (refreshToken) {
       try { await authApi.logout(refreshToken); } catch { /* ignore */ }
     }
+    await tokenStore.clear();
+    set({ status: 'guest', user: null });
+  },
+
+  deleteAccount: async () => {
+    await authApi.deleteAccount(); // 실패 시 throw — 화면에서 안내
     await tokenStore.clear();
     set({ status: 'guest', user: null });
   },

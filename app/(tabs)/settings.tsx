@@ -35,12 +35,35 @@ export default function SettingsScreen() {
     goalWeightKg, goalBodyFatPct, restDurationSec, unitKg, soundOnSilent,
     setGoalWeight, setGoalBodyFat, setRestDuration, setUnitKg, setSoundOnSilent,
   } = useSettingsStore();
-  const { user, logout } = useAuthStore();
+  const { user, logout, deleteAccount } = useAuthStore();
 
   const handleLogout = () => {
     Alert.alert('로그아웃', '정말 로그아웃하시겠어요?', [
       { text: '취소', style: 'cancel' },
       { text: '로그아웃', style: 'destructive', onPress: () => logout() },
+    ]);
+  };
+
+  // 회원탈퇴 — 이중 확인 후 모든 데이터 영구 삭제
+  const handleDeleteAccount = () => {
+    Alert.alert('회원탈퇴', '계정과 모든 운동 기록이 영구 삭제됩니다.\n이 작업은 되돌릴 수 없어요.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '계속', style: 'destructive', onPress: () => {
+          Alert.alert('정말 탈퇴할까요?', '삭제된 데이터는 복구할 수 없습니다.', [
+            { text: '취소', style: 'cancel' },
+            {
+              text: '영구 삭제', style: 'destructive', onPress: async () => {
+                try {
+                  await deleteAccount();
+                } catch {
+                  Alert.alert('탈퇴 실패', '잠시 후 다시 시도해 주세요.');
+                }
+              },
+            },
+          ]);
+        },
+      },
     ]);
   };
 
@@ -244,6 +267,10 @@ export default function SettingsScreen() {
               <View style={styles.divider} />
               <Pressable onPress={handleLogout} style={styles.row}>
                 <Text style={[styles.label, { color: '#FF453A' }]}>로그아웃</Text>
+              </Pressable>
+              <View style={styles.divider} />
+              <Pressable onPress={handleDeleteAccount} style={styles.row}>
+                <Text style={[styles.label, { color: '#8E8E93' }]}>회원탈퇴</Text>
               </Pressable>
             </View>
             )}
