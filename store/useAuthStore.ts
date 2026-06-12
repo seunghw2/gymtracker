@@ -11,6 +11,7 @@ type AuthState = {
   login: (email: string, password: string) => Promise<void>;
   kakao: (kakaoAccessToken: string) => Promise<void>;
   apple: (identityToken: string, name?: string | null) => Promise<void>;
+  google: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -53,6 +54,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   apple: async (identityToken, name) => {
     const res = await authApi.apple(identityToken, name);
+    await tokenStore.saveTokens(res.accessToken, res.refreshToken);
+    set({ status: 'authenticated', user: res.user });
+  },
+
+  google: async (idToken) => {
+    const res = await authApi.google(idToken);
     await tokenStore.saveTokens(res.accessToken, res.refreshToken);
     set({ status: 'authenticated', user: res.user });
   },

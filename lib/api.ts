@@ -108,6 +108,10 @@ export const authApi = {
     apiRequest<TokenResponse>('/api/v1/auth/apple', {
       method: 'POST', auth: false, body: { identityToken, name: name ?? null },
     }),
+  google: (idToken: string) =>
+    apiRequest<TokenResponse>('/api/v1/auth/google', {
+      method: 'POST', auth: false, body: { idToken },
+    }),
   logout: (refreshToken: string) =>
     apiRequest<void>('/api/v1/auth/logout', {
       method: 'POST', auth: false, body: { refreshToken },

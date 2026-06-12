@@ -5,9 +5,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
 import { useAuthStore } from '../../store/useAuthStore';
 import { ApiException } from '../../lib/api';
 import { loginWithKakao } from '../../lib/kakaoAuth';
+import { GOOGLE_CLIENT_IDS, googleConfigured } from '../../lib/googleAuth';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -19,6 +21,26 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [kakaoLoading, setKakaoLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const google = useAuthStore(s => s.google);
+
+  // Google 로그인 (클라이언트 ID 미설정 시 버튼 미노출 — docs/SOCIAL_LOGIN_SETUP.md)
+  const [googleRequest, googleResponse, promptGoogle] = Google.useIdTokenAuthRequest({
+    iosClientId: GOOGLE_CLIENT_IDS.ios,
+    androidClientId: GOOGLE_CLIENT_IDS.android,
+    webClientId: GOOGLE_CLIENT_IDS.web,
+    clientId: GOOGLE_CLIENT_IDS.web ?? 'not-configured.apps.googleusercontent.com',
+  });
+
+  useEffect(() => {
+    if (googleResponse?.type === 'success' && googleResponse.params.id_token) {
+      google(googleResponse.params.id_token).catch((e: unknown) => {
+        const msg = e instanceof ApiException ? e.body.message : 'Google 로그인에 실패했습니다.';
+        Alert.alert('Google 로그인 실패', msg);
+      });
+    } else if (googleResponse?.type === 'error') {
+      Alert.alert('Google 로그인 실패', googleResponse.error?.message ?? '오류가 발생했습니다.');
+    }
+  }, [googleResponse]);
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -142,6 +164,17 @@ export default function LoginScreen() {
             />
           )}
 
+          {googleConfigured && (
+            <Pressable
+              style={[styles.googleBtn, !googleRequest && { opacity: 0.5 }]}
+              onPress={() => promptGoogle()}
+              disabled={loading || kakaoLoading || !googleRequest}
+            >
+              <Text style={styles.googleIcon}>G</Text>
+              <Text style={styles.googleBtnText}>Google로 시작하기</Text>
+            </Pressable>
+          )}
+
           <Pressable
             style={[styles.kakaoBtn, kakaoLoading && { opacity: 0.5 }]}
             onPress={handleKakao}
@@ -206,6 +239,18 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: '#2C2C2E' },
   dividerText: { color: '#8E8E93', fontSize: 12 },
   appleBtn: { height: 56, marginBottom: 12 },
+  googleBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 18,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  googleIcon: { fontSize: 17, fontWeight: '800', color: '#4285F4' },
+  googleBtnText: { color: '#1F1F1F', fontSize: 16, fontWeight: '700' },
   kakaoBtn: {
     backgroundColor: '#FEE500',
     borderRadius: 14,
