@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, setExerciseTrackingType, Exercise } from '../db/queries';
+import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, Exercise } from '../db/queries';
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES, MUSCLE_KO, EQUIP_KO, MUSCLE_COLOR, PART_ORDER } from '../constants/exercises';
 import { GREEN } from '../constants/colors';
 import { useWorkoutStore } from '../store/useStore';
@@ -107,7 +107,7 @@ export default function ExerciseAddScreen() {
   const saveEdit = async () => {
     if (!editing) return;
     const isCustom = editing.is_custom === 1;
-    if (isCustom && !eName.trim()) return;
+    if (!eName.trim()) return;
     try {
       if (isCustom) {
         await updateExercise(editing.id, {
@@ -115,7 +115,8 @@ export default function ExerciseAddScreen() {
           brand: eBrand.trim() || null, tracking_type: eTime ? 'TIME' : 'REPS',
         });
       } else {
-        await setExerciseTrackingType(editing.id, eTime ? 'TIME' : 'REPS');
+        // 기본 종목: 이름 + 측정 방식만 변경(분류는 공유 데이터라 불가)
+        await updateExercise(editing.id, { name: eName.trim(), tracking_type: eTime ? 'TIME' : 'REPS' });
       }
       const list = await getExercises();
       setAll(list);
@@ -349,13 +350,14 @@ export default function ExerciseAddScreen() {
             return (
               <ScrollView keyboardShouldPersistTaps="handled">
                 <View style={styles.sheetGrip} />
-                <Text style={styles.sheetTitle}>{isCustom ? '종목 수정' : '측정 방식 변경'}</Text>
-                {!isCustom && <Text style={styles.sheetHint}>기본 종목은 측정 방식만 바꿀 수 있어요.</Text>}
+                <Text style={styles.sheetTitle}>종목 수정</Text>
+                {!isCustom && <Text style={styles.sheetHint}>기본 종목은 이름과 측정 방식만 바꿀 수 있어요.</Text>}
+
+                <Text style={styles.label}>운동 이름</Text>
+                <TextInput style={styles.input} placeholderTextColor="#48484A" value={eName} onChangeText={setEName} />
 
                 {isCustom && (
                   <>
-                    <Text style={styles.label}>운동 이름</Text>
-                    <TextInput style={styles.input} placeholderTextColor="#48484A" value={eName} onChangeText={setEName} />
                     <Text style={styles.label}>부위</Text>
                     <View style={styles.wrap}>
                       {MUSCLE_GROUPS.map(m => (
@@ -389,7 +391,7 @@ export default function ExerciseAddScreen() {
                   })}
                 </View>
 
-                <Pressable style={[styles.saveBtn, isCustom && !eName.trim() && { opacity: 0.4 }]} onPress={saveEdit} disabled={isCustom && !eName.trim()}>
+                <Pressable style={[styles.saveBtn, !eName.trim() && { opacity: 0.4 }]} onPress={saveEdit} disabled={!eName.trim()}>
                   <Text style={styles.saveBtnText}>저장</Text>
                 </Pressable>
                 {isCustom && (
