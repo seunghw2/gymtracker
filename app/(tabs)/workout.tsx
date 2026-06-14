@@ -1660,12 +1660,18 @@ export default function WorkoutScreen() {
                     const curD = toDisplay(convertRm(bestORM, basisN), unitKg);
                     const prevD = toDisplay(convertRm(ex.prevBest1rm ?? 0, basisN), unitKg);
                     const diff = Math.round((curD - prevD) * 10) / 10;
+                    // 표시값이 실제 basisN회 세트에서 나왔는지(실측) Epley 환산인지 판별:
+                    // bestORM을 만든 세트의 반복수가 기준 RM과 같으면 그 세트 무게 = 실측값
+                    const bestSet = ex.sets
+                      .filter(s => s.done && s.estimated_1rm)
+                      .reduce((b, s) => (s.estimated_1rm ?? 0) > (b?.estimated_1rm ?? 0) ? s : b, null as SetEntry | null);
+                    const rmKind = bestSet && bestSet.reps === basisN ? '실측' : '환산';
                     // 체크 후: 이전 → 현재 + 증감을 함께 표시 (이전 기록 유지)
                     if (bestORM > 0) {
                       return (
                         <Pressable onPress={() => setRmPickerIdx(exIdx)} hitSlop={6}>
                           <Text style={styles.exVolume}>
-                            {hasPrev ? `이전 ${basisN}RM ${prevD}${u} → ` : `${basisN}RM `}{curD}{u}
+                            {hasPrev ? `이전 ${basisN}RM ${prevD}${u} → ${rmKind} ` : `${rmKind} ${basisN}RM `}{curD}{u}
                             {hasPrev && diff !== 0 ? (
                               <Text style={{ color: diff > 0 ? '#30D158' : '#FF453A', fontWeight: '700' }}>{'  '}{diff > 0 ? '▲' : '▼'}{Math.abs(diff)}{u}</Text>
                             ) : null}
