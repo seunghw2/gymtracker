@@ -26,7 +26,7 @@ export type MuscleGroup = typeof MUSCLE_GROUPS[number];
 export const EQUIPMENT_TYPES = ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'Bodyweight'] as const;
 export type EquipmentType = typeof EQUIPMENT_TYPES[number];
 
-export const MACHINE_BRANDS = ['Hammer Strength', 'Panatta', 'Nautilus', 'Life Fitness', 'Focus', 'Cybex', '기타'] as const;
+export const MACHINE_BRANDS = ['Hammer Strength', 'Panatta', 'Nautilus', 'Life Fitness', 'Focus', 'Cybex', 'Newtech', '기타'] as const;
 export type MachineBrand = typeof MACHINE_BRANDS[number];
 
 /** 부위(영문 키) → 한글 라벨. */

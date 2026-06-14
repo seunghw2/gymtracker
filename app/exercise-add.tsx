@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, Exercise } from '../db/queries';
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES, MUSCLE_KO, EQUIP_KO, MUSCLE_COLOR, PART_ORDER } from '../constants/exercises';
 import { GREEN } from '../constants/colors';
@@ -24,6 +25,12 @@ export default function ExerciseAddScreen() {
   const [brand, setBrand] = useState<string>('ALL');
   const [pickedList, setPickedList] = useState<Exercise[]>([]);
   const [mode, setMode] = useState<'browse' | 'custom'>('browse');
+
+  // 사용자가 직접 추가한 브랜드(기기 저장) + 브랜드 칩 정렬 모드
+  const [customBrands, setCustomBrands] = useState<string[]>([]);
+  const [brandSort, setBrandSort] = useState<'asc' | 'desc' | 'recent'>('asc');
+  const [showBrandAdd, setShowBrandAdd] = useState(false);
+  const [brandAddInput, setBrandAddInput] = useState('');
 
   // 직접 등록 폼
   const [cName, setCName] = useState('');
@@ -48,6 +55,8 @@ export default function ExerciseAddScreen() {
       for (const r of list) m[r.exercise_id] = { count: r.count, last: r.last_date };
       setUsage(m);
     }).catch(() => {});
+    AsyncStorage.getItem('custom_brands').then(v => { if (v) setCustomBrands(JSON.parse(v)); }).catch(() => {});
+    AsyncStorage.getItem('brand_sort').then(v => { if (v === 'asc' || v === 'desc' || v === 'recent') setBrandSort(v); }).catch(() => {});
   }, []);
 
   // 선택 장비에 실제 존재하는 브랜드들 (머신/케이블에서만)
@@ -55,8 +64,53 @@ export default function ExerciseAddScreen() {
     if (equip !== 'Machine' && equip !== 'Cable') return [];
     const set = new Set<string>();
     for (const e of all) if (e.equipment_type === equip && e.brand) set.add(e.brand);
-    return Array.from(set).sort();
+    return Array.from(set);
   }, [all, equip]);
+
+  // 브랜드별 최신 사용일 (최근순 정렬용)
+  const brandRecency = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const e of all) {
+      if (!e.brand) continue;
+      const last = usage[e.id]?.last;
+      if (last && (!m[e.brand] || last > m[e.brand])) m[e.brand] = last;
+    }
+    return m;
+  }, [all, usage]);
+
+  // 화면에 노출할 브랜드 칩 = 종목추출 ∪ 직접추가, 정렬 적용 (머신/케이블에서만)
+  const brandChips = useMemo(() => {
+    if (equip !== 'Machine' && equip !== 'Cable') return [];
+    const arr = Array.from(new Set<string>([...brandsForEquip, ...customBrands]));
+    if (brandSort === 'recent') {
+      arr.sort((a, b) => (brandRecency[b] ?? '').localeCompare(brandRecency[a] ?? '') || a.localeCompare(b));
+    } else {
+      arr.sort((a, b) => a.localeCompare(b));
+      if (brandSort === 'desc') arr.reverse();
+    }
+    return arr;
+  }, [equip, brandsForEquip, customBrands, brandSort, brandRecency]);
+
+  const cycleBrandSort = () => {
+    const next = brandSort === 'asc' ? 'desc' : brandSort === 'desc' ? 'recent' : 'asc';
+    setBrandSort(next);
+    AsyncStorage.setItem('brand_sort', next).catch(() => {});
+  };
+
+  const addBrand = () => {
+    const b = brandAddInput.trim();
+    if (!b) return;
+    if (!customBrands.includes(b) && !brandsForEquip.includes(b)) {
+      const next = [...customBrands, b];
+      setCustomBrands(next);
+      AsyncStorage.setItem('custom_brands', JSON.stringify(next)).catch(() => {});
+    }
+    setBrand(b);
+    setBrandAddInput('');
+    setShowBrandAdd(false);
+  };
+
+  const SORT_LABEL: Record<typeof brandSort, string> = { asc: '이름 ↑', desc: '이름 ↓', recent: '최근순' };
 
   const q = search.trim().toLowerCase();
   const filtersActive = q !== '' || part !== 'ALL' || equip !== 'ALL' || brand !== 'ALL';
@@ -266,17 +320,22 @@ export default function ExerciseAddScreen() {
       </ScrollView>
 
       {/* 브랜드 필터 (머신/케이블일 때만) */}
-      {brandsForEquip.length > 0 && (
+      {(equip === 'Machine' || equip === 'Cable') && brandChips.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
-          <Text style={styles.brandLabel}>브랜드</Text>
-          <Pressable style={[styles.chip, brand === 'ALL' && styles.chipOn]} onPress={() => setBrand('ALL')}>
-            <Text style={[styles.chipText, brand === 'ALL' && styles.chipTextOn]}>전체</Text>
+          <Pressable style={styles.sortChip} onPress={cycleBrandSort}>
+            <Text style={styles.sortChipText}>{SORT_LABEL[brandSort]}</Text>
           </Pressable>
-          {brandsForEquip.map(b => (
+          <Pressable style={[styles.chip, brand === 'ALL' && styles.chipOn]} onPress={() => setBrand('ALL')}>
+            <Text style={[styles.chipText, brand === 'ALL' && styles.chipTextOn]}>브랜드 전체</Text>
+          </Pressable>
+          {brandChips.map(b => (
             <Pressable key={b} style={[styles.chip, brand === b && styles.chipOn]} onPress={() => setBrand(prev => prev === b ? 'ALL' : b)}>
               <Text style={[styles.chipText, brand === b && styles.chipTextOn]} numberOfLines={1}>{b}</Text>
             </Pressable>
           ))}
+          <Pressable style={[styles.chip, styles.addBrandChip]} onPress={() => { setBrandAddInput(''); setShowBrandAdd(true); }}>
+            <Text style={[styles.chipText, { color: GREEN }]}>+ 브랜드</Text>
+          </Pressable>
         </ScrollView>
       )}
 
@@ -407,6 +466,29 @@ export default function ExerciseAddScreen() {
           })()}
         </View>
       </Modal>
+
+      {/* 브랜드 추가 모달 */}
+      <Modal visible={showBrandAdd} transparent animationType="fade" onRequestClose={() => setShowBrandAdd(false)}>
+        <KeyboardAvoidingView style={styles.centerOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowBrandAdd(false)} />
+          <View style={styles.brandAddBox}>
+            <Text style={styles.sheetTitle}>브랜드 추가</Text>
+            <TextInput
+              style={[styles.input, { marginTop: 12 }]}
+              placeholder="예: Technogym, Matrix"
+              placeholderTextColor="#48484A"
+              value={brandAddInput}
+              onChangeText={setBrandAddInput}
+              autoFocus
+              onSubmitEditing={addBrand}
+              returnKeyType="done"
+            />
+            <Pressable style={[styles.saveBtn, !brandAddInput.trim() && { opacity: 0.4 }]} onPress={addBrand} disabled={!brandAddInput.trim()}>
+              <Text style={styles.saveBtnText}>추가</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -425,7 +507,11 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: GREEN },
   chipText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
   chipTextOn: { color: '#06210F' },
-  brandLabel: { color: '#8E8E93', fontSize: 13, fontWeight: '600', alignSelf: 'center', marginRight: 2 },
+  sortChip: { backgroundColor: '#2C2C2E', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36, justifyContent: 'center' },
+  sortChipText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  addBrandChip: { borderWidth: 1, borderColor: GREEN, backgroundColor: 'transparent' },
+  centerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  brandAddBox: { backgroundColor: '#161618', borderRadius: 16, padding: 20, alignSelf: 'stretch' },
   dot: { width: 9, height: 9, borderRadius: 5 },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
