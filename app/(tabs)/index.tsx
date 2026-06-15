@@ -28,6 +28,7 @@ import {
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
 import HeaderTimerButton from '../../components/HeaderTimerButton';
+import AiBriefingCard from '../../components/AiBriefingCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
@@ -199,6 +200,9 @@ export default function HomeScreen() {
             <Text style={styles.statLabel}>이번주 운동</Text>
           </View>
         </View>
+
+        {/* AI 주간 브리핑 진입 */}
+        <AiBriefingCard />
 
         {/* 목표 체중 카드 (탭하여 기록) */}
         <Pressable style={styles.goalCard} onPress={openWeightModal}>
