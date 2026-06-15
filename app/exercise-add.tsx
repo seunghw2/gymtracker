@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,11 +10,6 @@ import { useWorkoutStore } from '../store/useStore';
 import { buildExerciseEntry } from '../lib/exerciseEntry';
 
 const FAVORITE_BRANDS_KEY = '@gymtracker/favorite_brands';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
 function Dot({ group }: { group: string }) {
   return <View style={[styles.dot, { backgroundColor: MUSCLE_COLOR[group] ?? '#8E8E93' }]} />;
@@ -360,7 +355,7 @@ export default function ExerciseAddScreen() {
             <Pressable style={styles.sortChip} onPress={cycleBrandSort}>
               <Text style={styles.sortChipText}>{SORT_LABEL[brandSort]}</Text>
             </Pressable>
-            <Pressable style={styles.brandDropdown} onPress={() => { animate(); setBrandSearch(''); setBrandOpen(o => !o); }}>
+            <Pressable style={styles.brandDropdown} onPress={() => { setBrandSearch(''); setBrandOpen(o => !o); }}>
               <Text style={[styles.brandDropdownText, brand !== 'ALL' && styles.brandDropdownTextOn]} numberOfLines={1}>
                 브랜드 {brand === 'ALL' ? '전체' : brand}
               </Text>
@@ -379,9 +374,9 @@ export default function ExerciseAddScreen() {
                 clearButtonMode="while-editing"
                 autoCorrect={false}
               />
-              <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+              <ScrollView style={{ maxHeight: 480 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 {/* 고정: 브랜드 전체 (검색과 무관하게 항상 맨 위) */}
-                <Pressable style={styles.brandRow} onPress={() => { animate(); setBrand('ALL'); setBrandOpen(false); }}>
+                <Pressable style={styles.brandRow} onPress={() => { setBrand('ALL'); setBrandOpen(false); }}>
                   <View style={styles.starBtn} />
                   <Text style={styles.brandRowText}>브랜드 전체</Text>
                   {brand === 'ALL' && <Text style={styles.brandCheck}>✓</Text>}
@@ -395,7 +390,7 @@ export default function ExerciseAddScreen() {
                   const renderRow = (b: string) => {
                     const fav = favoriteBrands.includes(b);
                     return (
-                      <Pressable key={b} style={styles.brandRow} onPress={() => { animate(); setBrand(b); setBrandOpen(false); }}>
+                      <Pressable key={b} style={styles.brandRow} onPress={() => { setBrand(b); setBrandOpen(false); }}>
                         <Pressable style={styles.starBtn} hitSlop={8} onPress={() => toggleFavoriteBrand(b)}>
                           <Text style={[styles.star, fav && styles.starOn]}>{fav ? '★' : '☆'}</Text>
                         </Pressable>
@@ -422,7 +417,7 @@ export default function ExerciseAddScreen() {
 
                 <Pressable
                   style={styles.brandAddRow}
-                  onPress={() => { animate(); setBrandOpen(false); setBrandAddInput(''); setTimeout(() => setShowBrandAdd(true), 220); }}
+                  onPress={() => { setBrandOpen(false); setBrandAddInput(''); setTimeout(() => setShowBrandAdd(true), 220); }}
                 >
                   <Text style={styles.brandAddRowText}>+ 새 브랜드 추가</Text>
                 </Pressable>
