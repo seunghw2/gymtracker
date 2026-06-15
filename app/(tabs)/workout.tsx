@@ -1773,7 +1773,11 @@ export default function WorkoutScreen() {
                           </Text>
                           {activeKind === 'weight' && <View style={styles.caret} />}
                         </Pressable>
-                        {prev && <Text style={styles.prevHint}>이전 {toDisplay(prev.weight_kg, unitKg)}</Text>}
+                        {prev && (
+                          <Text style={styles.prevHint} numberOfLines={1}>
+                            이전 {toDisplay(prev.weight_kg, unitKg)}{!ex.timeBased ? `×${prev.reps}` : ''}
+                          </Text>
+                        )}
                       </View>
                       <View style={{ flex: 1 }}>
                         {ex.timeBased ? (
@@ -1797,7 +1801,6 @@ export default function WorkoutScreen() {
                             {activeKind === 'reps' && <View style={styles.caret} />}
                           </Pressable>
                         )}
-                        {prev && !ex.timeBased && <Text style={styles.prevHint}>×{prev.reps}</Text>}
                       </View>
                       <Pressable
                         style={[styles.checkBtn, { flex: 0.6 }]}

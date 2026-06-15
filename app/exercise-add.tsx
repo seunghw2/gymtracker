@@ -28,7 +28,7 @@ export default function ExerciseAddScreen() {
 
   // 사용자가 직접 추가한 브랜드(기기 저장) + 브랜드 칩 정렬 모드
   const [customBrands, setCustomBrands] = useState<string[]>([]);
-  const [brandSort, setBrandSort] = useState<'asc' | 'desc' | 'recent'>('asc');
+  const [brandSort, setBrandSort] = useState<'asc' | 'desc' | 'recent' | 'frequent'>('asc');
   const [showBrandAdd, setShowBrandAdd] = useState(false);
   const [brandAddInput, setBrandAddInput] = useState('');
 
@@ -56,7 +56,7 @@ export default function ExerciseAddScreen() {
       setUsage(m);
     }).catch(() => {});
     AsyncStorage.getItem('custom_brands').then(v => { if (v) setCustomBrands(JSON.parse(v)); }).catch(() => {});
-    AsyncStorage.getItem('brand_sort').then(v => { if (v === 'asc' || v === 'desc' || v === 'recent') setBrandSort(v); }).catch(() => {});
+    AsyncStorage.getItem('brand_sort').then(v => { if (v === 'asc' || v === 'desc' || v === 'recent' || v === 'frequent') setBrandSort(v); }).catch(() => {});
   }, []);
 
   // 선택 장비에 실제 존재하는 브랜드들 (머신/케이블에서만)
@@ -78,21 +78,34 @@ export default function ExerciseAddScreen() {
     return m;
   }, [all, usage]);
 
+  // 브랜드별 누적 사용횟수 (자주순 정렬용)
+  const brandFreq = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const e of all) {
+      if (!e.brand) continue;
+      m[e.brand] = (m[e.brand] ?? 0) + (usage[e.id]?.count ?? 0);
+    }
+    return m;
+  }, [all, usage]);
+
   // 화면에 노출할 브랜드 칩 = 종목추출 ∪ 직접추가, 정렬 적용 (머신/케이블에서만)
   const brandChips = useMemo(() => {
     if (equip !== 'Machine' && equip !== 'Cable') return [];
     const arr = Array.from(new Set<string>([...brandsForEquip, ...customBrands]));
     if (brandSort === 'recent') {
       arr.sort((a, b) => (brandRecency[b] ?? '').localeCompare(brandRecency[a] ?? '') || a.localeCompare(b));
+    } else if (brandSort === 'frequent') {
+      arr.sort((a, b) => (brandFreq[b] ?? 0) - (brandFreq[a] ?? 0) || a.localeCompare(b));
     } else {
       arr.sort((a, b) => a.localeCompare(b));
       if (brandSort === 'desc') arr.reverse();
     }
     return arr;
-  }, [equip, brandsForEquip, customBrands, brandSort, brandRecency]);
+  }, [equip, brandsForEquip, customBrands, brandSort, brandRecency, brandFreq]);
 
   const cycleBrandSort = () => {
-    const next = brandSort === 'asc' ? 'desc' : brandSort === 'desc' ? 'recent' : 'asc';
+    const order = ['asc', 'desc', 'recent', 'frequent'] as const;
+    const next = order[(order.indexOf(brandSort) + 1) % order.length];
     setBrandSort(next);
     AsyncStorage.setItem('brand_sort', next).catch(() => {});
   };
@@ -110,7 +123,7 @@ export default function ExerciseAddScreen() {
     setShowBrandAdd(false);
   };
 
-  const SORT_LABEL: Record<typeof brandSort, string> = { asc: '이름 ↑', desc: '이름 ↓', recent: '최근순' };
+  const SORT_LABEL: Record<typeof brandSort, string> = { asc: '이름 ↑', desc: '이름 ↓', recent: '최근순', frequent: '자주순' };
 
   const q = search.trim().toLowerCase();
   const filtersActive = q !== '' || part !== 'ALL' || equip !== 'ALL' || brand !== 'ALL';

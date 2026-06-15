@@ -13,7 +13,7 @@ import { COLORS } from '../constants/colors';
  * rest 상태를 그대로 재사용한다. 세션 여부와 무관하게 restTimerActive면 표시된다.
  */
 export default function RestTimerBanner() {
-  const { restTimerActive, restTimerEnd, restTotalSec, restNextLabel, stopRestTimer } = useWorkoutStore();
+  const { restTimerActive, restTimerEnd, restTotalSec, restNextLabel, stopRestTimer, adjustRestTimer } = useWorkoutStore();
   const insets = useSafeAreaInsets();
   const [remaining, setRemaining] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -82,7 +82,13 @@ export default function RestTimerBanner() {
           휴식 중{restNextLabel ? ` · 다음 ${restNextLabel}` : ''}
         </Text>
         <View style={styles.right}>
+          <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(-15)} hitSlop={6}>
+            <Text style={styles.adjText}>−15s</Text>
+          </Pressable>
           <Text style={styles.time}>{timeStr}</Text>
+          <Pressable style={styles.adjBtn} onPress={() => adjustRestTimer(15)} hitSlop={6}>
+            <Text style={styles.adjText}>+15s</Text>
+          </Pressable>
           <Pressable style={styles.skip} onPress={handleSkip} hitSlop={8}>
             <Text style={styles.skipText}>건너뛰기 ✕</Text>
           </Pressable>
@@ -99,8 +105,10 @@ const styles = StyleSheet.create({
   wrap: { backgroundColor: '#1C1C1E', borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
   label: { color: COLORS.green, fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  time: { color: COLORS.textPrimary, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  adjBtn: { backgroundColor: '#2C2C2E', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
+  adjText: { color: COLORS.textPrimary, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  time: { color: COLORS.textPrimary, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'], minWidth: 48, textAlign: 'center' },
   skip: { backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
   skipText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '700' },
   track: { height: 3, backgroundColor: '#2C2C2E' },
