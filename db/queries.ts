@@ -9,3 +9,4 @@ export * from './api/bodylog';
 export * from './api/settings';
 export * from './api/templates';
 export * from './api/gyms';
+export * from './api/ai';
