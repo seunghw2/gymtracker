@@ -98,6 +98,7 @@ import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, ne
 import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 import HeaderTimerButton from '../../components/HeaderTimerButton';
+import ExerciseEditSheet from '../../components/ExerciseEditSheet';
 import { useRestRemaining, fmtClock } from '../../hooks/useRestRemaining';
 import { playSetDoneSound } from '../../lib/sound';
 import { buildExerciseEntry } from '../../lib/exerciseEntry';
@@ -232,6 +233,8 @@ export default function WorkoutScreen() {
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
+  const [editExIdx, setEditExIdx] = useState<number | null>(null);
+  const setExerciseInfo = useWorkoutStore(s => s.setExerciseInfo);
   const [rmPickerIdx, setRmPickerIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
   const [restMain, setRestMain] = useState<number>(90);
@@ -1923,6 +1926,9 @@ export default function WorkoutScreen() {
             <Text style={styles.menuHeader} numberOfLines={1}>
               {cardMenuIdx != null ? exercises[cardMenuIdx]?.exerciseName : ''}
             </Text>
+            <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => setEditExIdx(i), 180); }}>
+              <Text style={styles.menuItemText}>✏️ 종목 정보 수정</Text>
+            </Pressable>
             <Pressable style={styles.menuItem} onPress={() => { const i = cardMenuIdx; setCardMenuIdx(null); if (i != null) setTimeout(() => openRestPicker(i), 180); }}>
               <Text style={styles.menuItemText}>⏱ 휴식 시간 설정</Text>
             </Pressable>
@@ -1941,6 +1947,22 @@ export default function WorkoutScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* 종목 정보 수정 시트 (카드 ⋯ 메뉴) */}
+      <ExerciseEditSheet
+        exerciseId={editExIdx != null ? (exercises[editExIdx]?.exerciseId ?? null) : null}
+        onClose={() => setEditExIdx(null)}
+        onSaved={(updated) => {
+          if (editExIdx != null) {
+            setExerciseInfo(editExIdx, {
+              exerciseName: updated.name,
+              brand: updated.brand,
+              timeBased: updated.tracking_type === 'TIME',
+              bodyweight: updated.equipment_type === 'Bodyweight',
+            });
+          }
+        }}
+      />
 
       {/* 기준 RM 선택 시트 */}
       <RmBasisSheet

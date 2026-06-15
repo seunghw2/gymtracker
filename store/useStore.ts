@@ -72,6 +72,7 @@ type WorkoutState = {
   setExerciseNote: (exIdx: number, note: string) => void;
   setExerciseSessionNote: (exIdx: number, note: string) => void;
   setExercisePrevBest: (exIdx: number, best: number) => void;
+  setExerciseInfo: (exIdx: number, info: { exerciseName?: string; brand?: string | null; timeBased?: boolean; bodyweight?: boolean }) => void;
   addSetToExercise: (exIdx: number) => void;
   prependWarmupSets: (exIdx: number, warmups: { weight_kg: number; reps: number }[]) => void;
   markSetDone: (exIdx: number, setIdx: number, estimated_1rm: number, setId: number, isPR?: boolean) => void;
@@ -177,6 +178,17 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
   setExercisePrevBest: (exIdx, best) =>
     set((state) => ({
       exercises: state.exercises.map((ex, i) => i === exIdx ? { ...ex, prevBest1rm: best } : ex),
+    })),
+
+  setExerciseInfo: (exIdx, info) =>
+    set((state) => ({
+      exercises: state.exercises.map((ex, i) => i === exIdx ? {
+        ...ex,
+        exerciseName: info.exerciseName ?? ex.exerciseName,
+        brand: info.brand !== undefined ? info.brand : ex.brand,
+        timeBased: info.timeBased !== undefined ? info.timeBased : ex.timeBased,
+        bodyweight: info.bodyweight !== undefined ? info.bodyweight : ex.bodyweight,
+      } : ex),
     })),
 
   reorderExercise: (from, to) =>
