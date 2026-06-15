@@ -1704,15 +1704,17 @@ export default function WorkoutScreen() {
                   {(() => {
                     const basisN = rmBasisMap[ex.exerciseId] ?? 10;
                     const hasPrev = (ex.prevBest1rm ?? 0) > 0;
-                    const curD = toDisplay(convertRm(bestORM, basisN), unitKg);
+                    // 실제로 기준 반복수(basisN)를 수행한 완료 세트가 있으면 그 최대 무게를 "실측"으로 우선 표시.
+                    // (없을 때만 Epley로 다른 세트에서 환산)
+                    const actualBasisKg = ex.sets
+                      .filter(s => s.done && !ex.timeBased && s.reps === basisN)
+                      .reduce((m, s) => Math.max(m, s.weight_kg), 0);
+                    const hasActual = actualBasisKg > 0;
+                    const rmKind = hasActual ? '실측' : '환산';
+                    const curKg = hasActual ? actualBasisKg : convertRm(bestORM, basisN);
+                    const curD = toDisplay(curKg, unitKg);
                     const prevD = toDisplay(convertRm(ex.prevBest1rm ?? 0, basisN), unitKg);
                     const diff = Math.round((curD - prevD) * 10) / 10;
-                    // 표시값이 실제 basisN회 세트에서 나왔는지(실측) Epley 환산인지 판별:
-                    // bestORM을 만든 세트의 반복수가 기준 RM과 같으면 그 세트 무게 = 실측값
-                    const bestSet = ex.sets
-                      .filter(s => s.done && s.estimated_1rm)
-                      .reduce((b, s) => (s.estimated_1rm ?? 0) > (b?.estimated_1rm ?? 0) ? s : b, null as SetEntry | null);
-                    const rmKind = bestSet && bestSet.reps === basisN ? '실측' : '환산';
                     // 체크 후: 이전 → 현재 + 증감을 함께 표시 (이전 기록 유지)
                     if (bestORM > 0) {
                       return (
