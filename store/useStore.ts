@@ -43,6 +43,8 @@ export type ExerciseEntry = {
   supersetGroup?: number | null;
   /** 시간 기반 종목(횟수 대신 시간 입력) */
   timeBased?: boolean;
+  /** 맨몸 종목(중량 기본값 0으로 표시) */
+  bodyweight?: boolean;
 };
 
 type WorkoutState = {
@@ -193,7 +195,7 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
         const last = ex.sets[ex.sets.length - 1];
         const newSet: SetEntry = {
           setOrder: ex.sets.length + 1,
-          weight_kg: last?.weight_kg ?? 60,
+          weight_kg: last?.weight_kg ?? 0,
           reps: last?.reps ?? 10,
           done: false,
           setType: 'NORMAL',

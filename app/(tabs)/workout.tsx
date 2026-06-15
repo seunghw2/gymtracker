@@ -1648,9 +1648,9 @@ export default function WorkoutScreen() {
             <View style={[styles.exerciseCard, isActive && styles.exerciseCardDragging]}>
               <View style={styles.exerciseCardHeader}>
                 <Pressable
-                  onPressIn={onDragStart}
+                  onLongPress={onDragStart}
                   onPressOut={onDragEnd}
-                  delayLongPress={120}
+                  delayLongPress={250}
                   hitSlop={8}
                   style={[styles.dragHandle, { marginRight: 10 }]}
                 >
@@ -1764,15 +1764,22 @@ export default function WorkoutScreen() {
                         )}
                       </Pressable>
                       <View style={{ flex: 1.4 }}>
-                        <Pressable
-                          style={[styles.fieldBtn, activeKind === 'weight' && styles.fieldActive]}
-                          onPress={() => beginEdit(exIdx, setIdx, 'weight')}
-                        >
-                          <Text style={styles.fieldText}>
-                            {activeKind === 'weight' ? (editValue || '0') : String(toDisplay(s.weight_kg, unitKg))}
-                          </Text>
-                          {activeKind === 'weight' && <View style={styles.caret} />}
-                        </Pressable>
+                        {(() => {
+                          // 맨몸이 아니고 기록 없는(0) 미완료 세트는 공란(—)로 입력 유도
+                          const blank = !ex.bodyweight && s.weight_kg === 0 && !s.done;
+                          return (
+                            <Pressable
+                              style={[styles.fieldBtn, activeKind === 'weight' && styles.fieldActive]}
+                              onPress={() => beginEdit(exIdx, setIdx, 'weight')}
+                            >
+                              <Text style={[styles.fieldText, activeKind !== 'weight' && blank && styles.fieldPlaceholder]}>
+                                {activeKind === 'weight'
+                                  ? editValue
+                                  : (blank ? '—' : String(toDisplay(s.weight_kg, unitKg)))}
+                              </Text>
+                            </Pressable>
+                          );
+                        })()}
                         {prev && (
                           <Text style={styles.prevHint} numberOfLines={1}>
                             이전 {toDisplay(prev.weight_kg, unitKg)}{!ex.timeBased ? `×${prev.reps}` : ''}
@@ -1786,9 +1793,8 @@ export default function WorkoutScreen() {
                             onPress={() => beginEdit(exIdx, setIdx, 'duration')}
                           >
                             <Text style={styles.fieldText}>
-                              {activeKind === 'duration' ? (editValue || '0') : String(s.durationSec ?? 0)}
+                              {activeKind === 'duration' ? editValue : String(s.durationSec ?? 0)}
                             </Text>
-                            {activeKind === 'duration' && <View style={styles.caret} />}
                           </Pressable>
                         ) : (
                           <Pressable
@@ -1796,9 +1802,8 @@ export default function WorkoutScreen() {
                             onPress={() => beginEdit(exIdx, setIdx, 'reps')}
                           >
                             <Text style={styles.fieldText}>
-                              {activeKind === 'reps' ? (editValue || '0') : String(s.reps)}
+                              {activeKind === 'reps' ? editValue : String(s.reps)}
                             </Text>
-                            {activeKind === 'reps' && <View style={styles.caret} />}
                           </Pressable>
                         )}
                       </View>

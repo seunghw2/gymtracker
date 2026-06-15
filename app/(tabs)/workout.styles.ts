@@ -305,7 +305,7 @@ export const styles = StyleSheet.create({
   },
   fieldActive: { borderColor: '#30D158', backgroundColor: '#14331F' },
   fieldText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  caret: { width: 2, height: 20, backgroundColor: '#30D158', marginLeft: 2, borderRadius: 1 },
+  fieldPlaceholder: { color: '#48484A', fontWeight: '500' },
   prevHint: {
     color: '#6E6E73',
     fontSize: 10,
