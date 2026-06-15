@@ -30,6 +30,8 @@ export type AiBriefing = {
 
 export type AiReportStatus = 'SUCCESS' | 'INSUFFICIENT_DATA' | 'PROFILE_REQUIRED' | 'FAILED';
 
+export type AiStagnation = { exercise: string; weeksFlat: number };
+
 /** POST /ai/report · GET /ai/report/latest 응답 래퍼. */
 export type AiReportResult = {
   status: AiReportStatus;
@@ -38,6 +40,9 @@ export type AiReportResult = {
   periodTo: string | null;
   model: string | null;
   report: AiBriefing | null;
+  /** 부가 정보(입력 집계에서) — 상세 리포트 표시용. */
+  stagnation: AiStagnation[] | null;
+  notesQuote: string | null;
   message: string | null;
 };
 
