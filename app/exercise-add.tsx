@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,6 +10,11 @@ import { useWorkoutStore } from '../store/useStore';
 import { buildExerciseEntry } from '../lib/exerciseEntry';
 
 const FAVORITE_BRANDS_KEY = '@gymtracker/favorite_brands';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
 function Dot({ group }: { group: string }) {
   return <View style={[styles.dot, { backgroundColor: MUSCLE_COLOR[group] ?? '#8E8E93' }]} />;
@@ -34,7 +39,7 @@ export default function ExerciseAddScreen() {
   const [showBrandAdd, setShowBrandAdd] = useState(false);
   const [brandAddInput, setBrandAddInput] = useState('');
   // 브랜드 선택 바텀시트 + 즐겨찾기
-  const [showBrandSheet, setShowBrandSheet] = useState(false);
+  const [brandOpen, setBrandOpen] = useState(false);
   const [brandSearch, setBrandSearch] = useState('');
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>([]);
 
@@ -348,18 +353,82 @@ export default function ExerciseAddScreen() {
         ))}
       </ScrollView>
 
-      {/* 브랜드 필터 (머신/케이블일 때만) — 정렬 버튼 + 드롭다운 */}
+      {/* 브랜드 필터 (머신/케이블일 때만) — 정렬 버튼 + 인라인 아코디언 드롭다운 */}
       {(equip === 'Machine' || equip === 'Cable') && brandChips.length > 0 && (
-        <View style={styles.brandBar}>
-          <Pressable style={styles.sortChip} onPress={cycleBrandSort}>
-            <Text style={styles.sortChipText}>{SORT_LABEL[brandSort]}</Text>
-          </Pressable>
-          <Pressable style={styles.brandDropdown} onPress={() => { setBrandSearch(''); setShowBrandSheet(true); }}>
-            <Text style={[styles.brandDropdownText, brand !== 'ALL' && styles.brandDropdownTextOn]} numberOfLines={1}>
-              브랜드 {brand === 'ALL' ? '전체' : brand}
-            </Text>
-            <Text style={[styles.caretDown, brand !== 'ALL' && styles.brandDropdownTextOn]}>▾</Text>
-          </Pressable>
+        <View>
+          <View style={styles.brandBar}>
+            <Pressable style={styles.sortChip} onPress={cycleBrandSort}>
+              <Text style={styles.sortChipText}>{SORT_LABEL[brandSort]}</Text>
+            </Pressable>
+            <Pressable style={styles.brandDropdown} onPress={() => { animate(); setBrandSearch(''); setBrandOpen(o => !o); }}>
+              <Text style={[styles.brandDropdownText, brand !== 'ALL' && styles.brandDropdownTextOn]} numberOfLines={1}>
+                브랜드 {brand === 'ALL' ? '전체' : brand}
+              </Text>
+              <Text style={[styles.caretDown, brand !== 'ALL' && styles.brandDropdownTextOn]}>{brandOpen ? '▴' : '▾'}</Text>
+            </Pressable>
+          </View>
+
+          {brandOpen && (
+            <View style={styles.brandPanel}>
+              <TextInput
+                style={[styles.input, { marginBottom: 8 }]}
+                placeholder="브랜드 검색"
+                placeholderTextColor="#48484A"
+                value={brandSearch}
+                onChangeText={setBrandSearch}
+                clearButtonMode="while-editing"
+                autoCorrect={false}
+              />
+              <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {/* 고정: 브랜드 전체 (검색과 무관하게 항상 맨 위) */}
+                <Pressable style={styles.brandRow} onPress={() => { animate(); setBrand('ALL'); setBrandOpen(false); }}>
+                  <View style={styles.starBtn} />
+                  <Text style={styles.brandRowText}>브랜드 전체</Text>
+                  {brand === 'ALL' && <Text style={styles.brandCheck}>✓</Text>}
+                </Pressable>
+
+                {(() => {
+                  const bq = brandSearch.trim().toLowerCase();
+                  const matchB = (b: string) => !bq || b.toLowerCase().includes(bq);
+                  const favs = brandChips.filter(b => favoriteBrands.includes(b) && matchB(b));
+                  const others = brandChips.filter(b => !favoriteBrands.includes(b) && matchB(b));
+                  const renderRow = (b: string) => {
+                    const fav = favoriteBrands.includes(b);
+                    return (
+                      <Pressable key={b} style={styles.brandRow} onPress={() => { animate(); setBrand(b); setBrandOpen(false); }}>
+                        <Pressable style={styles.starBtn} hitSlop={8} onPress={() => toggleFavoriteBrand(b)}>
+                          <Text style={[styles.star, fav && styles.starOn]}>{fav ? '★' : '☆'}</Text>
+                        </Pressable>
+                        <Text style={styles.brandRowText} numberOfLines={1}>{b}</Text>
+                        {brand === b && <Text style={styles.brandCheck}>✓</Text>}
+                      </Pressable>
+                    );
+                  };
+                  return (
+                    <>
+                      {favs.length > 0 && (
+                        <>
+                          <Text style={styles.brandSectionHeader}>★ 즐겨찾는 머신</Text>
+                          {favs.map(renderRow)}
+                        </>
+                      )}
+                      <Text style={styles.brandSectionHeader}>전체 머신</Text>
+                      {others.length > 0
+                        ? others.map(renderRow)
+                        : <Text style={styles.brandEmpty}>검색 결과가 없어요</Text>}
+                    </>
+                  );
+                })()}
+
+                <Pressable
+                  style={styles.brandAddRow}
+                  onPress={() => { animate(); setBrandOpen(false); setBrandAddInput(''); setTimeout(() => setShowBrandAdd(true), 220); }}
+                >
+                  <Text style={styles.brandAddRowText}>+ 새 브랜드 추가</Text>
+                </Pressable>
+              </ScrollView>
+            </View>
+          )}
         </View>
       )}
 
@@ -513,74 +582,6 @@ export default function ExerciseAddScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* 브랜드 선택 바텀시트 */}
-      <Modal visible={showBrandSheet} transparent animationType="slide" onRequestClose={() => setShowBrandSheet(false)}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Pressable style={styles.sheetBackdrop} onPress={() => setShowBrandSheet(false)} />
-          <View style={styles.brandSheet}>
-            <View style={styles.sheetGrip} />
-            <Text style={styles.sheetTitle}>브랜드 선택</Text>
-            <TextInput
-              style={[styles.input, { marginTop: 12, marginBottom: 8 }]}
-              placeholder="브랜드 검색"
-              placeholderTextColor="#48484A"
-              value={brandSearch}
-              onChangeText={setBrandSearch}
-              clearButtonMode="while-editing"
-              autoCorrect={false}
-            />
-            <ScrollView style={{ maxHeight: 360 }} keyboardShouldPersistTaps="handled">
-              {/* 고정: 브랜드 전체 (검색과 무관하게 항상 맨 위) */}
-              <Pressable style={styles.brandRow} onPress={() => { setBrand('ALL'); setShowBrandSheet(false); }}>
-                <View style={styles.starBtn} />
-                <Text style={styles.brandRowText}>브랜드 전체</Text>
-                {brand === 'ALL' && <Text style={styles.brandCheck}>✓</Text>}
-              </Pressable>
-
-              {(() => {
-                const bq = brandSearch.trim().toLowerCase();
-                const matchB = (b: string) => !bq || b.toLowerCase().includes(bq);
-                const favs = brandChips.filter(b => favoriteBrands.includes(b) && matchB(b));
-                const others = brandChips.filter(b => !favoriteBrands.includes(b) && matchB(b));
-                const renderRow = (b: string) => {
-                  const fav = favoriteBrands.includes(b);
-                  return (
-                    <Pressable key={b} style={styles.brandRow} onPress={() => { setBrand(b); setShowBrandSheet(false); }}>
-                      <Pressable style={styles.starBtn} hitSlop={8} onPress={() => toggleFavoriteBrand(b)}>
-                        <Text style={[styles.star, fav && styles.starOn]}>{fav ? '★' : '☆'}</Text>
-                      </Pressable>
-                      <Text style={styles.brandRowText} numberOfLines={1}>{b}</Text>
-                      {brand === b && <Text style={styles.brandCheck}>✓</Text>}
-                    </Pressable>
-                  );
-                };
-                return (
-                  <>
-                    {favs.length > 0 && (
-                      <>
-                        <Text style={styles.brandSectionHeader}>★ 즐겨찾는 머신</Text>
-                        {favs.map(renderRow)}
-                      </>
-                    )}
-                    <Text style={styles.brandSectionHeader}>전체 머신</Text>
-                    {others.length > 0
-                      ? others.map(renderRow)
-                      : <Text style={styles.brandEmpty}>검색 결과가 없어요</Text>}
-                  </>
-                );
-              })()}
-
-              <Pressable
-                style={styles.brandAddRow}
-                onPress={() => { setShowBrandSheet(false); setBrandAddInput(''); setTimeout(() => setShowBrandAdd(true), 220); }}
-              >
-                <Text style={styles.brandAddRowText}>+ 새 브랜드 추가</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -610,8 +611,8 @@ const styles = StyleSheet.create({
   brandDropdownTextOn: { color: GREEN },
   caretDown: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '700', marginLeft: 8 },
 
-  // 브랜드 선택 시트
-  brandSheet: { backgroundColor: '#161618', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingBottom: 28 },
+  // 브랜드 선택 인라인 패널
+  brandPanel: { backgroundColor: '#161618', borderRadius: 14, marginHorizontal: 16, marginTop: 8, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 4 },
   brandRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingVertical: 6 },
   brandRowText: { flex: 1, color: COLORS.textPrimary, fontSize: 16, fontWeight: '600' },
   brandCheck: { color: GREEN, fontSize: 16, fontWeight: '800', marginLeft: 10 },
