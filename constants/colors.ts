@@ -9,6 +9,7 @@ export const COLORS = {
   orange: '#FF9F0A',     // 경고/워밍업
   purple: '#BF5AF2',     // 드롭세트
   blue: '#0A84FF',
+  gold: '#FFD60A',       // 즐겨찾기 별
   textPrimary: '#FFFFFF',
   textSecondary: '#8E8E93',
 } as const;
