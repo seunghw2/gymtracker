@@ -17,6 +17,7 @@ import { LineChart, BarChart } from 'react-native-chart-kit';
 import { get1RMHistory, getBodyLogs, getVolumeStats, getTrainedExercises, getExercises, getRecords, getMuscleFrequency, getPeriodSummary, upsertBodyLog, getExerciseRmBasis, setExerciseRmBasis, convertRm, getActualRmHistory, TrainedExercise, BodyLog, VolumeStats, ExerciseRecord, MuscleFrequency, PeriodSummary, VolumeRange } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import OneRMChart from '../../components/OneRMChart';
+import HeaderTimerButton from '../../components/HeaderTimerButton';
 import { toDisplay, unitLabel } from '../../lib/units';
 import { MUSCLE_KO, MUSCLE_COLOR } from '../../constants/exercises';
 
@@ -231,7 +232,10 @@ export default function StatsScreen() {
         contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
       >
-        <Text style={styles.header}>통계</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <Text style={[styles.header, { marginBottom: 0 }]}>통계</Text>
+          <HeaderTimerButton />
+        </View>
 
         <ScrollView
           horizontal

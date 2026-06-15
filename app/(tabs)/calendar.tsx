@@ -13,6 +13,7 @@ import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, 
 import { formatShortWithDay } from '../../lib/date';
 import { formatDuration } from '../../lib/format';
 import SessionCard from '../../components/SessionCard';
+import HeaderTimerButton from '../../components/HeaderTimerButton';
 import { useWorkoutStore } from '../../store/useStore';
 
 function getWeekRange(offset = 0) {
@@ -123,7 +124,10 @@ export default function CalendarScreen() {
         contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
       >
-        <Text style={styles.header}>캘린더</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Text style={[styles.header, { marginBottom: 0 }]}>캘린더</Text>
+          <HeaderTimerButton />
+        </View>
 
         {/* 연속 운동 스트릭 */}
         {streak > 0 && (

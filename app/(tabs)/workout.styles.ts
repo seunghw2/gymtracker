@@ -148,7 +148,7 @@ export const styles = StyleSheet.create({
   finishBtnText: { color: '#000000', fontSize: 15, fontWeight: '700' },
 
   scrollContent: { padding: 16, paddingBottom: 60 },
-  scrollContentRest: { paddingBottom: 220 },
+  scrollContentRest: { paddingTop: 56, paddingBottom: 60 },
   scrollContentEditing: { paddingBottom: 300 },
   restDock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   restDockEditing: { bottom: 252 },

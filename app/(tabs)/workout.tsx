@@ -97,6 +97,7 @@ import {
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
 import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
+import HeaderTimerButton from '../../components/HeaderTimerButton';
 import { playSetDoneSound } from '../../lib/sound';
 import { buildExerciseEntry } from '../../lib/exerciseEntry';
 import { epley, formatDuration } from '../../lib/format';
@@ -1334,6 +1335,10 @@ export default function WorkoutScreen() {
       <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.homeContent}>
+          {/* 헤더 우측 휴식 타이머 버튼 */}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
+            <HeaderTimerButton />
+          </View>
           {/* 시작 — 바로 시작, 이름·헬스장·태그는 진행 중에 */}
           <Pressable style={styles.startBtnBig} onPress={handleStartWorkout}>
             <Text style={styles.startBtnText}>운동 시작</Text>

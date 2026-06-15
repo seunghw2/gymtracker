@@ -2,26 +2,20 @@ import { Tabs, useSegments } from 'expo-router';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../../store/useStore';
-import { useUiStore } from '../../store/useUiStore';
-import RestTimer from '../../components/RestTimer';
+import RestTimerBanner from '../../components/RestTimerBanner';
 import ActiveWorkoutBanner from '../../components/ActiveWorkoutBanner';
 import CustomTabBar from '../../components/CustomTabBar';
-import { TAB_BAR_CONTENT_HEIGHT, BANNER_BLOCK_HEIGHT, REST_TIMER_OVER_NUMPAD } from '../../constants/layout';
+import { TAB_BAR_CONTENT_HEIGHT } from '../../constants/layout';
 
 export default function TabLayout() {
   const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
-  // 운동 탭 숫자패드가 떠 있으면 휴식 타이머를 그 위로 올림
-  const numPadOpen = useUiStore(s => s.numPadOpen);
   const insets = useSafeAreaInsets();
-  // 탭바 전체 높이(safe area 포함) — 배너/휴식 타이머 위치 계산용
+  // 탭바 전체 높이(safe area 포함) — "운동 중" 배너 위치 계산용
   const tabBarH = TAB_BAR_CONTENT_HEIGHT + Math.max(insets.bottom, 8);
   // 진행 중 운동이 있고 "운동" 탭이 아닐 때만 전역 배너 표시(운동 탭에선 중복 방지)
   const segments = useSegments();
   const onWorkoutTab = segments[segments.length - 1] === 'workout';
   const bannerVisible = workoutActive && !onWorkoutTab;
-  // 배너가 떠 있으면 휴식 타이머는 그 위로 한 단계 더 올림
-  // 숫자패드가 떠 있으면 그 위로 확실히 올라오도록 여유를 둠
-  const restBottom = numPadOpen ? REST_TIMER_OVER_NUMPAD : tabBarH + (bannerVisible ? BANNER_BLOCK_HEIGHT : 0);
 
   return (
     <View style={{ flex: 1 }}>
@@ -43,9 +37,9 @@ export default function TabLayout() {
       </View>
     )}
 
-    {/* 전역 휴식 타이머 — 모든 탭 공통, 탭 바/배너/숫자패드 위에 표시 */}
-    <View style={{ position: 'absolute', left: 0, right: 0, bottom: restBottom }} pointerEvents="box-none">
-      <RestTimer />
+    {/* 전역 휴식 타이머 — 상단 진행 배너(상태바 아래), 탭 이동에도 유지 */}
+    <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }} pointerEvents="box-none">
+      <RestTimerBanner />
     </View>
     </View>
   );

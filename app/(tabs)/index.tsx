@@ -27,6 +27,7 @@ import {
 } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
+import HeaderTimerButton from '../../components/HeaderTimerButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
@@ -182,7 +183,10 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
       >
-        <Text style={styles.header}>GymTracker</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <Text style={[styles.header, { marginBottom: 0 }]}>GymTracker</Text>
+          <HeaderTimerButton />
+        </View>
 
         {/* 이번주 통계 */}
         <View style={styles.statsGrid}>

@@ -29,6 +29,7 @@ import {
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { exportWorkoutsCsv } from '../../lib/export';
+import HeaderTimerButton from '../../components/HeaderTimerButton';
 
 export default function SettingsScreen() {
   const {
@@ -248,7 +249,10 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
-        <Text style={styles.header}>설정</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <Text style={[styles.header, { marginBottom: 0 }]}>설정</Text>
+          <HeaderTimerButton />
+        </View>
 
         {/* 계정 */}
         {user && (
