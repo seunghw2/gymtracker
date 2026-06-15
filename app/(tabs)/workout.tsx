@@ -98,6 +98,7 @@ import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, ne
 import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 import HeaderTimerButton from '../../components/HeaderTimerButton';
+import { useRestRemaining, fmtClock } from '../../hooks/useRestRemaining';
 import { playSetDoneSound } from '../../lib/sound';
 import { buildExerciseEntry } from '../../lib/exerciseEntry';
 import { epley, formatDuration } from '../../lib/format';
@@ -136,8 +137,10 @@ function useElapsedTime(startTime: number | null) {
     const id = setInterval(() => setElapsed(Math.floor((Date.now() - startTime) / 1000)), 1000);
     return () => clearInterval(id);
   }, [startTime]);
-  const m = Math.floor(elapsed / 60);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
   const s = elapsed % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
@@ -173,10 +176,14 @@ export default function WorkoutScreen() {
     startRestTimer,
     stopRestTimer,
     restTimerActive,
+    restTimerEnd,
+    restNextLabel,
+    adjustRestTimer,
   } = useWorkoutStore();
   const { restDurationSec, unitKg } = useSettingsStore();
   const u = unitLabel(unitKg);
   const elapsed = useElapsedTime(sessionStartTime);
+  const restRemaining = useRestRemaining(restTimerActive, restTimerEnd);
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [selectStep, setSelectStep] = useState<SelectStep>('muscle');
@@ -1567,33 +1574,65 @@ export default function WorkoutScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe}>
+      {/* 상단 고정 바 — 스크롤해도 유지(휴식 타이머 버튼 · 경과/휴식 · 완료) */}
+      <View style={styles.stickyBar}>
+        <HeaderTimerButton />
+        {restTimerActive ? (
+          <View style={styles.stickyRest}>
+            <Pressable style={styles.stickyAdj} onPress={() => adjustRestTimer(-15)} hitSlop={6}>
+              <Text style={styles.stickyAdjText}>−15</Text>
+            </Pressable>
+            <View style={styles.stickyRestCenter}>
+              <Text style={styles.stickyRestTime}>{fmtClock(restRemaining)}</Text>
+              <Text style={styles.stickyRestLabel} numberOfLines={1}>휴식{restNextLabel ? ` · 다음 ${restNextLabel}` : ''}</Text>
+            </View>
+            <Pressable style={styles.stickyAdj} onPress={() => adjustRestTimer(15)} hitSlop={6}>
+              <Text style={styles.stickyAdjText}>+15</Text>
+            </Pressable>
+            <Pressable style={styles.stickySkip} onPress={() => stopRestTimer()} hitSlop={6}>
+              <Text style={styles.stickySkipText}>✕</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.stickyElapsed}>
+            <View style={styles.stickyDot} />
+            <Text style={styles.stickyElapsedText}>{elapsed}</Text>
+          </View>
+        )}
+        <Pressable style={styles.stickyFinish} onPress={handleFinishWorkout}>
+          <Text style={styles.stickyFinishText}>완료</Text>
+        </Pressable>
+      </View>
       <DragList
         ref={listRef}
         data={exercises}
         keyExtractor={(ex) => String(ex.exerciseId)}
         onReordered={(from, to) => reorderExercise(from, to)}
-        contentContainerStyle={[styles.scrollContent, restTimerActive && styles.scrollContentRest, edit && styles.scrollContentEditing]}
+        contentContainerStyle={[styles.scrollContent, edit && styles.scrollContentEditing]}
         keyboardShouldPersistTaps="handled"
         onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
         scrollEventThrottle={16}
         onScrollToIndexFailed={() => {}}
         ListHeaderComponent={(
           <>
-        {/* 헤더(제목·날짜·취소·완료) — 스크롤 시 함께 사라짐 */}
+        {/* 헤더(제목 수정 가능·날짜·취소) — 스크롤 시 함께 사라짐 */}
         <View style={styles.sessionHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.sessionTitleInput} numberOfLines={1}>
-              {sessionTitle?.trim() || (sessionDate ? formatDate(sessionDate) : '운동')}
-            </Text>
-            <Text style={styles.sessionElapsed}>
-              {sessionDate ? `${formatDate(sessionDate)} · ` : ''}{elapsed}
-            </Text>
+            <TextInput
+              style={styles.sessionTitleInput}
+              value={sessionTitle ?? ''}
+              onChangeText={setSessionTitle}
+              onEndEditing={handleSessionTitleBlur}
+              placeholder={sessionDate ? formatDate(sessionDate) : '운동 제목'}
+              placeholderTextColor="#8E8E93"
+              returnKeyType="done"
+              numberOfLines={1}
+              inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
+            />
+            {sessionDate && <Text style={styles.sessionDateSub}>{formatDate(sessionDate)}</Text>}
           </View>
           <Pressable style={styles.cancelBtn} onPress={handleCancelWorkout}>
             <Text style={styles.cancelBtnText}>취소</Text>
-          </Pressable>
-          <Pressable style={styles.finishBtn} onPress={handleFinishWorkout}>
-            <Text style={styles.finishBtnText}>완료</Text>
           </Pressable>
         </View>
         <View style={styles.metaRow}>

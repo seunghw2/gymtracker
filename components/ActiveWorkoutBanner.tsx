@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWorkoutStore } from '../store/useStore';
 import { GREEN } from '../constants/colors';
+import { useRestRemaining, fmtClock } from '../hooks/useRestRemaining';
 
 /** 경과 초를 mm:ss(1시간 이상이면 h:mm:ss)로 포맷. */
 function formatElapsed(totalSec: number): string {
@@ -32,6 +33,10 @@ function elapsedLabel(totalSec: number): string {
 export default function ActiveWorkoutBanner() {
   const router = useRouter();
   const startTime = useWorkoutStore(s => s.sessionStartTime);
+  const restActive = useWorkoutStore(s => s.restTimerActive);
+  const restEnd = useWorkoutStore(s => s.restTimerEnd);
+  const stopRestTimer = useWorkoutStore(s => s.stopRestTimer);
+  const restRemaining = useRestRemaining(restActive, restEnd);
   const [now, setNow] = useState(Date.now());
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -68,10 +73,27 @@ export default function ActiveWorkoutBanner() {
       <View style={styles.dotWrap}>
         <Animated.View style={[styles.dot, { opacity: dotOpacity, transform: [{ scale: dotScale }] }]} />
       </View>
-      <Text style={styles.label}>운동 중</Text>
-      <Text style={styles.time}>{formatElapsed(elapsedSec)}</Text>
-      <View style={{ flex: 1 }} />
-      <Text style={styles.cta}>탭하여 돌아가기 ›</Text>
+      {restActive ? (
+        <>
+          <Text style={styles.label}>휴식</Text>
+          <Text style={styles.time}>{fmtClock(restRemaining)}</Text>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); stopRestTimer(); }}
+            hitSlop={8}
+            style={styles.skipBtn}
+          >
+            <Text style={styles.skipText}>건너뛰기 ✕</Text>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <Text style={styles.label}>운동 중</Text>
+          <Text style={styles.time}>{formatElapsed(elapsedSec)}</Text>
+          <View style={{ flex: 1 }} />
+          <Text style={styles.cta}>탭하여 돌아가기 ›</Text>
+        </>
+      )}
     </Pressable>
   );
 }
@@ -99,4 +121,6 @@ const styles = StyleSheet.create({
   label: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', marginRight: 10 },
   time: { color: GREEN, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   cta: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  skipBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  skipText: { color: '#8E8E93', fontSize: 12, fontWeight: '700' },
 });

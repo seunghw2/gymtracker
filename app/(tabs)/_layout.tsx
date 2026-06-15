@@ -2,7 +2,7 @@ import { Tabs, useSegments } from 'expo-router';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../../store/useStore';
-import RestTimerBanner from '../../components/RestTimerBanner';
+import RestTimerEngine from '../../components/RestTimerEngine';
 import ActiveWorkoutBanner from '../../components/ActiveWorkoutBanner';
 import CustomTabBar from '../../components/CustomTabBar';
 import { TAB_BAR_CONTENT_HEIGHT } from '../../constants/layout';
@@ -30,17 +30,15 @@ export default function TabLayout() {
       <Tabs.Screen name="settings" options={{ title: '설정' }} />
     </Tabs>
 
-    {/* 전역 "운동 중" 배너 — 탭 바 바로 위에 도킹, 운동 탭에선 숨김 */}
+    {/* 전역 "운동 중" 배너 — 탭 바 바로 위에 도킹, 운동 탭에선 숨김(휴식 중이면 휴식도 함께 표시) */}
     {bannerVisible && (
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: tabBarH + 8 }} pointerEvents="box-none">
         <ActiveWorkoutBanner />
       </View>
     )}
 
-    {/* 전역 휴식 타이머 — 상단 진행 배너(상태바 아래), 탭 이동에도 유지 */}
-    <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }} pointerEvents="box-none">
-      <RestTimerBanner />
-    </View>
+    {/* 휴식 타이머 엔진(UI 없음) — 화면 어디서든 사운드·알림·자동종료 처리 */}
+    <RestTimerEngine />
     </View>
   );
 }
