@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -36,6 +36,15 @@ export default function ExerciseAddScreen() {
   // 브랜드 선택 바텀시트 + 즐겨찾기
   const [brandOpen, setBrandOpen] = useState(false);
   const [brandSearch, setBrandSearch] = useState('');
+  const [brandPanelTop, setBrandPanelTop] = useState(0);
+  const brandPanelRef = useRef<View>(null);
+  const { height: winH } = useWindowDimensions();
+  // 브랜드 목록 높이를 화면에 맞게 제한 — 하단 완료 바(절대 위치) 뒤로 "+ 새 브랜드 추가"가
+  // 가려지지 않도록 패널의 실제 화면 위치(measureInWindow)에서 검색칸·하단바·여백을 뺀 만큼만 사용.
+  // (검색칸 ~52 + 하단바 ~110 + 여백)
+  const brandListMaxH = brandPanelTop > 0
+    ? Math.max(160, winH - brandPanelTop - 52 - 110 - 12)
+    : 320;
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>([]);
 
   // 직접 등록 폼
@@ -364,7 +373,11 @@ export default function ExerciseAddScreen() {
           </View>
 
           {brandOpen && (
-            <View style={styles.brandPanel}>
+            <View
+              ref={brandPanelRef}
+              style={styles.brandPanel}
+              onLayout={() => brandPanelRef.current?.measureInWindow((_x, y) => setBrandPanelTop(y))}
+            >
               <TextInput
                 style={[styles.input, { marginBottom: 8 }]}
                 placeholder="브랜드 검색"
@@ -374,7 +387,7 @@ export default function ExerciseAddScreen() {
                 clearButtonMode="while-editing"
                 autoCorrect={false}
               />
-              <ScrollView style={{ maxHeight: 480 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+              <ScrollView style={{ maxHeight: brandListMaxH }} contentContainerStyle={{ paddingBottom: 4 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 {/* 고정: 브랜드 전체 (검색과 무관하게 항상 맨 위) */}
                 <Pressable style={styles.brandRow} onPress={() => { setBrand('ALL'); setBrandOpen(false); }}>
                   <View style={styles.starBtn} />
