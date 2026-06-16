@@ -187,6 +187,11 @@ export default function WorkoutScreen() {
   const elapsed = useElapsedTime(sessionStartTime);
   const restRemaining = useRestRemaining(restTimerActive, restTimerEnd);
 
+  // 인라인 휴식 바(스트롱 스타일): 어떤 세트 직후 휴식이 도는지 추적
+  const [restAnchor, setRestAnchor] = useState<{ ex: number; set: number } | null>(null);
+  const [restTotal, setRestTotal] = useState(0);
+  useEffect(() => { if (!restTimerActive) setRestAnchor(null); }, [restTimerActive]);
+
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [selectStep, setSelectStep] = useState<SelectStep>('muscle');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
@@ -913,6 +918,8 @@ export default function WorkoutScreen() {
       ? await getExerciseWarmupRest(ex.exerciseId, 30)
       : await getExerciseRest(ex.exerciseId, restDurationSec);
     startRestTimer(restSec, { nextLabel });
+    setRestTotal(restSec);
+    setRestAnchor({ ex: exIdx, set: setIdx });
   };
 
   const saveCustomExercise = async () => {
@@ -1785,9 +1792,12 @@ export default function WorkoutScreen() {
                 const isWarmup = (s.setType ?? 'NORMAL') === 'WARMUP';
                 const prev = ex.lastSets?.[setIdx];
                 const activeKind = edit && edit.exIdx === exIdx && edit.setIdx === setIdx ? edit.kind : null;
+                const isAnchor = !!restAnchor && restAnchor.ex === exIdx && restAnchor.set === setIdx;
+                const showBar = restTimerActive && isAnchor;
+                const restPct = restTotal > 0 ? Math.max(0, Math.min(100, (restRemaining / restTotal) * 100)) : 0;
                 return (
+                  <React.Fragment key={setIdx}>
                   <Swipeable
-                    key={setIdx}
                     ref={ref => {
                       const key = `${exIdx}-${setIdx}`;
                       if (ref) swipeableRefs.current.set(key, ref);
@@ -1870,6 +1880,19 @@ export default function WorkoutScreen() {
                       </Pressable>
                     </View>
                   </Swipeable>
+                  {showBar ? (
+                    <Pressable onPress={() => stopRestTimer()} style={{ height: 30, borderRadius: 8, backgroundColor: '#13233A', justifyContent: 'center', overflow: 'hidden', marginVertical: 4 }}>
+                      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${restPct}%`, backgroundColor: '#0A84FF' }} />
+                      <Text style={{ textAlign: 'center', color: '#fff', fontWeight: '800', fontVariant: ['tabular-nums'] }}>{fmtClock(restRemaining)}</Text>
+                    </Pressable>
+                  ) : s.done ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.35)' }} />
+                      <Text style={{ color: '#30D158', fontSize: 11, fontWeight: '700', marginHorizontal: 8, fontVariant: ['tabular-nums'] }}>{fmtClock(restDurationSec)}</Text>
+                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.35)' }} />
+                    </View>
+                  ) : null}
+                  </React.Fragment>
                 );
               })}
 
