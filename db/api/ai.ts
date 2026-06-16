@@ -83,6 +83,11 @@ export async function putAiProfile(input: AiProfileInput): Promise<AiProfile> {
   return apiRequest<AiProfile>('/api/v1/ai/profile', { method: 'PUT', body: input });
 }
 
+/** 인테이크 프로필 삭제(온보딩 초기화 — 개발/테스트용). */
+export async function deleteAiProfile(): Promise<void> {
+  await apiRequest<void>('/api/v1/ai/profile', { method: 'DELETE' });
+}
+
 /** 주간 브리핑 생성/캐시 조회. */
 export async function generateAiReport(opts: { from?: string; to?: string; force?: boolean } = {}): Promise<AiReportResult> {
   const params = new URLSearchParams();

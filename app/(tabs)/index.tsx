@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 import {
   getTodayBodyLog,
   getLatestBodyLog,
@@ -27,7 +28,6 @@ import {
 } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
-import HeaderTimerButton from '../../components/HeaderTimerButton';
 import AiBriefingCard from '../../components/AiBriefingCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -184,10 +184,7 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <Text style={[styles.header, { marginBottom: 0 }]}>GymTracker</Text>
-          <HeaderTimerButton />
-        </View>
+        <Text style={styles.header}>GymTracker</Text>
 
         {/* 이번주 통계 */}
         <View style={styles.statsGrid}>
@@ -254,6 +251,16 @@ export default function HomeScreen() {
           <Text style={styles.startBtnText}>운동 시작</Text>
         </Pressable>
       </ScrollView>
+
+      {/* 캘린더 진입 FAB — 우측 하단(탭바에서 캘린더 탭을 옮겨옴) */}
+      <Pressable
+        style={[styles.fab, bannerActive && styles.fabRaised]}
+        onPress={() => router.push('/(tabs)/calendar')}
+        accessibilityRole="button"
+        accessibilityLabel="캘린더"
+      >
+        <Ionicons name="calendar" size={24} color="#000000" />
+      </Pressable>
 
       {/* 체중 입력 모달 — 눈금자 + 자동 저장, 바깥 탭하면 닫힘 */}
       <Modal visible={showWeightModal} transparent animationType="slide" onRequestClose={closeWeightModal}>
@@ -354,6 +361,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   startBtnText: { color: '#000000', fontSize: 17, fontWeight: '700' },
+
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#30D158',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  fabRaised: { bottom: 100 },
 
   modalOverlay: {
     flex: 1,

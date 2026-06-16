@@ -17,13 +17,13 @@ const GOALS: Opt[] = [
   { v: 'maintain', label: '체형 유지' },
 ];
 const EXPERIENCE: Opt[] = [
-  { v: 'beginner', label: '초급' },
-  { v: 'intermediate', label: '중급' },
-  { v: 'advanced', label: '고급' },
+  { v: 'beginner', label: '막 시작했어요' },
+  { v: 'intermediate', label: '기본기는 있어요' },
+  { v: 'advanced', label: '베테랑이에요' },
 ];
 const DURATION: Opt[] = [
   { v: 3, label: '6개월 미만' },
-  { v: 9, label: '6~12개월' },
+  { v: 9, label: '6개월~1년' },
   { v: 24, label: '1~3년' },
   { v: 48, label: '3년 이상' },
 ];
@@ -32,10 +32,10 @@ const FREQ: Opt[] = [
   { v: 5, label: '주 5회' }, { v: 6, label: '주 6회+' },
 ];
 const SPLIT: Opt[] = [
-  { v: 'full_body', label: '무분할 / 풀바디' },
+  { v: 'full_body', label: '무분할 (전신)' },
   { v: 'split_2_3', label: '2~3분할' },
   { v: 'split_4_5', label: '4~5분할' },
-  { v: 'ppl', label: 'PPL' },
+  { v: 'ppl', label: 'PPL (밀기·당기기·다리)' },
   { v: 'unsure', label: '아직 잘 몰라요' },
 ];
 const SESSION_MIN: Opt[] = [
@@ -56,15 +56,15 @@ type QType = 'single' | 'multi' | 'constraints' | 'note';
 type Question = { id: string; type: QType; prompt: React.ReactNode; options?: Opt[] };
 
 const QUESTIONS: Question[] = [
-  { id: 'goal', type: 'single', options: GOALS, prompt: <>처음이라 몇 가지만 여쭤볼게요. 먼저, <B>어떤 몸</B>을 목표로 해요?</> },
-  { id: 'experience', type: 'single', options: EXPERIENCE, prompt: <>운동 <B>경력</B>은 어느 정도예요?</> },
-  { id: 'trainingMonths', type: 'single', options: DURATION, prompt: <>꾸준히 운동한 지는 <B>얼마나</B> 됐어요?</> },
-  { id: 'frequency', type: 'single', options: FREQ, prompt: <>일주일에 <B>몇 번</B> 운동하는 걸 목표로 해요?</> },
-  { id: 'split', type: 'single', options: SPLIT, prompt: <>주로 어떤 <B>분할</B>로 운동해요?</> },
-  { id: 'sessionMinutes', type: 'single', options: SESSION_MIN, prompt: <>한 번 운동할 때 <B>시간</B>은 보통 얼마나 써요?</> },
-  { id: 'muscles', type: 'multi', options: MUSCLES, prompt: <>특히 <B>집중하고 싶은 부위</B>가 있어요? (여러 개 OK)</> },
-  { id: 'constraints', type: 'constraints', options: PAIN_CHIPS, prompt: <>혹시 <B>아픈 데</B>나 피해야 할 동작 있어요?</> },
-  { id: 'note', type: 'note', prompt: <>마지막으로, 분석할 때 알아두면 좋을 게 더 있을까요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 건너뛰어도 돼요)</Text></> },
+  { id: 'goal', type: 'single', options: GOALS, prompt: <>반가워요! 더 정확히 분석하려고 몇 가지만 물어볼게요. 먼저, 요즘 <B>어떤 몸</B>을 만들고 싶어요?</> },
+  { id: 'experience', type: 'single', options: EXPERIENCE, prompt: <>지금 <B>운동 실력</B>은 어느 쪽에 가까워요?</> },
+  { id: 'trainingMonths', type: 'single', options: DURATION, prompt: <>운동을 <B>꾸준히 한 지</B>는 얼마나 됐어요?</> },
+  { id: 'frequency', type: 'single', options: FREQ, prompt: <>일주일에 보통 <B>며칠</B> 운동해요?</> },
+  { id: 'split', type: 'single', options: SPLIT, prompt: <>운동을 <B>어떻게 나눠서</B> 해요?</> },
+  { id: 'sessionMinutes', type: 'single', options: SESSION_MIN, prompt: <>한 번 운동하면 보통 <B>얼마나</B> 걸려요?</> },
+  { id: 'muscles', type: 'multi', options: MUSCLES, prompt: <>특히 <B>키우고 싶은 부위</B>가 있어요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(여러 개 골라도 돼요)</Text></> },
+  { id: 'constraints', type: 'constraints', options: PAIN_CHIPS, prompt: <>혹시 <B>아프거나 조심해야</B> 할 곳이 있어요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 넘어가도 돼요)</Text></> },
+  { id: 'note', type: 'note', prompt: <>마지막! 분석할 때 <B>참고하면 좋을</B> 내용이 더 있을까요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 건너뛰어도 돼요)</Text></> },
 ];
 
 type Msg = { id: string; role: 'ai' | 'user'; content: React.ReactNode };
@@ -253,11 +253,10 @@ export default function AiIntake() {
         >
           {messages.map(m => <Bubble key={m.id} role={m.role}>{m.content}</Bubble>)}
           {typing && <TypingBubble />}
-        </ScrollView>
 
-        {/* 현재 활성 질문의 입력 컨트롤 */}
-        {q && (
-          <View style={styles.panel}>
+          {/* 현재 활성 질문의 입력 컨트롤 — 질문 버블 바로 아래 인라인 */}
+          {q && (
+          <View style={styles.controls}>
             {q.type === 'single' && (
               <View style={styles.chips}>
                 {q.options!.map(o => {
@@ -345,7 +344,8 @@ export default function AiIntake() {
               </>
             )}
           </View>
-        )}
+          )}
+        </ScrollView>
 
         {saving && (
           <View style={styles.savingBar}>
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   typing: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 14 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: AI.textSub },
 
-  panel: { padding: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: AI.line, gap: 10 },
+  controls: { gap: 10, marginTop: 6, marginBottom: 4 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderColor: AI.accent, borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 },
   chipOn: { backgroundColor: AI.tint },

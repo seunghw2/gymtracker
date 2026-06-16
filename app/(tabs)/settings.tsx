@@ -23,13 +23,13 @@ import {
   setSetting,
   setExerciseRest,
   setExerciseTrackingType,
+  deleteAiProfile,
   Gym,
   Exercise,
 } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { exportWorkoutsCsv } from '../../lib/export';
-import HeaderTimerButton from '../../components/HeaderTimerButton';
 
 export default function SettingsScreen() {
   const {
@@ -244,15 +244,29 @@ export default function SettingsScreen() {
     }
   };
 
+  // 개발자 도구 — 온보딩(AI 인테이크 프로필) 초기화 후 다시 테스트
+  const handleResetOnboarding = () => {
+    Alert.alert('온보딩 초기화', 'AI 인테이크 프로필을 삭제할까요?\nAI 탭에 다시 들어가면 온보딩이 처음부터 시작됩니다.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '초기화', style: 'destructive', onPress: async () => {
+          try {
+            await deleteAiProfile();
+            Alert.alert('완료', '온보딩이 초기화됐어요. AI 탭에서 다시 시작하세요.');
+          } catch {
+            Alert.alert('초기화 실패', '잠시 후 다시 시도해 주세요.');
+          }
+        },
+      },
+    ]);
+  };
+
   const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <Text style={[styles.header, { marginBottom: 0 }]}>설정</Text>
-          <HeaderTimerButton />
-        </View>
+        <Text style={styles.header}>설정</Text>
 
         {/* 계정 */}
         {user && (
@@ -545,6 +559,19 @@ export default function SettingsScreen() {
           )}
         </View>
         )}
+
+        {/* 개발자 도구 */}
+        {Cat('dev', '🛠', '개발자 도구')}
+        {open === 'dev' && (
+        <View style={styles.card}>
+          <Text style={[styles.listItemSub, { marginBottom: 4 }]}>
+            테스트용 도구입니다. 신중히 사용하세요.
+          </Text>
+          <Pressable style={[styles.addBtn, styles.devBtn]} onPress={handleResetOnboarding}>
+            <Text style={[styles.addBtnText, styles.devBtnText]}>온보딩 초기화 (AI 프로필 삭제)</Text>
+          </Pressable>
+        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -640,6 +667,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   addBtnText: { color: '#30D158', fontSize: 15, fontWeight: '600' },
+  devBtn: { borderColor: '#FF453A' },
+  devBtnText: { color: '#FF453A' },
 
   listItem: {
     flexDirection: 'row',
