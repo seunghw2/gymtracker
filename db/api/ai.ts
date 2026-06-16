@@ -88,6 +88,75 @@ export async function deleteAiProfile(): Promise<void> {
   await apiRequest<void>('/api/v1/ai/profile', { method: 'DELETE' });
 }
 
+// ── 통합 리포트(명세 §7) — 6종 기간을 한 스키마로 ─────────────────────────
+
+export type ReportPeriodType = 'session' | 'week' | 'month' | 'quarter' | 'half' | 'year';
+export type ReportStatusV2 = 'SUCCESS' | 'PROFILE_REQUIRED' | 'INSUFFICIENT_DATA' | 'FAILED';
+
+export type RPoint = { x: string; y: number };
+export type RMetric = { label: string; value: string; delta: string | null; direction: AiMetricDirection };
+export type RScore = { label: string; value: number; unit: string; tone: string } | null;
+
+export type RTimelineItem = { kind: string; title: string; body: string | null; tag: string | null };
+export type RExerciseLine = { name: string; sets: string; prevDelta: string | null; isPR: boolean };
+export type RBalanceItem = { part: string; sets: number; target: number; status: string };
+export type RGrowthItem = { name: string; change: string; direction: AiMetricDirection };
+export type RStagnationItem = { name: string; weeksFlat: number };
+export type RMilestone = { icon: string; text: string };
+export type RTrendSeries = { metric: string; points: RPoint[] };
+
+export type RMeasure = { current: number | null; delta: string | null; trend: RPoint[] };
+export type RBodyComposition = {
+  display: 'none' | 'oneLine' | 'line' | 'beforeAfter';
+  weight: RMeasure | null;
+  bodyFat: RMeasure | null;
+  comment: string | null;
+};
+export type RGoalProgress = { goalLabel: string; value: number; comment: string } | null;
+export type RPrescription = { horizon: string; action: string; why: string; todo: string };
+
+export type AiReportV2 = {
+  id: string;
+  period: { type: ReportPeriodType; label: string; start: string; end: string; nextReportEtaDays: number | null };
+  confidence: AiConfidence;
+  dataCaveat: string | null;
+  headline: string;
+  summary: { score: RScore; metrics: RMetric[]; oneLiner: string };
+  detail: {
+    timeline: RTimelineItem[];
+    exercises: RExerciseLine[] | null;
+    balance: RBalanceItem[] | null;
+    growth: RGrowthItem[] | null;
+    stagnation: RStagnationItem[] | null;
+    milestones: RMilestone[] | null;
+    trends: RTrendSeries[] | null;
+    heatmap: number[] | null;
+  };
+  bodyComposition: RBodyComposition | null;
+  goalProgress: RGoalProgress;
+  prescription: RPrescription;
+  notesQuote: string | null;
+  suggestedQuestions: string[];
+};
+
+export type AiReportV2Response = { status: ReportStatusV2; message: string | null; report: AiReportV2 | null };
+
+/** 통합 리포트 조회/생성. type별 완료된 직전 기간 회고. */
+export async function getReportV2(type: ReportPeriodType, force = false): Promise<AiReportV2Response> {
+  const qs = `?type=${type}${force ? '&force=true' : ''}`;
+  return apiRequest<AiReportV2Response>(`/api/v1/ai/v2/report${qs}`, { method: 'GET' });
+}
+
+export type ChatTurn = { role: 'user' | 'ai'; content: string };
+export type ChatReply = { content: string; suggestedQuestions: string[] };
+
+/** 기간 스코프 채팅 — 답변은 해당 리포트 기간에 한정. */
+export async function askReportChat(input: {
+  reportId: string; period: ReportPeriodType; question: string; history: ChatTurn[];
+}): Promise<ChatReply> {
+  return apiRequest<ChatReply>('/api/v1/ai/v2/chat', { method: 'POST', body: input });
+}
+
 /** 주간 브리핑 생성/캐시 조회. */
 export async function generateAiReport(opts: { from?: string; to?: string; force?: boolean } = {}): Promise<AiReportResult> {
   const params = new URLSearchParams();

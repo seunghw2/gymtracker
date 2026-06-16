@@ -63,7 +63,7 @@ export default function AiBriefingChat() {
           <Briefing b={result.report} onWhy={(why) => setExtra(e => [...e, { from: 'usr', text: '왜 그런데?' }, { from: 'ai', text: why }])}
             onOk={() => setExtra(e => [...e, { from: 'usr', text: '좋아, 해볼게' }, { from: 'ai', text: '좋아요. 다음 주에 이행했는지 같이 확인할게요. 💪' }])}
             extra={extra}
-            onDetail={() => router.push('/ai/report')} />
+            onDetail={() => router.push('/ai/reports')} />
         ) : result?.status === 'PROFILE_REQUIRED' ? (
           <Empty icon="🎯" title="먼저 목표를 알려주세요"
             desc={result.message ?? '목표 체형·우선 부위를 설정하면 분석을 시작해요.'}
