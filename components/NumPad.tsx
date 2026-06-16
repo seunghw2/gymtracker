@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   stepRow: { flexDirection: 'row' },
   stepBtn: { flex: 1, backgroundColor: '#2C2C2E' },
-  nextBtn: { backgroundColor: '#30D158' },
+  nextBtn: { backgroundColor: '#FF3B30' },
   nextDisabled: { backgroundColor: '#2C2C2E' },
   nextText: { color: '#000000', fontSize: 16, fontWeight: '700' },
 });

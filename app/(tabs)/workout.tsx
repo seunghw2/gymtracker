@@ -1219,7 +1219,7 @@ export default function WorkoutScreen() {
               style={[styles.choiceBtn, styles.choiceBtnOutline]}
               onPress={() => { setCustomBrandInput(''); setSelectStep('custom-brand'); }}
             >
-              <Text style={[styles.choiceText, { color: '#30D158' }]}>+ 직접 등록</Text>
+              <Text style={[styles.choiceText, { color: '#FF3B30' }]}>+ 직접 등록</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -1517,7 +1517,7 @@ export default function WorkoutScreen() {
                             />
                           )}
                         </View>
-                        <Text style={[styles.setReadOnly, { color: '#30D158' }]}>
+                        <Text style={[styles.setReadOnly, { color: '#FF3B30' }]}>
                           {s.estimated_1rm ? `${toDisplay(s.estimated_1rm, unitKg)}${u}` : '-'}
                         </Text>
                       </View>

@@ -346,7 +346,7 @@ export default function SettingsScreen() {
             <Switch
               value={unitKg}
               onValueChange={toggleUnit}
-              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -367,7 +367,7 @@ export default function SettingsScreen() {
             <Switch
               value={showSessionNote}
               onValueChange={toggleShowSessionNote}
-              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -381,7 +381,7 @@ export default function SettingsScreen() {
             <Switch
               value={weightPrompt}
               onValueChange={toggleWeightPrompt}
-              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -395,7 +395,7 @@ export default function SettingsScreen() {
             <Switch
               value={autoTagPrompt}
               onValueChange={toggleAutoTagPrompt}
-              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -416,7 +416,7 @@ export default function SettingsScreen() {
             <Switch
               value={soundOnSilent}
               onValueChange={toggleSoundOnSilent}
-              trackColor={{ false: '#3A3A3C', true: '#30D158' }}
+              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -595,12 +595,12 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     marginTop: 10,
   },
-  catRowOpen: { backgroundColor: '#242426', borderColor: '#30D158', borderWidth: 1, marginBottom: 2 },
+  catRowOpen: { backgroundColor: '#242426', borderColor: '#FF3B30', borderWidth: 1, marginBottom: 2 },
   catLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   catIcon: { fontSize: 18, width: 24, textAlign: 'center' },
   catTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   catChevron: { color: '#8E8E93', fontSize: 22, fontWeight: '700' },
-  catChevronOpen: { color: '#30D158' },
+  catChevronOpen: { color: '#FF3B30' },
 
   card: {
     backgroundColor: '#1C1C1E',
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#2C2C2E', marginVertical: 8 },
   label: { color: '#FFFFFF', fontSize: 16 },
   input: {
-    color: '#30D158',
+    color: '#FF3B30',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'right',
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
   trackChipText: { color: '#8E8E93', fontSize: 12, fontWeight: '600' },
   trackChipTextOn: { color: '#5AB0FF' },
   restInput: {
-    color: '#30D158',
+    color: '#FF3B30',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
   },
 
   saveBtn: {
-    backgroundColor: '#30D158',
+    backgroundColor: '#FF3B30',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -659,14 +659,14 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     borderWidth: 1,
-    borderColor: '#30D158',
+    borderColor: '#FF3B30',
     borderRadius: 10,
     padding: 12,
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 4,
   },
-  addBtnText: { color: '#30D158', fontSize: 15, fontWeight: '600' },
+  addBtnText: { color: '#FF3B30', fontSize: 15, fontWeight: '600' },
   devBtn: { borderColor: '#FF453A' },
   devBtnText: { color: '#FF453A' },
 

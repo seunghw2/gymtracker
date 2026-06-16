@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E',
     borderRadius: 14,
     borderLeftWidth: 4,
-    borderLeftColor: '#30D158',
+    borderLeftColor: '#FF3B30',
     padding: 16,
     marginBottom: 10,
   },
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   menuDots: { color: '#8E8E93', fontSize: 22, fontWeight: '700', lineHeight: 24 },
   title: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginTop: 6 },
   stats: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginTop: 8 },
-  statNum: { color: '#30D158', fontWeight: '700' },
+  statNum: { color: '#FF3B30', fontWeight: '700' },
   exercises: { color: '#8E8E93', fontSize: 13, marginTop: 8 },
 
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

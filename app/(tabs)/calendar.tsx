@@ -121,7 +121,7 @@ export default function CalendarScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF3B30" />}
       >
         <Text style={styles.header}>캘린더</Text>
 
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
 
   segment: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, marginBottom: 20 },
   segmentBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
-  segmentBtnOn: { backgroundColor: '#30D158' },
+  segmentBtnOn: { backgroundColor: '#FF3B30' },
   segmentText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
   segmentTextOn: { color: '#000000' },
 
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   streakEmoji: { fontSize: 18 },
-  streakText: { color: '#30D158', fontSize: 15, fontWeight: '700' },
+  streakText: { color: '#FF3B30', fontSize: 15, fontWeight: '700' },
 
   monthNav: {
     flexDirection: 'row',
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   navBtn: { padding: 8 },
-  navArrow: { color: '#30D158', fontSize: 28, fontWeight: '300' },
+  navArrow: { color: '#FF3B30', fontSize: 28, fontWeight: '300' },
   monthLabel: { color: '#FFFFFF', fontSize: 20, fontWeight: '600' },
 
   dayRow: { flexDirection: 'row', marginBottom: 8 },
@@ -296,9 +296,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayCircleWorkout: { backgroundColor: '#1A3D27' },
-  dayCircleToday: { backgroundColor: '#30D158' },
+  dayCircleToday: { backgroundColor: '#FF3B30' },
   dayText: { color: '#8E8E93', fontSize: 14 },
-  dayTextWorkout: { color: '#30D158', fontWeight: '600' },
+  dayTextWorkout: { color: '#FF3B30', fontWeight: '600' },
   dayTextToday: { color: '#000000', fontWeight: '700' },
 
   summaryRow: { flexDirection: 'row', gap: 12 },

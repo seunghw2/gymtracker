@@ -66,8 +66,8 @@ export default function OneRMChart({ data, title, unitKg = true }: Props) {
       <Svg width={WIDTH} height={HEIGHT}>
         <Defs>
           <LinearGradient id="rmFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#30D158" stopOpacity={0.35} />
-            <Stop offset="1" stopColor="#30D158" stopOpacity={0.02} />
+            <Stop offset="0" stopColor="#FF3B30" stopOpacity={0.35} />
+            <Stop offset="1" stopColor="#FF3B30" stopOpacity={0.02} />
           </LinearGradient>
         </Defs>
 
@@ -81,12 +81,12 @@ export default function OneRMChart({ data, title, unitKg = true }: Props) {
 
         {/* 영역 + 라인 */}
         {n > 1 && <Path d={areaPath} fill="url(#rmFill)" />}
-        {n > 1 && <Polyline points={points} fill="none" stroke="#30D158" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />}
+        {n > 1 && <Polyline points={points} fill="none" stroke="#FF3B30" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />}
 
         {/* 점 — 마지막 점 강조 */}
         {values.map((v, i) => (
           <Circle key={i} cx={x(i)} cy={y(v)} r={i === n - 1 ? 6 : 3.5}
-            fill={i === n - 1 ? '#30D158' : '#0B0B0B'} stroke="#30D158" strokeWidth={2} />
+            fill={i === n - 1 ? '#FF3B30' : '#0B0B0B'} stroke="#FF3B30" strokeWidth={2} />
         ))}
 
         {/* 마지막 값 라벨 */}

@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, maxHeight: '85%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: '#FFFFFF', fontSize: 19, fontWeight: '700', flex: 1, marginRight: 12 },
-  close: { color: '#30D158', fontSize: 16, fontWeight: '600' },
+  close: { color: '#FF3B30', fontSize: 16, fontWeight: '600' },
   sub: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   note: { color: '#E5E5EA', fontSize: 13, marginTop: 8, backgroundColor: '#2C2C2E', borderRadius: 8, padding: 10 },
   tagBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
@@ -130,5 +130,5 @@ const styles = StyleSheet.create({
   setRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   setNum: { color: '#8E8E93', fontSize: 14, width: 28, fontWeight: '700' },
   setVal: { color: '#FFFFFF', fontSize: 15, flex: 1, fontVariant: ['tabular-nums'] },
-  set1rm: { color: '#30D158', fontSize: 12, fontVariant: ['tabular-nums'] },
+  set1rm: { color: '#FF3B30', fontSize: 12, fontVariant: ['tabular-nums'] },
 });

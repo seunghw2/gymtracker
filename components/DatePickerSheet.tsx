@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2C2C2E',
   },
   title: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  selectedLabel: { color: '#30D158', fontSize: 15, fontWeight: '600', textAlign: 'center', paddingTop: 12 },
+  selectedLabel: { color: '#FF3B30', fontSize: 15, fontWeight: '600', textAlign: 'center', paddingTop: 12 },
   cancel: { color: '#8E8E93', fontSize: 16 },
-  confirm: { color: '#30D158', fontSize: 16, fontWeight: '700' },
+  confirm: { color: '#FF3B30', fontSize: 16, fontWeight: '700' },
   picker: { alignSelf: 'center' },
 });

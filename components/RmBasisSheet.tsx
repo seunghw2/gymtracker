@@ -135,12 +135,12 @@ const styles = StyleSheet.create({
   picker: { marginTop: 22, height: 64, justifyContent: 'center' },
   item: { width: ITEM_W, alignItems: 'center', justifyContent: 'center' },
   itemText: { fontVariant: ['tabular-nums'], fontWeight: '700' },
-  itemSel: { color: '#30D158', fontSize: 38 },
+  itemSel: { color: '#FF3B30', fontSize: 38 },
   itemNear: { color: '#8E8E93', fontSize: 24 },
   itemFar: { color: '#48484A', fontSize: 20 },
 
   caption: { color: '#8E8E93', fontSize: 14, textAlign: 'center', marginTop: 14, marginBottom: 18 },
-  captionHi: { color: '#30D158', fontWeight: '700' },
+  captionHi: { color: '#FF3B30', fontWeight: '700' },
 
   closeBtn: { backgroundColor: '#2C2C2E', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   closeText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },

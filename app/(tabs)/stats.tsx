@@ -90,7 +90,7 @@ const volumeChartConfig = {
   color: (opacity = 1) => `rgba(48, 209, 88, ${opacity})`,
   labelColor: () => '#8E8E93',
   style: { borderRadius: 12 },
-  propsForDots: { r: '4', strokeWidth: '2', stroke: '#30D158' },
+  propsForDots: { r: '4', strokeWidth: '2', stroke: '#FF3B30' },
   barPercentage: 0.7,
   formatYLabel: (y: string) => formatVolume(Number(y)),
 };
@@ -229,7 +229,7 @@ export default function StatsScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#30D158" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF3B30" />}
       >
         <Text style={styles.header}>통계</Text>
 
@@ -453,7 +453,7 @@ export default function StatsScreen() {
                   color: (opacity = 1) => `rgba(48, 209, 88, ${opacity})`,
                   labelColor: () => '#8E8E93',
                   style: { borderRadius: 12 },
-                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#30D158' },
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: '#FF3B30' },
                 }}
                 bezier
                 style={{ borderRadius: 12, marginBottom: 16 }}
@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#1C1C1E',
   },
-  chipActive: { backgroundColor: '#30D158' },
+  chipActive: { backgroundColor: '#FF3B30' },
   chipText: { color: '#8E8E93', fontSize: 14, fontWeight: '600' },
   chipTextActive: { color: '#000000' },
 
@@ -713,12 +713,12 @@ const styles = StyleSheet.create({
   segmentText: { color: '#8E8E93', fontSize: 15, fontWeight: '700' },
   segmentTextOn: { color: '#FFFFFF' },
 
-  summaryCard: { backgroundColor: '#161616', borderRadius: 20, borderLeftWidth: 3, borderLeftColor: '#30D158', padding: 20, marginBottom: 16 },
+  summaryCard: { backgroundColor: '#161616', borderRadius: 20, borderLeftWidth: 3, borderLeftColor: '#FF3B30', padding: 20, marginBottom: 16 },
   summaryCardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   summaryTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
   summarySub: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   summaryBadge: { backgroundColor: '#173A26', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-  summaryBadgeText: { color: '#30D158', fontSize: 13, fontWeight: '700' },
+  summaryBadgeText: { color: '#FF3B30', fontSize: 13, fontWeight: '700' },
   barRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 7 },
   barLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', width: 44 },
   barTrack: { flex: 1, height: 22, backgroundColor: '#2C2C2E', borderRadius: 11, marginHorizontal: 12, overflow: 'hidden', justifyContent: 'center' },
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
   rmModeCell: { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   rmGrid: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, marginBottom: 22 },
   rmGridCell: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
-  rmCellOn: { backgroundColor: '#30D158' },
+  rmCellOn: { backgroundColor: '#FF3B30' },
   rmText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
   rmTextOn: { color: '#000000' },
   exSelectBtn: {
@@ -756,7 +756,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   exSelectText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', flex: 1 },
-  exSelectChevron: { color: '#30D158', fontSize: 18, marginLeft: 8 },
+  exSelectChevron: { color: '#FF3B30', fontSize: 18, marginLeft: 8 },
 
   modalSafe: { flex: 1, backgroundColor: '#000000' },
   modalHeader: {
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1C1C1E',
   },
-  modalBack: { color: '#30D158', fontSize: 16, width: 60 },
+  modalBack: { color: '#FF3B30', fontSize: 16, width: 60 },
   modalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   modalContent: { padding: 16 },
   exItem: {
@@ -779,15 +779,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  exItemActive: { borderColor: '#30D158', borderWidth: 1 },
+  exItemActive: { borderColor: '#FF3B30', borderWidth: 1 },
   exItemName: { color: '#FFFFFF', fontSize: 16 },
   exItemBrand: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
-  exItemCheck: { color: '#30D158', fontSize: 18, fontWeight: '700', marginLeft: 6 },
+  exItemCheck: { color: '#FF3B30', fontSize: 18, fontWeight: '700', marginLeft: 6 },
 
   // 시안 C — 부위 필터 + 평면 리스트
   partRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   partChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1C1C1E', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
-  partChipOn: { backgroundColor: '#30D158' },
+  partChipOn: { backgroundColor: '#FF3B30' },
   partChipText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
   partChipTextOn: { color: '#000000' },
   partDot: { width: 8, height: 8, borderRadius: 4 },
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
   goalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   goalLabel: { color: '#8E8E93', fontSize: 14 },
   progressBar: { height: 8, backgroundColor: '#2C2C2E', borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#30D158', borderRadius: 4 },
+  progressFill: { height: '100%', backgroundColor: '#FF3B30', borderRadius: 4 },
   goalValue: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', marginTop: 8, textAlign: 'center' },
 
   recordCard: {
@@ -833,18 +833,18 @@ const styles = StyleSheet.create({
   recordName: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   recordBrand: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
   recordStats: { alignItems: 'flex-end' },
-  recordStat: { color: '#30D158', fontSize: 15, fontWeight: '700' },
+  recordStat: { color: '#FF3B30', fontSize: 15, fontWeight: '700' },
   recordSub: { color: '#8E8E93', fontSize: 11, marginTop: 3, textAlign: 'right' },
   recordSearch: { backgroundColor: '#1C1C1E', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: '#FFFFFF', fontSize: 15, marginBottom: 10 },
   recordSortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   recordSortBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, backgroundColor: '#1C1C1E' },
-  recordSortOn: { backgroundColor: '#30D158' },
+  recordSortOn: { backgroundColor: '#FF3B30' },
   recordSortText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
   recordSortTextOn: { color: '#000000' },
 
   rangeRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   rangeBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: '#1C1C1E', alignItems: 'center' },
-  rangeBtnActive: { backgroundColor: '#30D158' },
+  rangeBtnActive: { backgroundColor: '#FF3B30' },
   rangeText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
   rangeTextActive: { color: '#000000' },
 
@@ -859,5 +859,5 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   freqMuscle: { color: '#FFFFFF', fontSize: 15 },
-  freqValue: { color: '#30D158', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  freqValue: { color: '#FF3B30', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

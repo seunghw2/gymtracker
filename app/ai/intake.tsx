@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   chip: { borderColor: AI.accent, borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 },
   chipOn: { backgroundColor: AI.tint },
   chipText: { color: AI.accent, fontSize: 13.5, fontWeight: '700' },
-  chipTextOn: { color: '#C9B6FF' },
+  chipTextOn: { color: '#FF9F97' },
 
   input: { backgroundColor: AI.bubble, borderRadius: 12, padding: 13, color: '#fff', fontSize: 14, minHeight: 48 },
 
