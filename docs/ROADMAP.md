@@ -1,6 +1,6 @@
 # GymTracker 프로젝트 현황 & 로드맵
 
-> 최종 업데이트: 2026-06-16
+> 최종 업데이트: 2026-06-17
 > 이 문서는 프로젝트의 진행 상황과 향후 작업을 추적하는 살아있는 문서입니다.
 
 ---
@@ -79,16 +79,30 @@
 
 ## 3. 향후 작업 (세분화)
 
-### AI 리포트 v2 (애널리스트) — 🚧 진행 중 (2026-06-16)
+### AI 리포트 v2 (애널리스트) — ✅ 대부분 완료 (2026-06-17)
 명세: 6종 기간(session/week/month/quarter/half/year)을 **하나의 2층 컴포넌트**로 렌더 + 기간 스코프 채팅. "계산은 코드, 해석만 LLM".
-- [x] 백엔드 통합 리포트 `GET /api/v1/ai/v2/report?type=` — 명세 §7 스키마(`AiReportV2`). 서술은 기존 주간 LLM 파이프라인 재사용(기간만 교체), 구조화 detail은 코드 매핑(`ReportV2Service`)
-- [x] 백엔드 기간 스코프 채팅 `POST /api/v1/ai/v2/chat`(`AiChatService`) — 해당 기간 facts만 주입, 스코프 밖 질문은 정직하게 거절
-- [x] 프론트 통합 타입/호출(`db/api/ai.ts`), 단일 2층 렌더러(`components/ReportView.tsx`), 기간 셀렉터 화면(`app/ai/reports.tsx`), 채팅 화면(`app/ai/chat.tsx`)
-- [x] 로컬 JWT 발급으로 백엔드 실호출 테스트 완료(week/month SUCCESS, 채팅·스코프 가드 검증)
-- [x] 아카이브 리스트(과거 리포트 혼합 목록) — `GET /v2/archive` + `back` 파라미터로 과거 인스턴스 조회(`app/ai/archive.tsx`)
-- [x] 세션 리포트(운동 종료 후 진입) — `type=session`(`ReportPeriod.resolveSession`) + 종목별 detail.exercises(`ReportView` 렌더)
-- [ ] 하단 "리포트 탭" 신설(현재 AI 화면 경유)
+- [x] 통합 리포트 `GET /v2/report` (`AiReportV2`) — 서술은 LLM, 구조화 detail은 코드 매핑(`ReportV2Service`)
+- [x] 기간 스코프 채팅 `POST /v2/chat`(`AiChatService`) — 스코프 밖 질문 거절
+- [x] 프론트 2층 렌더러(`ReportView`)·기간 셀렉터(`reports.tsx`)·채팅(`chat.tsx`)·아카이브(`archive.tsx`)
+- [x] 세션 리포트(`type=session`) + 종목별 detail.exercises
+- [x] **비동기 생성 + 실시간 진행률** — 캐시 미스 시 `GENERATING` 즉시 반환 + `@Async` 백그라운드, Anthropic 스트리밍 토큰 비례 진행률(`ReportJobs`/`ProgressSink`), 프론트 오비탈 로딩(`BriefingLoading`) + 폴링
+- [x] 온보딩 인테이크 채팅(9문항, `app/ai/intake.tsx`)
 - [ ] 목표 진척 게이지(분기+), 요일 히트맵(주간), 체중 추세 포인트, 일관성 score, 타임라인 세션 단위화
+
+### CARBON 리디자인 — ✅ 1·2단계 완료 (2026-06-16)
+- [x] 디자인 토큰 레드 통일(`constants/colors.ts`), 의미색(증감/경고)은 분리 유지
+- [x] FOCUS 브리핑 홈(`(tabs)/index.tsx`) = AI 요약 + 운동 시작, 설정은 톱니로
+- [x] 새 탭바: 브리핑·기록·통계·리포트 / 운동은 슬라이드업 모달(`app/workout.tsx`)
+- [x] 기록 타임라인(+월별 토글), 운동 중 처방 배너, 스트롱식 인라인 휴식 타이머(세트 사이 막대·설정 패널)
+- [ ] 통계 화면 정밀 레이아웃, 리포트/채팅 카드 리스타일(후속)
+
+### 알림 인박스 (애널리스트 피드) — ✅ 완료 (2026-06-16)
+- [x] `notifications` 테이블 + API 3개(`/notifications`, `/unread-count`, `/read-all`)
+- [x] 적재 지점: 리포트 완료(REPORT_READY)·PR·정체(STAGNATION)·리마인드, `(user_id, dedupe_key)` 중복 방지
+- [x] 프론트 인박스(`app/ai/inbox.tsx`) + 브리핑 종 아이콘·안읽음 배지
+
+### Strong CSV 임포트 — ✅ 완료 (2026-06-16)
+- [x] 세션/세트/종목 매핑(워밍업·드롭·실패 보존), 미매칭 종목은 커스텀 생성
 
 ### 세션 기본기 보완 — ✅ 완료 (2026-05-30)
 - [x] 세션 이름(title) — 백엔드 `WorkoutSession.title` 컬럼/DTO 추가, 시작·세션중·상세·히스토리에서 입력/표시
