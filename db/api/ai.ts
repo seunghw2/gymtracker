@@ -141,9 +141,20 @@ export type AiReportV2 = {
 
 export type AiReportV2Response = { status: ReportStatusV2; message: string | null; report: AiReportV2 | null };
 
-/** 통합 리포트 조회/생성. back=n이면 n기간 이전(아카이브). */
-export async function getReportV2(type: ReportPeriodType, back = 0, force = false): Promise<AiReportV2Response> {
-  const qs = `?type=${type}&back=${back}${force ? '&force=true' : ''}`;
+/**
+ * 통합 리포트 조회/생성. back=n이면 n기간 이전(아카이브).
+ * range를 주면 그 임의 달력 구간(주/월/분기/반기·진행 중)으로 분석한다(back 무시).
+ */
+export async function getReportV2(
+  type: ReportPeriodType,
+  back = 0,
+  force = false,
+  range?: { from: string; to: string; label?: string },
+): Promise<AiReportV2Response> {
+  let qs = `?type=${type}&back=${back}${force ? '&force=true' : ''}`;
+  if (range) {
+    qs += `&from=${range.from}&to=${range.to}${range.label ? `&label=${encodeURIComponent(range.label)}` : ''}`;
+  }
   return apiRequest<AiReportV2Response>(`/api/v1/ai/v2/report${qs}`, { method: 'GET' });
 }
 
