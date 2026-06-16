@@ -67,13 +67,13 @@ import {
   TemplateSummary,
   TrackingType,
   Gym,
-} from '../../db/queries';
-import DatePickerSheet from '../../components/DatePickerSheet';
-import SessionCard from '../../components/SessionCard';
-import RulerPicker from '../../components/RulerPicker';
-import { useUiStore } from '../../store/useUiStore';
-import { formatDateWithDay } from '../../lib/date';
-import { toDisplay, fromInput, unitLabel } from '../../lib/units';
+} from '../db/queries';
+import DatePickerSheet from '../components/DatePickerSheet';
+import SessionCard from '../components/SessionCard';
+import RulerPicker from '../components/RulerPicker';
+import { useUiStore } from '../store/useUiStore';
+import { formatDateWithDay } from '../lib/date';
+import { toDisplay, fromInput, unitLabel } from '../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -93,17 +93,17 @@ import {
   MACHINE_BRANDS,
   MuscleGroup,
   EquipmentType,
-} from '../../constants/exercises';
-import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../../store/useStore';
-import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
-import NumPad from '../../components/NumPad';
-import HeaderTimerButton from '../../components/HeaderTimerButton';
-import ExerciseEditSheet from '../../components/ExerciseEditSheet';
-import WorkoutCoachBanner from '../../components/WorkoutCoachBanner';
-import { useRestRemaining, fmtClock } from '../../hooks/useRestRemaining';
-import { playSetDoneSound } from '../../lib/sound';
-import { buildExerciseEntry } from '../../lib/exerciseEntry';
-import { epley, formatDuration } from '../../lib/format';
+} from '../constants/exercises';
+import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../store/useStore';
+import RmBasisSheet, { RmMode } from '../components/RmBasisSheet';
+import NumPad from '../components/NumPad';
+import HeaderTimerButton from '../components/HeaderTimerButton';
+import ExerciseEditSheet from '../components/ExerciseEditSheet';
+import WorkoutCoachBanner from '../components/WorkoutCoachBanner';
+import { useRestRemaining, fmtClock } from '../hooks/useRestRemaining';
+import { playSetDoneSound } from '../lib/sound';
+import { buildExerciseEntry } from '../lib/exerciseEntry';
+import { epley, formatDuration } from '../lib/format';
 import { styles } from './workout.styles';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
@@ -1346,8 +1346,11 @@ export default function WorkoutScreen() {
       <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.homeContent}>
-          {/* 헤더 우측 휴식 타이머 버튼 */}
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 }}>
+          {/* 헤더 — 좌측 접기, 우측 휴식 타이머 버튼 */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="닫기">
+              <Text style={{ color: '#8E8E93', fontSize: 22, fontWeight: '700' }}>⌄</Text>
+            </Pressable>
             <HeaderTimerButton />
           </View>
           {/* 시작 — 바로 시작, 이름·헬스장·태그는 진행 중에 */}
@@ -1580,6 +1583,9 @@ export default function WorkoutScreen() {
     <SafeAreaView style={styles.safe}>
       {/* 상단 고정 바 — 스크롤해도 유지(휴식 타이머 버튼 · 경과/휴식 · 완료) */}
       <View style={styles.stickyBar}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={{ paddingRight: 6, paddingVertical: 4 }} accessibilityLabel="운동 접기">
+          <Text style={{ color: '#8E8E93', fontSize: 22, fontWeight: '700' }}>⌄</Text>
+        </Pressable>
         <HeaderTimerButton />
         {restTimerActive ? (
           <View style={styles.stickyRest}>

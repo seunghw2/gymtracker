@@ -71,7 +71,7 @@ export default function AiBriefingChat() {
         ) : result?.status === 'INSUFFICIENT_DATA' ? (
           <Empty icon="📭" title="이번 주 기록이 없어요"
             desc={result.message ?? '완료된 운동이 있어야 분석할 수 있어요.'}
-            cta="운동하러 가기" onPress={() => router.replace('/(tabs)/workout')} />
+            cta="운동하러 가기" onPress={() => router.replace('/workout')} />
         ) : (
           <Empty icon="⚠️" title="브리핑을 만들지 못했어요"
             desc={result?.message ?? '잠시 후 다시 시도해 주세요.'}

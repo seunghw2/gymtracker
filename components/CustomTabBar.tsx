@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useSegments } from 'expo-router';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ACCENT } from '../constants/colors';
 
@@ -10,27 +11,44 @@ const INACTIVE = '#7E7E83';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-// CARBON 4탭: 브리핑(홈)·운동·기록·통계. 설정은 탭에서 빼고 브리핑 헤더 ⚙️로 진입.
-// META에 없는 라우트(settings)는 탭바에 렌더되지 않는다.
+// CARBON 탭: 브리핑(홈)·기록·통계 + 리포트(별도 스택). 운동은 탭에서 제거(브리핑에서 시작),
+// 설정은 브리핑 헤더 ⚙️로 진입. META에 없는 라우트(workout/settings)는 탭바에 렌더되지 않는다.
 const META: Record<string, { active: IoniconName; inactive: IoniconName; label: string }> = {
   index: { active: 'sparkles', inactive: 'sparkles-outline', label: '브리핑' },
-  workout: { active: 'barbell', inactive: 'barbell-outline', label: '운동' },
   calendar: { active: 'list', inactive: 'list-outline', label: '기록' },
   stats: { active: 'stats-chart', inactive: 'stats-chart-outline', label: '통계' },
 };
 
 /**
- * CARBON 하단 탭바 — 레드 활성 스타일. 활성 탭은 상단 짧은 레드 인디케이터 + 채움 아이콘 + 굵은 라벨.
+ * CARBON 하단 탭바 — 레드 활성 스타일. 리포트 탭은 (tabs) 밖 app/ai 스택이라 router.push로 진입.
  */
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const segments = useSegments();
+  const reportActive = (segments as string[]).includes('ai');
+
+  const reportTab = (
+    <Pressable
+      key="__report"
+      style={styles.tab}
+      onPress={() => router.push('/ai/reports')}
+      accessibilityRole="button"
+      accessibilityState={{ selected: reportActive }}
+      accessibilityLabel="리포트"
+    >
+      <View style={[styles.indicator, reportActive && styles.indicatorOn]} />
+      <Ionicons name={reportActive ? 'document-text' : 'document-text-outline'} size={26} color={reportActive ? ACTIVE : INACTIVE} />
+      <Text style={[styles.label, { color: reportActive ? ACTIVE : INACTIVE }, reportActive && styles.labelOn]}>리포트</Text>
+    </Pressable>
+  );
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {state.routes.map((route, idx) => {
         const meta = META[route.name];
         if (!meta) return null;
-        const focused = state.index === idx;
+        const focused = state.index === idx && !reportActive;
         const color = focused ? ACTIVE : INACTIVE;
 
         const onPress = () => {
@@ -41,7 +59,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           navigation.emit({ type: 'tabLongPress', target: route.key });
         };
 
-        return (
+        const tab = (
           <Pressable
             key={route.key}
             style={styles.tab}
@@ -56,6 +74,12 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             <Text style={[styles.label, { color }, focused && styles.labelOn]}>{meta.label}</Text>
           </Pressable>
         );
+
+        // 통계 뒤(맨 끝)에 리포트 탭을 끼워 넣는다.
+        if (route.name === 'stats') {
+          return <React.Fragment key={route.key}>{tab}{reportTab}</React.Fragment>;
+        }
+        return tab;
       })}
     </View>
   );

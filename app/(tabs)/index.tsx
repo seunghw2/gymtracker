@@ -211,7 +211,7 @@ export default function BriefingHome() {
         </View>
 
         {/* 운동 시작 */}
-        <Pressable style={styles.startBtn} onPress={() => router.push('/(tabs)/workout')}>
+        <Pressable style={styles.startBtn} onPress={() => router.push('/workout')}>
           <Ionicons name="play" size={18} color={ACCENT_INK} />
           <Text style={styles.startBtnText}>운동 시작</Text>
         </Pressable>

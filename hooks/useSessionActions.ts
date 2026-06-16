@@ -37,7 +37,7 @@ export function useSessionActions() {
       return;
     }
     setEditTarget(session);
-    router.push('/(tabs)/workout');
+    router.push('/workout');
   };
 
   // 과거 세션을 오늘 새 세션으로 그대로 시작 (입력칸 미완료 상태로 프리필)
@@ -74,7 +74,7 @@ export function useSessionActions() {
     const entries = order.map(id => groups[id]);
     addExercises(entries);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.push('/(tabs)/workout');
+    router.push('/workout');
     // PR 기준 역대 최고 1RM 비동기 채움
     const bests = await Promise.all(order.map(id => get1RMHistory(id).catch(() => [])));
     bests.forEach((hist, idx) => {

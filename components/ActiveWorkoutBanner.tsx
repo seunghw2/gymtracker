@@ -66,7 +66,7 @@ export default function ActiveWorkoutBanner() {
   return (
     <Pressable
       style={styles.bar}
-      onPress={() => router.navigate('/(tabs)/workout')}
+      onPress={() => router.navigate('/workout')}
       accessibilityRole="button"
       accessibilityLabel={`운동으로 돌아가기, ${elapsedLabel(elapsedSec)}`}
     >
@@ -107,9 +107,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginHorizontal: 10,
     borderRadius: 15,
-    backgroundColor: '#0E2A18',
+    backgroundColor: '#2A1113',
     borderWidth: 1,
-    borderColor: 'rgba(48,209,88,0.45)',
+    borderColor: 'rgba(255,59,48,0.45)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,

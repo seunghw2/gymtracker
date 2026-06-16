@@ -24,7 +24,6 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ title: '브리핑' }} />
-      <Tabs.Screen name="workout" options={{ title: '운동' }} />
       <Tabs.Screen name="calendar" options={{ title: '기록' }} />
       <Tabs.Screen name="stats" options={{ title: '통계' }} />
       <Tabs.Screen name="settings" options={{ title: '설정' }} />

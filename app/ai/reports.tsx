@@ -104,7 +104,7 @@ export default function AiReportsScreen() {
         ) : res?.status === 'PROFILE_REQUIRED' ? (
           <Empty icon="🎯" title="먼저 목표를 알려주세요" desc={res.message ?? '목표 체형·우선 부위를 설정하면 분석을 시작해요.'} cta="설정하기" onPress={() => router.push('/ai/intake')} />
         ) : res?.status === 'INSUFFICIENT_DATA' ? (
-          <Empty icon="📭" title="이 기간 기록이 없어요" desc={res.message ?? '완료된 운동이 있어야 분석할 수 있어요.'} cta="운동하러 가기" onPress={() => router.replace('/(tabs)/workout')} />
+          <Empty icon="📭" title="이 기간 기록이 없어요" desc={res.message ?? '완료된 운동이 있어야 분석할 수 있어요.'} cta="운동하러 가기" onPress={() => router.replace('/workout')} />
         ) : (
           <Empty icon="⚠️" title="리포트를 불러오지 못했어요" desc={res?.message ?? '잠시 후 다시 시도해 주세요.'} cta="다시 시도" onPress={() => load(true)} />
         )}
