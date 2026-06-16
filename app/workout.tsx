@@ -190,7 +190,8 @@ export default function WorkoutScreen() {
   // 인라인 휴식 바(스트롱 스타일): 어떤 세트 직후 휴식이 도는지 추적
   const [restAnchor, setRestAnchor] = useState<{ ex: number; set: number } | null>(null);
   const [restTotal, setRestTotal] = useState(0);
-  useEffect(() => { if (!restTimerActive) setRestAnchor(null); }, [restTimerActive]);
+  const [restControlOpen, setRestControlOpen] = useState(false);
+  useEffect(() => { if (!restTimerActive) { setRestAnchor(null); setRestControlOpen(false); } }, [restTimerActive]);
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [selectStep, setSelectStep] = useState<SelectStep>('muscle');
@@ -1593,29 +1594,10 @@ export default function WorkoutScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={{ paddingRight: 6, paddingVertical: 4 }} accessibilityLabel="운동 접기">
           <Text style={{ color: '#8E8E93', fontSize: 22, fontWeight: '700' }}>⌄</Text>
         </Pressable>
-        <HeaderTimerButton />
-        {restTimerActive ? (
-          <View style={styles.stickyRest}>
-            <Pressable style={styles.stickyAdj} onPress={() => adjustRestTimer(-15)} hitSlop={6}>
-              <Text style={styles.stickyAdjText}>−15</Text>
-            </Pressable>
-            <View style={styles.stickyRestCenter}>
-              <Text style={styles.stickyRestTime}>{fmtClock(restRemaining)}</Text>
-              <Text style={styles.stickyRestLabel} numberOfLines={1}>휴식{restNextLabel ? ` · 다음 ${restNextLabel}` : ''}</Text>
-            </View>
-            <Pressable style={styles.stickyAdj} onPress={() => adjustRestTimer(15)} hitSlop={6}>
-              <Text style={styles.stickyAdjText}>+15</Text>
-            </Pressable>
-            <Pressable style={styles.stickySkip} onPress={() => stopRestTimer()} hitSlop={6}>
-              <Text style={styles.stickySkipText}>✕</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.stickyElapsed}>
-            <View style={styles.stickyDot} />
-            <Text style={styles.stickyElapsedText}>{elapsed}</Text>
-          </View>
-        )}
+        <View style={[styles.stickyElapsed, { flex: 1 }]}>
+          <View style={styles.stickyDot} />
+          <Text style={styles.stickyElapsedText}>{elapsed}</Text>
+        </View>
         <Pressable style={styles.stickyFinish} onPress={handleFinishWorkout}>
           <Text style={styles.stickyFinishText}>완료</Text>
         </Pressable>
@@ -1881,16 +1863,16 @@ export default function WorkoutScreen() {
                     </View>
                   </Swipeable>
                   {showBar ? (
-                    <Pressable onPress={() => stopRestTimer()} style={{ height: 30, borderRadius: 8, backgroundColor: '#13233A', justifyContent: 'center', overflow: 'hidden', marginVertical: 4 }}>
+                    <Pressable onPress={() => setRestControlOpen(true)} style={{ height: 28, borderRadius: 8, backgroundColor: '#13233A', justifyContent: 'center', overflow: 'hidden', marginVertical: 3 }}>
                       <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${restPct}%`, backgroundColor: '#0A84FF' }} />
                       <Text style={{ textAlign: 'center', color: '#fff', fontWeight: '800', fontVariant: ['tabular-nums'] }}>{fmtClock(restRemaining)}</Text>
                     </Pressable>
                   ) : s.done ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.35)' }} />
+                    <Pressable onPress={() => openRestPicker(exIdx)} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1.5 }} hitSlop={6}>
+                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.3)' }} />
                       <Text style={{ color: '#30D158', fontSize: 11, fontWeight: '700', marginHorizontal: 8, fontVariant: ['tabular-nums'] }}>{fmtClock(restDurationSec)}</Text>
-                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.35)' }} />
-                    </View>
+                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.3)' }} />
+                    </Pressable>
                   ) : null}
                   </React.Fragment>
                 );
@@ -1903,6 +1885,33 @@ export default function WorkoutScreen() {
           );
         }}
       />
+
+      {/* 휴식 제어 패널 — 인라인 막대 탭 시(스트롱식): 큰 타이머 + ±15 · 리셋 · 건너뛰기 */}
+      <Modal visible={restControlOpen && restTimerActive} transparent animationType="slide" onRequestClose={() => setRestControlOpen(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }} onPress={() => setRestControlOpen(false)}>
+          <Pressable style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, alignItems: 'center' }} onPress={() => {}}>
+            <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '700' }}>휴식 타이머</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 64, fontWeight: '800', letterSpacing: -1, marginTop: 6, fontVariant: ['tabular-nums'] }}>{fmtClock(restRemaining)}</Text>
+            {restNextLabel ? <Text style={{ color: '#8E8E93', fontSize: 13, marginTop: 2 }}>다음 · {restNextLabel}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 22, alignSelf: 'stretch' }}>
+              <Pressable style={{ flex: 1, backgroundColor: '#2C2C2E', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }} onPress={() => adjustRestTimer(-15)}>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>−15</Text>
+              </Pressable>
+              <Pressable style={{ flex: 1, backgroundColor: '#2C2C2E', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }} onPress={() => adjustRestTimer(15)}>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>+15</Text>
+              </Pressable>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, alignSelf: 'stretch' }}>
+              <Pressable style={{ flex: 1, backgroundColor: '#2C2C2E', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }} onPress={() => startRestTimer(restTotal, { nextLabel: restNextLabel ?? undefined })}>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>리셋</Text>
+              </Pressable>
+              <Pressable style={{ flex: 1, backgroundColor: '#0A84FF', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }} onPress={() => { stopRestTimer(); setRestControlOpen(false); }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>건너뛰기</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={showTags} transparent animationType="fade" onRequestClose={() => { setShowTags(false); setTagEdit(false); setFinishAfterTags(false); }}>
         <Pressable style={styles.centerBackdrop} onPress={() => { setShowTags(false); setTagEdit(false); setFinishAfterTags(false); }}>
