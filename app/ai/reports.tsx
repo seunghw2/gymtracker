@@ -69,7 +69,14 @@ export default function AiReportsScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={8}><Text style={styles.back}>‹</Text></Pressable>
         <Text style={styles.title}>리포트</Text>
-        <View style={{ width: 24 }} />
+        <Pressable
+          onPress={() => load(true)}
+          hitSlop={8}
+          disabled={loading || res?.status === 'GENERATING'}
+          accessibilityLabel="리포트 다시 받기"
+        >
+          <Text style={[styles.regen, (loading || res?.status === 'GENERATING') && { opacity: 0.4 }]}>↻ 다시 받기</Text>
+        </Pressable>
       </View>
 
       {/* 단위 세그먼트 */}
@@ -165,6 +172,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: AI.line },
   back: { color: AI.accent, fontSize: 30, width: 24, marginTop: -4 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  regen: { color: AI.accent, fontSize: 12.5, fontWeight: '700' },
 
   // 단위 세그먼트
   segRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
