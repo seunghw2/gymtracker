@@ -136,7 +136,7 @@ const CHAPTERS = [
   { n: 3, label: '계속 가기 · 동기' },
 ];
 function CoachTab({ r, onAsk }: { r: AiReportV2; onAsk?: () => void }) {
-  const items = r.coaching ?? [];
+  const items = (r.coaching ?? []).filter(it => it.defaultOn);
   return (
     <View>
       <View style={styles.coachBanner}>
