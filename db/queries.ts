@@ -10,3 +10,4 @@ export * from './api/settings';
 export * from './api/templates';
 export * from './api/gyms';
 export * from './api/ai';
+export * from './api/notifications';

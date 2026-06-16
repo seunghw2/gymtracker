@@ -5,6 +5,7 @@ import { AI, COLORS } from '../../constants/colors';
 import { getReportV2, getAllWorkoutDates, AiReportV2Response } from '../../db/queries';
 import { PERIOD_UNITS, PeriodUnit, buildBuckets, earliestDate } from '../../lib/periods';
 import ReportView from '../../components/ReportView';
+import BriefingLoading from '../../components/BriefingLoading';
 
 const GREEN = COLORS.green;
 const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기' };
@@ -50,6 +51,16 @@ export default function AiReportsScreen() {
     if (datesLoaded && selected) load(false);
   }, [datesLoaded, selected?.start, selected?.end, load]));
 
+  // 생성 중이면 2초 폴링(스피너 토글 없이 res만 갱신) → 완료 시 자동 교체
+  useEffect(() => {
+    if (res?.status !== 'GENERATING' || !selected) return;
+    const id = setTimeout(() => {
+      getReportV2(unitType, 0, false, { from: selected.start, to: selected.end, label: selected.label })
+        .then(setRes).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(id);
+  }, [res, selected?.start, selected?.end, unitType]);
+
   const pickUnit = (u: PeriodUnit) => { setUnit(u); setIndex(0); };
   const pickIndex = (i: number) => { setIndex(i); setSheetOpen(false); };
 
@@ -92,7 +103,9 @@ export default function AiReportsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
-        {loading ? (
+        {res?.status === 'GENERATING' ? (
+          <BriefingLoading percent={res.percent} step={res.step} />
+        ) : loading ? (
           <View style={styles.center}><ActivityIndicator color={AI.accent} size="large" /><Text style={styles.dim}>분석 중…</Text></View>
         ) : res?.status === 'SUCCESS' && res.report ? (
           <>

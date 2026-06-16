@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -25,11 +25,13 @@ import {
   getAllWorkoutDates,
   getSetting,
   getReportV2,
+  getUnreadCount,
   AiReportV2,
   BodyLog,
 } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
+import BriefingLoading from '../../components/BriefingLoading';
 import { ACCENT, ACCENT_INK, AI } from '../../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -66,6 +68,8 @@ export default function BriefingHome() {
   const { goalWeightKg } = useSettingsStore();
   const [report, setReport] = useState<AiReportV2 | null>(null);
   const [reportStatus, setReportStatus] = useState<string>('');
+  const [reportPct, setReportPct] = useState(0);
+  const [reportStep, setReportStep] = useState<string | null>(null);
   const [weekCount, setWeekCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
@@ -75,6 +79,7 @@ export default function BriefingHome() {
   const [todayBodyFat, setTodayBodyFat] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     const today = getTodayStr();
@@ -104,17 +109,34 @@ export default function BriefingHome() {
     }
     setLoaded(true);
 
-    // v2 주간 브리핑(별도 — 느릴 수 있어 await 후 갱신)
+    // 알림 안읽음 수(배지) — 실패해도 화면엔 영향 없음
+    getUnreadCount().then(setUnreadCount).catch(() => {});
+
+    // v2 주간 브리핑(비동기 — 생성 중이면 GENERATING, 폴링으로 완성 감지)
     try {
       const r = await getReportV2('week');
       setReportStatus(r.status);
       setReport(r.report);
+      setReportPct(r.percent ?? 0);
+      setReportStep(r.step ?? null);
     } catch {
       setReportStatus('FAILED');
     }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // 생성 중이면 2초 폴링 → 완료 시 헤드라인/처방으로 교체
+  useEffect(() => {
+    if (reportStatus !== 'GENERATING') return;
+    const id = setTimeout(() => {
+      getReportV2('week').then(r => {
+        setReportStatus(r.status); setReport(r.report);
+        setReportPct(r.percent ?? 0); setReportStep(r.step ?? null);
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(id);
+  }, [reportStatus, reportPct]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -168,12 +190,27 @@ export default function BriefingHome() {
         {/* 헤더 */}
         <View style={styles.headerRow}>
           <Text style={styles.brand}>브리핑</Text>
-          <Pressable hitSlop={10} onPress={() => router.push('/(tabs)/settings')}>
-            <Ionicons name="settings-outline" size={22} color={AI.textSub} />
-          </Pressable>
+          <View style={styles.headerIcons}>
+            <Pressable hitSlop={10} onPress={() => router.push('/ai/inbox')}>
+              <Ionicons name="notifications-outline" size={22} color={AI.textSub} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable hitSlop={10} onPress={() => router.push('/(tabs)/settings')}>
+              <Ionicons name="settings-outline" size={22} color={AI.textSub} />
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.dateChip}>{dateChip}</Text>
 
+        {reportStatus === 'GENERATING' ? (
+          <View style={{ height: 300 }}>
+            <BriefingLoading percent={reportPct} step={reportStep} />
+          </View>
+        ) : (<>
         {/* 큰 헤드라인 */}
         <Pressable onPress={() => router.push('/ai/reports')}>
           <Text style={styles.headline}>{headline}</Text>
@@ -193,6 +230,7 @@ export default function BriefingHome() {
             {!!rx.todo && <Text style={styles.rxTodo}>{rx.todo}</Text>}
           </Pressable>
         ) : null}
+        </>)}
 
         {/* 핵심 지표 3 */}
         <View style={styles.metrics}>
@@ -257,6 +295,9 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  badge: { position: 'absolute', top: -5, right: -7, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  badgeText: { color: ACCENT_INK, fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
   brand: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
   dateChip: { color: AI.textSub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
 

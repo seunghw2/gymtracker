@@ -91,7 +91,7 @@ export async function deleteAiProfile(): Promise<void> {
 // ── 통합 리포트(명세 §7) — 6종 기간을 한 스키마로 ─────────────────────────
 
 export type ReportPeriodType = 'session' | 'week' | 'month' | 'quarter' | 'half' | 'year';
-export type ReportStatusV2 = 'SUCCESS' | 'PROFILE_REQUIRED' | 'INSUFFICIENT_DATA' | 'FAILED';
+export type ReportStatusV2 = 'SUCCESS' | 'PROFILE_REQUIRED' | 'INSUFFICIENT_DATA' | 'FAILED' | 'GENERATING';
 
 export type RPoint = { x: string; y: number };
 export type RMetric = { label: string; value: string; delta: string | null; direction: AiMetricDirection };
@@ -139,7 +139,13 @@ export type AiReportV2 = {
   suggestedQuestions: string[];
 };
 
-export type AiReportV2Response = { status: ReportStatusV2; message: string | null; report: AiReportV2 | null };
+export type AiReportV2Response = {
+  status: ReportStatusV2;
+  message: string | null;
+  report: AiReportV2 | null;
+  percent?: number | null;
+  step?: string | null;
+};
 
 /**
  * 통합 리포트 조회/생성. back=n이면 n기간 이전(아카이브).
