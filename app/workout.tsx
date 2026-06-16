@@ -1867,13 +1867,13 @@ export default function WorkoutScreen() {
                       <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${restPct}%`, backgroundColor: '#0A84FF' }} />
                       <Text style={{ textAlign: 'center', color: '#fff', fontWeight: '800', fontVariant: ['tabular-nums'] }}>{fmtClock(restRemaining)}</Text>
                     </Pressable>
-                  ) : s.done ? (
+                  ) : (
                     <Pressable onPress={() => openRestPicker(exIdx)} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1.5 }} hitSlop={6}>
-                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.3)' }} />
-                      <Text style={{ color: '#30D158', fontSize: 11, fontWeight: '700', marginHorizontal: 8, fontVariant: ['tabular-nums'] }}>{fmtClock(restDurationSec)}</Text>
-                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(48,209,88,0.3)' }} />
+                      <View style={{ flex: 1, height: 1, backgroundColor: s.done ? 'rgba(48,209,88,0.3)' : 'rgba(120,120,128,0.22)' }} />
+                      <Text style={{ color: s.done ? '#30D158' : '#7E7E83', fontSize: 11, fontWeight: '700', marginHorizontal: 8, fontVariant: ['tabular-nums'] }}>{fmtClock(restDurationSec)}</Text>
+                      <View style={{ flex: 1, height: 1, backgroundColor: s.done ? 'rgba(48,209,88,0.3)' : 'rgba(120,120,128,0.22)' }} />
                     </Pressable>
-                  ) : null}
+                  )}
                   </React.Fragment>
                 );
               })}
