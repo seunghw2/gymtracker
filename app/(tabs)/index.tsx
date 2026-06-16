@@ -77,6 +77,8 @@ export default function BriefingHome() {
   const [dialValue, setDialValue] = useState(70);
   const [bodyFatInput, setBodyFatInput] = useState('');
   const [todayBodyFat, setTodayBodyFat] = useState<number | null>(null);
+  const [waistInput, setWaistInput] = useState('');
+  const [todayWaist, setTodayWaist] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -97,12 +99,14 @@ export default function BriefingHome() {
       if (todayLog?.weight_kg) {
         setTodayWeight(todayLog.weight_kg);
         setTodayBodyFat(todayLog.body_fat_pct ?? null);
+        setTodayWaist(todayLog.waist_cm ?? null);
       } else {
         const enabled = await getSetting('weight_prompt_enabled', '1').catch(() => '1');
         const dismissed = await AsyncStorage.getItem(WEIGHT_PROMPT_KEY).catch(() => null);
         if (enabled !== '0' && dismissed !== today) setShowWeightModal(true);
         setDialValue(latestLog?.weight_kg ?? 70);
         setBodyFatInput(latestLog?.body_fat_pct ? String(latestLog.body_fat_pct) : '');
+        setWaistInput(latestLog?.waist_cm ? String(latestLog.waist_cm) : '');
       }
     } catch {
       // 무시 — 폴백 UI
@@ -147,14 +151,18 @@ export default function BriefingHome() {
   const openWeightModal = () => {
     setDialValue(todayWeight ?? dialValue);
     setBodyFatInput(todayBodyFat != null ? String(todayBodyFat) : bodyFatInput);
+    setWaistInput(todayWaist != null ? String(todayWaist) : waistInput);
     setShowWeightModal(true);
   };
   const handleSaveWeight = async () => {
     const fat = parseFloat(bodyFatInput);
     const fatValue = Number.isFinite(fat) && fat > 0 ? fat : todayBodyFat ?? undefined;
-    try { await upsertBodyLog(getTodayStr(), dialValue, fatValue); } catch {}
+    const waist = parseFloat(waistInput);
+    const waistValue = Number.isFinite(waist) && waist > 0 ? waist : todayWaist ?? undefined;
+    try { await upsertBodyLog(getTodayStr(), dialValue, fatValue, waistValue); } catch {}
     setTodayWeight(dialValue);
     if (fatValue != null) setTodayBodyFat(fatValue);
+    if (waistValue != null) setTodayWaist(waistValue);
     AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {});
     setShowWeightModal(false);
   };
@@ -276,6 +284,19 @@ export default function BriefingHome() {
                     maxLength={4}
                   />
                   <Text style={styles.fatUnit}>%</Text>
+                </View>
+                <View style={styles.fatRow}>
+                  <Text style={styles.fatLabel}>허리</Text>
+                  <TextInput
+                    style={styles.fatInput}
+                    value={waistInput}
+                    onChangeText={setWaistInput}
+                    placeholder="선택"
+                    placeholderTextColor="#48484A"
+                    keyboardType="decimal-pad"
+                    maxLength={5}
+                  />
+                  <Text style={styles.fatUnit}>cm</Text>
                 </View>
                 <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
                   <Text style={styles.saveBtnText}>저장</Text>

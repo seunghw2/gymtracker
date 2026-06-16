@@ -40,6 +40,7 @@ export type BodyLog = {
   date: string;
   weight_kg: number | null;
   body_fat_pct: number | null;
+  waist_cm: number | null;
 };
 
 export type Gym = {

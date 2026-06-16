@@ -17,10 +17,10 @@ export async function getLatestBodyLog(): Promise<BodyLog | null> {
   }
 }
 
-export async function upsertBodyLog(date: string, weight_kg: number, body_fat_pct?: number): Promise<void> {
+export async function upsertBodyLog(date: string, weight_kg: number, body_fat_pct?: number, waist_cm?: number): Promise<void> {
   await apiRequest('/api/v1/body-logs', {
     method: 'POST',
-    body: { date, weightKg: weight_kg, bodyFatPct: body_fat_pct ?? null },
+    body: { date, weightKg: weight_kg, bodyFatPct: body_fat_pct ?? null, waistCm: waist_cm ?? null },
   });
 }
 

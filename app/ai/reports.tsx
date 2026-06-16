@@ -4,7 +4,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AI, COLORS } from '../../constants/colors';
 import { getReportV2, getAllWorkoutDates, AiReportV2Response } from '../../db/queries';
 import { PERIOD_UNITS, PeriodUnit, buildBuckets, earliestDate } from '../../lib/periods';
-import ReportView from '../../components/ReportView';
+import ReportTabs from '../../components/report/ReportTabs';
 import BriefingLoading from '../../components/BriefingLoading';
 
 const GREEN = COLORS.green;
@@ -112,7 +112,7 @@ export default function AiReportsScreen() {
             {res.report.period.nextReportEtaDays != null && (
               <View style={styles.eta}><Text style={styles.etaText}>🔓 {res.report.period.label} · 진행 중 (D-{res.report.period.nextReportEtaDays})</Text></View>
             )}
-            <ReportView r={res.report} onAsk={() => router.push({ pathname: '/ai/chat', params: { reportId: res.report!.id, period: unitType } })} />
+            <ReportTabs r={res.report} onAsk={() => router.push({ pathname: '/ai/chat', params: { reportId: res.report!.id, period: unitType } })} />
           </>
         ) : res?.status === 'PROFILE_REQUIRED' ? (
           <Empty icon="🎯" title="먼저 목표를 알려주세요" desc={res.message ?? '목표 체형·우선 부위를 설정하면 분석을 시작해요.'} cta="설정하기" onPress={() => router.push('/ai/intake')} />

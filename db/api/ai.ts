@@ -110,7 +110,18 @@ export type RBodyComposition = {
   display: 'none' | 'oneLine' | 'line' | 'beforeAfter';
   weight: RMeasure | null;
   bodyFat: RMeasure | null;
+  waist: RMeasure | null;
+  recomp: string | null;
   comment: string | null;
+};
+
+export type RConsistency = {
+  attendancePct: number; sessions: number; planned: number;
+  longestGapDays: number; weeklyAvg: number; streak: number; strip: number[];
+};
+export type RCoachItem = {
+  key: string; chapter: number; icon: string; title: string; body: string;
+  badge: string | null; defaultOn: boolean;
 };
 export type RGoalProgress = { goalLabel: string; value: number; comment: string } | null;
 export type RPrescription = { horizon: string; action: string; why: string; todo: string };
@@ -137,6 +148,8 @@ export type AiReportV2 = {
   prescription: RPrescription;
   notesQuote: string | null;
   suggestedQuestions: string[];
+  consistency: RConsistency | null;
+  coaching: RCoachItem[] | null;
 };
 
 export type AiReportV2Response = {

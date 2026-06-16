@@ -31,7 +31,7 @@ export type ApiSessionSummary = {
 
 export type ApiBodyLog = {
   id: number; date: string;
-  weightKg: number | null; bodyFatPct: number | null;
+  weightKg: number | null; bodyFatPct: number | null; waistCm: number | null;
 };
 
 export type ApiCalendar = {
@@ -80,6 +80,6 @@ export function mapSetDtoToSessionSetRow(s: ApiSetDto): SessionSetRow {
 export function mapBodyLog(b: ApiBodyLog): BodyLog {
   return {
     id: b.id, date: b.date,
-    weight_kg: b.weightKg, body_fat_pct: b.bodyFatPct,
+    weight_kg: b.weightKg, body_fat_pct: b.bodyFatPct, waist_cm: b.waistCm,
   };
 }
