@@ -99,6 +99,7 @@ import RmBasisSheet, { RmMode } from '../../components/RmBasisSheet';
 import NumPad from '../../components/NumPad';
 import HeaderTimerButton from '../../components/HeaderTimerButton';
 import ExerciseEditSheet from '../../components/ExerciseEditSheet';
+import WorkoutCoachBanner from '../../components/WorkoutCoachBanner';
 import { useRestRemaining, fmtClock } from '../../hooks/useRestRemaining';
 import { playSetDoneSound } from '../../lib/sound';
 import { buildExerciseEntry } from '../../lib/exerciseEntry';
@@ -1668,6 +1669,8 @@ export default function WorkoutScreen() {
             autoFocus
           />
         )}
+
+        <WorkoutCoachBanner />
 
         {exercises.length === 0 && (
           <View style={styles.emptyHint}>

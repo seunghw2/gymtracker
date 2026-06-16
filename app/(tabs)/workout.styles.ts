@@ -212,7 +212,7 @@ export const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 13,
     fontWeight: '600',
-    backgroundColor: '#1A3D27',
+    backgroundColor: '#2A1113',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
@@ -452,7 +452,7 @@ export const styles = StyleSheet.create({
   warmupApplyText: { color: '#000000', fontSize: 16, fontWeight: '700' },
   historyBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
   repeatBtn: {
-    backgroundColor: '#1A3D27',
+    backgroundColor: '#2A1113',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -522,7 +522,7 @@ export const styles = StyleSheet.create({
   quickAddTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    backgroundColor: '#1A3D27',
+    backgroundColor: '#2A1113',
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 9,
