@@ -10,6 +10,7 @@ const UP = COLORS.green;
 const WARN = '#FF9F0A';
 const HIDDEN_KEY = 'ai_report_hidden';
 const TONE_KEY = 'ai_coach_tone';
+const PINNED_KEY = 'ai_pinned_lifts';
 const TONES: [string, string][] = [['plain', '담백'], ['cheer', '응원'], ['blunt', '직설']];
 const COMPOUND = ['squat', 'bench', 'deadlift', 'press', 'row', 'pulldown', 'pull up', 'pullup', 'lunge', 'dip', 'chin'];
 const PINNED = ['squat', 'bench press', 'deadlift', 'overhead press', 'lat pulldown'];
@@ -22,11 +23,22 @@ export default function ReportTabs({ r, onAsk, onReload }: { r: AiReportV2; onAs
   const [editing, setEditing] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [tone, setTone] = useState('plain');
+  const [pinned, setPinned] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getSetting(HIDDEN_KEY, '[]').then(v => { try { setHidden(new Set(JSON.parse(v))); } catch {} }).catch(() => {});
     getSetting(TONE_KEY, 'plain').then(setTone).catch(() => {});
+    getSetting(PINNED_KEY, '').then(v => setPinned(new Set(v.split(',').map(s => s.trim()).filter(Boolean)))).catch(() => {});
   }, []);
+
+  const togglePin = (name: string) => {
+    setPinned(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      setSetting(PINNED_KEY, [...next].join(',')).catch(() => {});
+      return next;
+    });
+  };
 
   const toggleHidden = (key: string) => {
     setHidden(prev => {
@@ -53,8 +65,8 @@ export default function ReportTabs({ r, onAsk, onReload }: { r: AiReportV2; onAs
         </View>
         <Pressable onPress={() => setEditing(e => !e)} hitSlop={8}><Text style={styles.edit}>{editing ? '완료' : '편집'}</Text></Pressable>
       </View>
-      {tab === 'brief' && <BriefTab r={r} />}
-      {tab === 'data' && <DataTab r={r} editing={editing} hidden={hidden} toggle={toggleHidden} />}
+      {tab === 'brief' && <BriefTab r={r} editing={editing} hidden={hidden} toggle={toggleHidden} />}
+      {tab === 'data' && <DataTab r={r} editing={editing} hidden={hidden} toggle={toggleHidden} pinned={pinned} togglePin={togglePin} />}
       {tab === 'coach' && <CoachTab r={r} onAsk={onAsk} editing={editing} hidden={hidden} toggle={toggleHidden} tone={tone} onTone={changeTone} />}
     </View>
   );
@@ -65,19 +77,21 @@ function EditDot({ on, onPress }: { on: boolean; onPress: () => void }) {
 }
 
 // ── 브리핑 ──────────────────────────────────────────────────────────
-function BriefTab({ r }: { r: AiReportV2 }) {
+function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: boolean; hidden: Set<string>; toggle: (k: string) => void }) {
   const c = r.consistency;
   const stallN = r.detail.stagnation?.length ?? 0;
   const vol = r.detail.trends?.find(t => t.metric.includes('볼륨'))?.points.map(p => p.y) ?? [];
   const w = r.bodyComposition?.weight;
+  const show = (k: string) => editing || !hidden.has(k);
+  const editDot = (k: string) => editing ? <View style={styles.kpiEdit}><EditDot on={hidden.has(k)} onPress={() => toggle(k)} /></View> : null;
   return (
     <View>
       <Text style={styles.hero}>{r.headline}</Text>
       <View style={styles.kpiGrid}>
-        <Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'up'} />
-        <Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} />
-        <KpiSpark points={vol} l="주간 볼륨" />
-        <Kpi v={`${stallN}건`} l="정체 종목" tone={stallN > 0 ? 'warn' : 'up'} />
+        {show('kpi_attendance') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'up'} />{editDot('kpi_attendance')}</View>}
+        {show('kpi_weight') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_weight') && { opacity: 0.4 }]}><Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} />{editDot('kpi_weight')}</View>}
+        {show('kpi_volume') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_volume') && { opacity: 0.4 }]}><KpiSpark points={vol} l="주간 볼륨" />{editDot('kpi_volume')}</View>}
+        {show('kpi_stall') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_stall') && { opacity: 0.4 }]}><Kpi v={`${stallN}건`} l="정체 종목" tone={stallN > 0 ? 'warn' : 'up'} />{editDot('kpi_stall')}</View>}
       </View>
       {!!r.summary.oneLiner && (
         <View style={styles.insight}><Text style={styles.insightK}>진단</Text><Text style={styles.insightX}>{r.summary.oneLiner}</Text></View>
@@ -91,18 +105,20 @@ function BriefTab({ r }: { r: AiReportV2 }) {
 }
 
 // ── 데이터 ──────────────────────────────────────────────────────────
-function DataTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: boolean; hidden: Set<string>; toggle: (k: string) => void }) {
+function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiReportV2; editing: boolean; hidden: Set<string>; toggle: (k: string) => void; pinned: Set<string>; togglePin: (n: string) => void }) {
   const c = r.consistency;
   const bc = r.bodyComposition;
   const goalWeight = useSettingsStore(s => s.goalWeightKg);
   const [exFilter, setExFilter] = useState<'pinned' | 'compound' | 'all'>('pinned');
   const show = (k: string) => editing || !hidden.has(k);
+  // 핀 설정이 있으면 그걸, 없으면 기본 빅스 이름 매칭
+  const isPin = (name: string) => pinned.size > 0 ? pinned.has(name) : isPinned(name);
 
   const exRows = [
     ...(r.detail.growth ?? []).map(g => ({ name: g.name, val: g.change, color: UP })),
     ...(r.detail.stagnation ?? []).map(s => ({ name: s.name, val: `${s.weeksFlat}주 정체`, color: WARN })),
   ];
-  const exFiltered = exRows.filter(e => exFilter === 'all' ? true : exFilter === 'compound' ? isCompound(e.name) : isPinned(e.name));
+  const exFiltered = exRows.filter(e => exFilter === 'all' ? true : exFilter === 'compound' ? isCompound(e.name) : isPin(e.name));
 
   return (
     <View style={{ gap: 12 }}>
@@ -166,10 +182,16 @@ function DataTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: boole
           {exFiltered.length === 0 ? <Text style={styles.exEmpty}>해당 종목이 없어요.</Text> :
             exFiltered.map((e, i) => (
               <View key={i} style={styles.exRow}>
-                <Text style={styles.exName}>{isPinned(e.name) ? '★ ' : ''}{e.name}</Text>
+                {editing && (
+                  <Pressable onPress={() => togglePin(e.name)} hitSlop={6}>
+                    <Text style={[styles.pinStar, { color: isPin(e.name) ? COLORS.gold : AI.faint }]}>{isPin(e.name) ? '★' : '☆'}</Text>
+                  </Pressable>
+                )}
+                <Text style={styles.exName}>{!editing && isPin(e.name) ? '★ ' : ''}{e.name}</Text>
                 <Text style={[styles.exVal, { color: e.color }]}>{e.val}</Text>
               </View>
             ))}
+          {editing && <Text style={styles.exHint}>★ 탭하여 주력 종목 지정/해제</Text>}
         </Card>
       )}
     </View>
@@ -313,7 +335,9 @@ const styles = StyleSheet.create({
 
   hero: { color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 30, letterSpacing: -0.4, marginBottom: 16 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  kpi: { width: '48%', backgroundColor: AI.card, borderRadius: 12, padding: 14, minHeight: 72, justifyContent: 'center' },
+  kpiWrap: { width: '48%', position: 'relative' },
+  kpiEdit: { position: 'absolute', top: 6, right: 8 },
+  kpi: { width: '100%', backgroundColor: AI.card, borderRadius: 12, padding: 14, minHeight: 72, justifyContent: 'center' },
   kpiV: { color: '#fff', fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
   kpiL: { color: AI.textSub, fontSize: 11.5, marginTop: 3 },
   kpiSub: { color: AI.faint, fontSize: 11, marginTop: 1, fontVariant: ['tabular-nums'] },
@@ -365,9 +389,11 @@ const styles = StyleSheet.create({
   chipText: { color: AI.textSub, fontSize: 11.5, fontWeight: '700' },
   chipTextOn: { color: '#fff' },
   exEmpty: { color: AI.faint, fontSize: 12, paddingVertical: 6 },
-  exRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
-  exName: { color: '#EDEDF0', fontSize: 13 },
+  exRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+  exName: { color: '#EDEDF0', fontSize: 13, flex: 1 },
   exVal: { fontSize: 13, fontWeight: '800' },
+  pinStar: { fontSize: 15, width: 18 },
+  exHint: { color: AI.faint, fontSize: 11, marginTop: 6 },
 
   coachBanner: { backgroundColor: AI.tint, borderRadius: 10, padding: 11, marginBottom: 10 },
   coachBannerText: { color: ACCENT, fontSize: 12.5, fontWeight: '700' },
