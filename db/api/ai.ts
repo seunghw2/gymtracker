@@ -52,6 +52,9 @@ export type AiProfile = {
   weeklyFrequencyTarget: number | null;
   constraints: string[];
   experienceLevel: string | null;
+  trainingMonths: number | null;
+  splitStyle: string | null;
+  sessionMinutes: number | null;
   freeNote: string | null;
 };
 
@@ -61,6 +64,9 @@ export type AiProfileInput = {
   weeklyFrequencyTarget?: number | null;
   constraints?: string[];
   experienceLevel?: string | null;
+  trainingMonths?: number | null;
+  splitStyle?: string | null;
+  sessionMinutes?: number | null;
   freeNote?: string | null;
 };
 
