@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { getReportV2, AiReportV2Response, ReportPeriodType } from '../../db/queries';
 import ReportView from '../../components/ReportView';
@@ -15,39 +15,45 @@ const PERIODS: { t: ReportPeriodType; label: string }[] = [
 
 export default function AiReportsScreen() {
   const router = useRouter();
-  const [period, setPeriod] = useState<ReportPeriodType>('week');
+  const params = useLocalSearchParams<{ type?: string; back?: string }>();
+  const initType = (params.type as ReportPeriodType) ?? 'week';
+  const initBack = Number(params.back ?? 0);
+  const [period, setPeriod] = useState<ReportPeriodType>(initType);
+  const [back, setBack] = useState<number>(initBack);
   const [res, setRes] = useState<AiReportV2Response | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback((t: ReportPeriodType, force = false) => {
+  const load = useCallback((t: ReportPeriodType, b: number, force = false) => {
     setLoading(true);
-    getReportV2(t, force)
+    getReportV2(t, b, force)
       .then(setRes)
       .catch(() => setRes({ status: 'FAILED', message: '네트워크 오류로 불러오지 못했어요.', report: null }))
       .finally(() => setLoading(false));
   }, []);
 
-  useFocusEffect(useCallback(() => { load(period); }, [period, load]));
+  useFocusEffect(useCallback(() => { load(period, back); }, [period, back, load]));
 
-  const pick = (t: ReportPeriodType) => { setPeriod(t); };
+  const pick = (t: ReportPeriodType) => { setBack(0); setPeriod(t); };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={8}><Text style={styles.back}>‹</Text></Pressable>
         <Text style={styles.title}>리포트</Text>
-        <View style={{ width: 24 }} />
+        <Pressable onPress={() => router.push('/ai/archive')} hitSlop={8}><Text style={styles.archive}>📚</Text></Pressable>
       </View>
 
-      <View style={styles.segWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.seg}>
-          {PERIODS.map(p => (
-            <Pressable key={p.t} style={[styles.chip, period === p.t && styles.chipOn]} onPress={() => pick(p.t)}>
-              <Text style={[styles.chipText, period === p.t && styles.chipTextOn]}>{p.label}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+      {period !== 'session' && back === 0 && (
+        <View style={styles.segWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.seg}>
+            {PERIODS.map(p => (
+              <Pressable key={p.t} style={[styles.chip, period === p.t && styles.chipOn]} onPress={() => pick(p.t)}>
+                <Text style={[styles.chipText, period === p.t && styles.chipTextOn]}>{p.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.body}>
         {loading ? (
@@ -64,7 +70,7 @@ export default function AiReportsScreen() {
         ) : res?.status === 'INSUFFICIENT_DATA' ? (
           <Empty icon="📭" title="이 기간 기록이 없어요" desc={res.message ?? '완료된 운동이 있어야 분석할 수 있어요.'} cta="운동하러 가기" onPress={() => router.replace('/(tabs)/workout')} />
         ) : (
-          <Empty icon="⚠️" title="리포트를 불러오지 못했어요" desc={res?.message ?? '잠시 후 다시 시도해 주세요.'} cta="다시 시도" onPress={() => load(period, true)} />
+          <Empty icon="⚠️" title="리포트를 불러오지 못했어요" desc={res?.message ?? '잠시 후 다시 시도해 주세요.'} cta="다시 시도" onPress={() => load(period, back, true)} />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -87,6 +93,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: AI.line },
   back: { color: AI.accent, fontSize: 30, width: 24, marginTop: -4 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  archive: { fontSize: 18 },
 
   segWrap: { borderBottomWidth: 1, borderBottomColor: AI.line },
   seg: { gap: 7, paddingHorizontal: 14, paddingVertical: 10 },

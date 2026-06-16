@@ -19,7 +19,7 @@ export default function ReportView({ r, onAsk }: { r: AiReportV2; onAsk?: () => 
   const low = r.confidence === 'low';
   const d = r.detail;
   const hasDetail =
-    (d.timeline?.length ?? 0) > 0 || d.balance || d.growth || d.stagnation ||
+    (d.timeline?.length ?? 0) > 0 || d.exercises || d.balance || d.growth || d.stagnation ||
     d.milestones || d.trends || r.bodyComposition?.weight || r.goalProgress;
 
   return (
@@ -81,6 +81,17 @@ export default function ReportView({ r, onAsk }: { r: AiReportV2; onAsk?: () => 
 
       {open && (
         <View style={styles.detail}>
+          {d.exercises && (
+            <Section title="종목별">
+              {d.exercises.map((e, i) => (
+                <View key={i} style={styles.lineRow}>
+                  <Text style={styles.lineName}>{e.name}{e.isPR ? ' 🏅' : ''}</Text>
+                  <Text style={styles.exSets}>{e.sets}{e.prevDelta ? ` · ${e.prevDelta}` : ''}</Text>
+                </View>
+              ))}
+            </Section>
+          )}
+
           {r.goalProgress && (
             <Section title="🎯 목표 진척">
               <View style={styles.gauge}><View style={[styles.gaugeFill, { width: `${Math.round(r.goalProgress.value * 100)}%` }]} /></View>
@@ -229,6 +240,7 @@ const styles = StyleSheet.create({
 
   lineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   lineName: { color: '#EDEDF0', fontSize: 13 },
+  exSets: { color: AI.textSub, fontSize: 12.5, fontVariant: ['tabular-nums'] },
   up: { color: '#30D158', fontSize: 13, fontWeight: '800' },
   warn: { color: AI.warn, fontSize: 12.5, fontWeight: '700' },
   milestone: { color: '#EDEDF0', fontSize: 13, lineHeight: 22 },

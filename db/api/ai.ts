@@ -141,10 +141,17 @@ export type AiReportV2 = {
 
 export type AiReportV2Response = { status: ReportStatusV2; message: string | null; report: AiReportV2 | null };
 
-/** 통합 리포트 조회/생성. type별 완료된 직전 기간 회고. */
-export async function getReportV2(type: ReportPeriodType, force = false): Promise<AiReportV2Response> {
-  const qs = `?type=${type}${force ? '&force=true' : ''}`;
+/** 통합 리포트 조회/생성. back=n이면 n기간 이전(아카이브). */
+export async function getReportV2(type: ReportPeriodType, back = 0, force = false): Promise<AiReportV2Response> {
+  const qs = `?type=${type}&back=${back}${force ? '&force=true' : ''}`;
   return apiRequest<AiReportV2Response>(`/api/v1/ai/v2/report${qs}`, { method: 'GET' });
+}
+
+export type ArchiveEntry = { id: string; type: ReportPeriodType; label: string; start: string; end: string; back: number };
+
+/** 과거 리포트 아카이브(시간 역순 혼합 목록). */
+export async function getArchive(): Promise<{ items: ArchiveEntry[] }> {
+  return apiRequest<{ items: ArchiveEntry[] }>('/api/v1/ai/v2/archive', { method: 'GET' });
 }
 
 export type ChatTurn = { role: 'user' | 'ai'; content: string };
