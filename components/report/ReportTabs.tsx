@@ -129,6 +129,20 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
   const goalWeight = useSettingsStore(st => st.goalWeightKg);
   const [exFilter, setExFilter] = useState<'pinned' | 'compound' | 'all'>('pinned');
   const [refOpen, setRefOpen] = useState(false);   // '참고' 그룹 기본 접힘
+  const [order, setOrder] = useState<Record<string, string[]>>({});
+  useEffect(() => { getSetting('ai_report_order', '{}').then(v => { try { setOrder(JSON.parse(v)); } catch {} }).catch(() => {}); }, []);
+  const move = (group: string, naturalKeys: string[], key: string, dir: -1 | 1) => {
+    setOrder(prev => {
+      const cur = (prev[group] ?? naturalKeys).filter(k => naturalKeys.includes(k));
+      naturalKeys.forEach(k => { if (!cur.includes(k)) cur.push(k); });
+      const i = cur.indexOf(key), j = i + dir;
+      if (i < 0 || j < 0 || j >= cur.length) return prev;
+      [cur[i], cur[j]] = [cur[j], cur[i]];
+      const next = { ...prev, [group]: cur };
+      setSetting('ai_report_order', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
   const show = (k: string) => editing || !hidden.has(k);
   const isPin = (name: string) => pinned.size > 0 ? pinned.has(name) : isPinned(name);
 
@@ -144,211 +158,215 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
   (r.detail.balance ?? []).filter(b => b.status === 'low').slice(0, 2).forEach(b => alerts.push({ tone: 'bad', text: `${b.part} 하드세트 부족(주 ${b.sets})` }));
   if (c && c.longestGapDays >= 5) alerts.push({ tone: 'bad', text: `최장 공백 ${c.longestGapDays}일` });
 
-  // 섹션 표시 여부
-  const hasTrend = !!d?.volumeBars || exRows.length > 0 || !!c;
-  const hasComp = !!r.detail.balance || !!d?.muscleVolumeShare || !!d?.muscleBalance || !!d?.repRange;
-  const hasStrength = !!d?.relativeStrength || !!d?.prTimeline;
-  const hasBody = (!!bc && bc.display !== 'none' && !!bc.weight) || !!d?.lbm || !!d?.goals;
-  const hasRef = !!d?.overload || !!d?.recovery || !!d?.sessionStats;
+  // ── 블록 레지스트리(P4: 그룹 내 표시·순서 커스텀) ──
+  const blocks: { key: string; group: string; node: React.ReactNode }[] = [];
+  const add = (key: string, group: string, cond: any, node: React.ReactNode) => { if (cond) blocks.push({ key, group, node }); };
+
+  add('card_alerts', 'alert', alerts.length > 0 && show('card_alerts'),
+    <Card title="⚠ 이번 주 주의" editing={editing} hidden={hidden.has('card_alerts')} onHide={() => toggle('card_alerts')}>
+      {alerts.map((a, i) => (
+        <View key={i} style={s.alertRow}><View style={[s.alertDot, { backgroundColor: toneColor(a.tone) }]} /><Text style={s.alertText}>{a.text}</Text></View>
+      ))}
+    </Card>);
+
+  add('card_volume', 'trend', d?.volumeBars && d.volumeBars.length > 0 && show('card_volume'),
+    <Card title="주별 볼륨 추세" chip={d?.volumeBars ? volTone(d.volumeBars) : undefined} editing={editing} hidden={hidden.has('card_volume')} onHide={() => toggle('card_volume')}>
+      <View style={s.bigRow}><BigNum value={(d?.volumeBars ?? []).reduce((a, b) => a + b.tons, 0).toFixed(1)} unit="톤" /></View>
+      <VBars data={(d?.volumeBars ?? []).map(b => ({ label: b.label, value: b.tons, sub: `${b.tons}t`, color: b.tone === 'bad' ? RT.bad : b.tone === 'warn' ? RT.warn : RT.c3 }))} />
+    </Card>);
+
+  add('card_exercises', 'trend', exRows.length > 0 && show('card_exercises'),
+    <Card title="1RM 성장 · 종목별" caption="3회+ 수행 · 탭하면 상세" editing={editing} hidden={hidden.has('card_exercises')} onHide={() => toggle('card_exercises')}>
+      <View style={s.chips}>
+        {([['pinned', '주력'], ['compound', '대형 복합'], ['all', '전체']] as const).map(([k, label]) => (
+          <Pressable key={k} style={[s.fchip, exFilter === k && s.fchipOn]} onPress={() => setExFilter(k)}>
+            <Text style={[s.fchipText, exFilter === k && s.fchipTextOn]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {exFiltered.length === 0 ? <Text style={s.exEmpty}>해당 종목이 없어요.</Text> :
+        exFiltered.map((e, i) => (
+          <Pressable key={i} style={s.exRow} disabled={editing} onPress={() => router.push({ pathname: '/exercise-detail', params: { name: e.name } })}>
+            {editing && (
+              <Pressable onPress={() => togglePin(e.name)} hitSlop={6}>
+                <Text style={[s.pinStar, { color: isPin(e.name) ? '#FFD60A' : RT.ink3 }]}>{isPin(e.name) ? '★' : '☆'}</Text>
+              </Pressable>
+            )}
+            <Text style={s.exName}>{!editing && isPin(e.name) ? '★ ' : ''}{e.name}</Text>
+            <Text style={[s.exVal, { color: toneColor(e.tone) }]}>{e.val}</Text>
+            {!editing && <Text style={s.exGo}>›</Text>}
+          </Pressable>
+        ))}
+      {editing ? <Text style={s.exHint}>★ 탭하여 주력 종목 지정/해제</Text> : <Text style={s.exHint}>종목을 탭하면 1RM 추세 상세를 볼 수 있어요</Text>}
+    </Card>);
+
+  add('card_consistency', 'trend', c && show('card_consistency'),
+    <Card title="일관성" caption="출석 · 빈도 · 준수율" chip={c && c.attendancePct < 80 ? { tone: 'warn', label: '주의' } : { tone: 'good', label: '양호' }} editing={editing} hidden={hidden.has('card_consistency')} onHide={() => toggle('card_consistency')}>
+      {c && <>
+        <View style={s.ringRow}>
+          <Ring pct={c.attendancePct} label="출석" tone={c.attendancePct < 80 ? 'warn' : 'good'} />
+          <View style={s.tiles}>
+            <Tile v={`${c.sessions}/${c.planned}`} l="세션" />
+            <Tile v={`${c.longestGapDays}일`} l="최장 공백" tone={c.longestGapDays >= 5 ? 'bad' : undefined} />
+            <Tile v={`${c.weeklyAvg}`} l="주 평균" />
+            <Tile v={`${c.streak}`} l="연속" />
+          </View>
+        </View>
+        {c.strip.length > 0 && <Strip cells={c.strip} />}
+      </>}
+      {d?.weekdayFreq && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={s.subh}>요일별 세션</Text>
+          <VBars height={56} data={d.weekdayFreq.map(b => ({ label: b.day, value: b.count, color: b.active ? RT.good : RT.c5 }))} />
+        </View>
+      )}
+      {d?.routineAdherence && (
+        <View style={s.freq}>
+          <Text style={s.subh}>루틴 준수율(근사)</Text>
+          <ProgressRow name="완료 세션" value={`${d.routineAdherence.completedSessions} / ${d.routineAdherence.plannedSessions}`} pct={pct(d.routineAdherence.completedSessions, d.routineAdherence.plannedSessions)} tone={tone3(pct(d.routineAdherence.completedSessions, d.routineAdherence.plannedSessions))} />
+        </View>
+      )}
+    </Card>);
+
+  add('card_balance', 'comp', r.detail.balance && show('card_balance'),
+    <Card title="부위 하드세트 / 주" caption="권장 10–20" editing={editing} hidden={hidden.has('card_balance')} onHide={() => toggle('card_balance')}>
+      {(r.detail.balance ?? []).map((b, i) => <BandRow key={i} part={b.part} sets={b.sets} status={b.status} />)}
+      {d?.muscleFreqDays && d.muscleFreqDays.length > 0 && (
+        <View style={s.freq}>
+          <Text style={s.subh}>부위별 빈도 · 주 2–3회 권장</Text>
+          {d.muscleFreqDays.map((m, i) => (
+            <View key={i} style={s.frow}><Text style={s.fn}>{m.part}</Text><Text style={[s.ff, m.low && { color: toneColor('bad') }]}>주 {m.perWeek}회{m.low ? ' 부족' : ''}</Text></View>
+          ))}
+        </View>
+      )}
+    </Card>);
+
+  add('card_share', 'comp', d?.muscleVolumeShare && d.muscleVolumeShare.length > 0 && show('card_share'),
+    <Card title="부위별 볼륨 분배" caption="총 볼륨이 어디에 쏠렸나" editing={editing} hidden={hidden.has('card_share')} onHide={() => toggle('card_share')}>
+      <Donut slices={d?.muscleVolumeShare ?? []} />
+    </Card>);
+
+  add('card_mbalance', 'comp', d?.muscleBalance && d.muscleBalance.length > 0 && show('card_mbalance'),
+    <Card title="근육군 밸런스" caption="밀기·당기기 / 상·하체 / 컴파운드·아이솔레이션" editing={editing} hidden={hidden.has('card_mbalance')} onHide={() => toggle('card_mbalance')}>
+      {(d?.muscleBalance ?? []).map((b, i) => <BalanceSplit key={i} {...b} />)}
+    </Card>);
+
+  add('card_reprange', 'comp', d?.repRange && show('card_reprange'),
+    <Card title="강도 · 렙 구간" caption={d?.repRange ? `평균 ${d.repRange.avgE1rmPct}% e1RM · 근비대 구간 비중` : undefined} editing={editing} hidden={hidden.has('card_reprange')} onHide={() => toggle('card_reprange')}>
+      {d?.repRange && <>
+        <StackedBar segments={[
+          { pct: d.repRange.strengthPct, color: RT.c4, label: d.repRange.strengthPct >= 12 ? '근력' : undefined },
+          { pct: d.repRange.hyperPct, color: RT.c1, label: d.repRange.hyperPct >= 20 ? `근비대 ${d.repRange.hyperPct}%` : undefined, dark: true },
+          { pct: d.repRange.endurancePct, color: RT.c3, label: d.repRange.endurancePct >= 12 ? '지구력' : undefined, dark: true },
+        ]} />
+        <View style={s.legRow2}>
+          <Text style={s.leg2}><Text style={{ color: RT.c4 }}>■</Text> 1–5렙 {d.repRange.strengthPct}%</Text>
+          <Text style={s.leg2}><Text style={{ color: RT.c1 }}>■</Text> 6–12렙 {d.repRange.hyperPct}%</Text>
+          <Text style={s.leg2}><Text style={{ color: RT.c3 }}>■</Text> 13+렙 {d.repRange.endurancePct}%</Text>
+        </View>
+      </>}
+    </Card>);
+
+  add('card_rel', 'strength', d?.relativeStrength && d.relativeStrength.length > 0 && show('card_rel'),
+    <Card title="상대 강도" caption="체중 대비 배수 · 표준 등급" editing={editing} hidden={hidden.has('card_rel')} onHide={() => toggle('card_rel')}>
+      {(d?.relativeStrength ?? []).map((rs, i) => (
+        <ProgressRow key={i} name={rs.lift} value={`${rs.multiple}×BW · ${rs.grade}`} pct={rs.barPct} tone={rs.barPct >= 66 ? 'good' : rs.barPct >= 40 ? 'warn' : 'bad'} />
+      ))}
+    </Card>);
+
+  add('card_pr', 'strength', d?.prTimeline && d.prTimeline.length > 0 && show('card_pr'),
+    <Card title="PR" chip={{ tone: 'good', label: `${d?.prTimeline?.length ?? 0}건` }} editing={editing} hidden={hidden.has('card_pr')} onHide={() => toggle('card_pr')}>
+      {(d?.prTimeline ?? []).map((p, i) => (
+        <View key={i} style={s.lrow}><Text style={[s.lst, { color: p.isNew ? RT.good : RT.ink2 }]}>{p.isNew ? '＋' : '●'}</Text><Text style={s.lnm}>{p.name}</Text><Text style={[s.lvl, { color: RT.good }]}>{p.isNew ? '신규' : p.value}</Text></View>
+      ))}
+    </Card>);
+
+  add('card_body', 'body', bc && bc.display !== 'none' && bc.weight && show('card_body'),
+    <Card title="몸" caption="체성분 · 7일 이동평균" right={bc?.weight?.delta ? <Delta text={bc.weight.delta} tone={bc.weight.delta.startsWith('-') ? 'good' : undefined} /> : undefined} editing={editing} hidden={hidden.has('card_body')} onHide={() => toggle('card_body')}>
+      {bc?.weight && <>
+        <View style={s.bigRow}><BigNum value={bc.weight.current ?? '–'} unit="kg" /></View>
+        {bc.weight.trend && bc.weight.trend.length >= 2 && (
+          <MiniLine points={bc.weight.trend.map(p => p.y)} band={goalWeight ? [goalWeight - 1, goalWeight + 1] : undefined} />
+        )}
+        <View style={s.tiles}>
+          {bc.bodyFat?.current != null && <Tile v={`${bc.bodyFat.current}%`} l="체지방" />}
+          {bc.waist?.current != null && <Tile v={`${bc.waist.current}`} l="허리(cm)" sub={bc.waist.delta ?? undefined} />}
+          {d?.lbm?.current != null && <Tile v={`${d.lbm.current}`} l="제지방 kg" />}
+          {!!bc.recomp && <Tile v="↓" l={bc.recomp} tone="good" />}
+        </View>
+      </>}
+      {!!d?.lbm?.comment && <Text style={s.cnote}>{d.lbm.comment}</Text>}
+      {d?.goals && d.goals.length > 0 && (
+        <View style={s.freq}>
+          <Text style={s.subh}>목표 진행률</Text>
+          {d.goals.map((g, i) => <ProgressRow key={i} name={g.label} value={g.detail} pct={g.pct} tone={g.tone} />)}
+        </View>
+      )}
+    </Card>);
+
+  add('card_overload', 'ref', d?.overload && show('card_overload'),
+    <Card title="점진적 과부하" caption="지난 수행 대비 무게·렙이 오른 비율" chip={{ tone: (d?.overload?.pct ?? 0) >= 50 ? 'good' : 'warn', label: (d?.overload?.pct ?? 0) >= 50 ? '양호' : '주의' }} editing={editing} hidden={hidden.has('card_overload')} onHide={() => toggle('card_overload')}>
+      {d?.overload && (
+        <View style={s.ringRow}>
+          <Ring pct={d.overload.pct} label="진행" tone={d.overload.pct >= 50 ? 'good' : 'warn'} />
+          <View style={s.tiles}>
+            <Tile v={`${d.overload.up}`} l="상승" tone="good" />
+            <Tile v={`${d.overload.hold}`} l="유지" />
+            <Tile v={`${d.overload.stall}`} l="정체" tone={d.overload.stall > 0 ? 'warn' : undefined} />
+            <Tile v={`${d.overload.total}`} l="전체" />
+          </View>
+        </View>
+      )}
+    </Card>);
+
+  add('card_recovery', 'ref', d?.recovery && d.recovery.length > 0 && show('card_recovery'),
+    <Card title="부위별 회복 간격" caption="마지막 자극 후 경과일" editing={editing} hidden={hidden.has('card_recovery')} onHide={() => toggle('card_recovery')}>
+      {(d?.recovery ?? []).map((rc, i) => (
+        <View key={i} style={s.lrow}><Text style={s.lnm}>{rc.part}</Text><Text style={[s.lvl, { color: toneColor(rc.tone) }]}>{rc.days}일</Text></View>
+      ))}
+    </Card>);
+
+  add('card_sessionstats', 'ref', d?.sessionStats && show('card_sessionstats'),
+    <Card title="세션 통계" editing={editing} hidden={hidden.has('card_sessionstats')} onHide={() => toggle('card_sessionstats')}>
+      {d?.sessionStats && <StatGrid items={[
+        { v: `${d.sessionStats.sessions}`, l: '총 세션' }, { v: `${d.sessionStats.sets}`, l: '총 세트' }, { v: `${d.sessionStats.reps}`, l: '총 렙' },
+        { v: `${d.sessionStats.avgMin}분`, l: '평균 시간' }, { v: `${d.sessionStats.setsPerSession}`, l: '세션당 세트' }, { v: `${d.sessionStats.prs}`, l: 'PR' },
+      ]} />}
+    </Card>);
+
+  const GROUPS: [string, string][] = [['alert', ''], ['trend', '추세'], ['comp', '구성'], ['strength', '강도 · 진행'], ['body', '몸'], ['ref', '참고']];
+  const renderGroup = ([group, label]: [string, string]) => {
+    const gb = blocks.filter(b => b.group === group);
+    if (gb.length === 0) return null;
+    const natural = gb.map(b => b.key);
+    const ord = (order[group] ?? natural).filter(k => natural.includes(k));
+    natural.forEach(k => { if (!ord.includes(k)) ord.push(k); });
+    const sorted = ord.map(k => gb.find(b => b.key === k)!).filter(Boolean);
+    const collapsed = group === 'ref' && !refOpen && !editing;
+    return (
+      <View key={group}>
+        {group === 'ref'
+          ? <Pressable style={s.refHead} onPress={() => setRefOpen(o => !o)}><Text style={s.refLabel}>참고</Text><Text style={s.refChevron}>{refOpen ? '⌄' : '›'}</Text></Pressable>
+          : label ? <Eyebrow label={label} /> : null}
+        {!collapsed && sorted.map((b, idx) => (
+          <View key={b.key}>
+            {editing && (
+              <View style={s.reorder}>
+                <Pressable disabled={idx === 0} onPress={() => move(group, natural, b.key, -1)} hitSlop={6}><Text style={[s.reBtn, idx === 0 && s.reOff]}>↑</Text></Pressable>
+                <Pressable disabled={idx === sorted.length - 1} onPress={() => move(group, natural, b.key, 1)} hitSlop={6}><Text style={[s.reBtn, idx === sorted.length - 1 && s.reOff]}>↓</Text></Pressable>
+              </View>
+            )}
+            {b.node}
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <View>
-      {/* ── 이 기간 운동 기록 ── */}
       <PeriodSessions start={r.period.start} end={r.period.end} />
-
-      {/* ── ⚠ 이번 주 주의(자동) ── */}
-      {alerts.length > 0 && show('card_alerts') && (
-        <Card title="⚠ 이번 주 주의" editing={editing} hidden={hidden.has('card_alerts')} onHide={() => toggle('card_alerts')}>
-          {alerts.map((a, i) => (
-            <View key={i} style={s.alertRow}>
-              <View style={[s.alertDot, { backgroundColor: toneColor(a.tone) }]} />
-              <Text style={s.alertText}>{a.text}</Text>
-            </View>
-          ))}
-        </Card>
-      )}
-
-      {/* ── 추세 ── */}
-      {hasTrend && <Eyebrow label="추세" />}
-      {d?.volumeBars && d.volumeBars.length > 0 && show('card_volume') && (
-        <Card title="주별 볼륨 추세" chip={volTone(d.volumeBars)} editing={editing} hidden={hidden.has('card_volume')} onHide={() => toggle('card_volume')}>
-          <View style={s.bigRow}><BigNum value={d.volumeBars.reduce((a, b) => a + b.tons, 0).toFixed(1)} unit="톤" /></View>
-          <VBars data={d.volumeBars.map(b => ({ label: b.label, value: b.tons, sub: `${b.tons}t`, color: b.tone === 'bad' ? RT.bad : b.tone === 'warn' ? RT.warn : RT.c3 }))} />
-        </Card>
-      )}
-      {exRows.length > 0 && show('card_exercises') && (
-        <Card title="1RM 성장 · 종목별" caption="3회+ 수행 · 탭하면 상세" editing={editing} hidden={hidden.has('card_exercises')} onHide={() => toggle('card_exercises')}>
-          <View style={s.chips}>
-            {([['pinned', '주력'], ['compound', '대형 복합'], ['all', '전체']] as const).map(([k, label]) => (
-              <Pressable key={k} style={[s.fchip, exFilter === k && s.fchipOn]} onPress={() => setExFilter(k)}>
-                <Text style={[s.fchipText, exFilter === k && s.fchipTextOn]}>{label}</Text>
-              </Pressable>
-            ))}
-          </View>
-          {exFiltered.length === 0 ? <Text style={s.exEmpty}>해당 종목이 없어요.</Text> :
-            exFiltered.map((e, i) => (
-              <Pressable key={i} style={s.exRow} disabled={editing}
-                onPress={() => router.push({ pathname: '/exercise-detail', params: { name: e.name } })}>
-                {editing && (
-                  <Pressable onPress={() => togglePin(e.name)} hitSlop={6}>
-                    <Text style={[s.pinStar, { color: isPin(e.name) ? '#FFD60A' : RT.ink3 }]}>{isPin(e.name) ? '★' : '☆'}</Text>
-                  </Pressable>
-                )}
-                <Text style={s.exName}>{!editing && isPin(e.name) ? '★ ' : ''}{e.name}</Text>
-                <Text style={[s.exVal, { color: toneColor(e.tone) }]}>{e.val}</Text>
-                {!editing && <Text style={s.exGo}>›</Text>}
-              </Pressable>
-            ))}
-          {editing ? <Text style={s.exHint}>★ 탭하여 주력 종목 지정/해제</Text> : <Text style={s.exHint}>종목을 탭하면 1RM 추세 상세를 볼 수 있어요</Text>}
-        </Card>
-      )}
-      {c && show('card_consistency') && (
-        <Card title="일관성" caption="출석 · 빈도 · 준수율" chip={c.attendancePct < 80 ? { tone: 'warn', label: '주의' } : { tone: 'good', label: '양호' }} editing={editing} hidden={hidden.has('card_consistency')} onHide={() => toggle('card_consistency')}>
-          <View style={s.ringRow}>
-            <Ring pct={c.attendancePct} label="출석" tone={c.attendancePct < 80 ? 'warn' : 'good'} />
-            <View style={s.tiles}>
-              <Tile v={`${c.sessions}/${c.planned}`} l="세션" />
-              <Tile v={`${c.longestGapDays}일`} l="최장 공백" tone={c.longestGapDays >= 5 ? 'bad' : undefined} />
-              <Tile v={`${c.weeklyAvg}`} l="주 평균" />
-              <Tile v={`${c.streak}`} l="연속" />
-            </View>
-          </View>
-          {c.strip.length > 0 && <Strip cells={c.strip} />}
-          {d?.weekdayFreq && (
-            <View style={{ marginTop: 14 }}>
-              <Text style={s.subh}>요일별 세션</Text>
-              <VBars height={56} data={d.weekdayFreq.map(b => ({ label: b.day, value: b.count, color: b.active ? RT.good : RT.c5 }))} />
-            </View>
-          )}
-          {d?.routineAdherence && (
-            <View style={s.freq}>
-              <Text style={s.subh}>루틴 준수율(근사)</Text>
-              <ProgressRow name="완료 세션" value={`${d.routineAdherence.completedSessions} / ${d.routineAdherence.plannedSessions}`} pct={pct(d.routineAdherence.completedSessions, d.routineAdherence.plannedSessions)} tone={tone3(pct(d.routineAdherence.completedSessions, d.routineAdherence.plannedSessions))} />
-            </View>
-          )}
-        </Card>
-      )}
-
-      {/* ── 구성 ── */}
-      {hasComp && <Eyebrow label="구성" />}
-      {r.detail.balance && show('card_balance') && (
-        <Card title="부위 하드세트 / 주" caption="권장 10–20" editing={editing} hidden={hidden.has('card_balance')} onHide={() => toggle('card_balance')}>
-          {r.detail.balance.map((b, i) => <BandRow key={i} part={b.part} sets={b.sets} status={b.status} />)}
-          {d?.muscleFreqDays && d.muscleFreqDays.length > 0 && (
-            <View style={s.freq}>
-              <Text style={s.subh}>부위별 빈도 · 주 2–3회 권장</Text>
-              {d.muscleFreqDays.map((m, i) => (
-                <View key={i} style={s.frow}><Text style={s.fn}>{m.part}</Text><Text style={[s.ff, m.low && { color: toneColor('bad') }]}>주 {m.perWeek}회{m.low ? ' 부족' : ''}</Text></View>
-              ))}
-            </View>
-          )}
-        </Card>
-      )}
-      {d?.muscleVolumeShare && d.muscleVolumeShare.length > 0 && show('card_share') && (
-        <Card title="부위별 볼륨 분배" caption="총 볼륨이 어디에 쏠렸나" editing={editing} hidden={hidden.has('card_share')} onHide={() => toggle('card_share')}>
-          <Donut slices={d.muscleVolumeShare} />
-        </Card>
-      )}
-      {d?.muscleBalance && d.muscleBalance.length > 0 && show('card_mbalance') && (
-        <Card title="근육군 밸런스" caption="밀기·당기기 / 상·하체 / 컴파운드·아이솔레이션" editing={editing} hidden={hidden.has('card_mbalance')} onHide={() => toggle('card_mbalance')}>
-          {d.muscleBalance.map((b, i) => <BalanceSplit key={i} {...b} />)}
-        </Card>
-      )}
-      {d?.repRange && show('card_reprange') && (
-        <Card title="강도 · 렙 구간" caption={`평균 ${d.repRange.avgE1rmPct}% e1RM · 근비대 구간 비중`} editing={editing} hidden={hidden.has('card_reprange')} onHide={() => toggle('card_reprange')}>
-          <StackedBar segments={[
-            { pct: d.repRange.strengthPct, color: RT.c4, label: d.repRange.strengthPct >= 12 ? '근력' : undefined },
-            { pct: d.repRange.hyperPct, color: RT.c1, label: d.repRange.hyperPct >= 20 ? `근비대 ${d.repRange.hyperPct}%` : undefined, dark: true },
-            { pct: d.repRange.endurancePct, color: RT.c3, label: d.repRange.endurancePct >= 12 ? '지구력' : undefined, dark: true },
-          ]} />
-          <View style={s.legRow2}>
-            <Text style={s.leg2}><Text style={{ color: RT.c4 }}>■</Text> 1–5렙 {d.repRange.strengthPct}%</Text>
-            <Text style={s.leg2}><Text style={{ color: RT.c1 }}>■</Text> 6–12렙 {d.repRange.hyperPct}%</Text>
-            <Text style={s.leg2}><Text style={{ color: RT.c3 }}>■</Text> 13+렙 {d.repRange.endurancePct}%</Text>
-          </View>
-        </Card>
-      )}
-
-      {/* ── 강도·진행 ── */}
-      {hasStrength && <Eyebrow label="강도 · 진행" />}
-      {d?.relativeStrength && d.relativeStrength.length > 0 && show('card_rel') && (
-        <Card title="상대 강도" caption="체중 대비 배수 · 표준 등급" editing={editing} hidden={hidden.has('card_rel')} onHide={() => toggle('card_rel')}>
-          {d.relativeStrength.map((rs, i) => (
-            <ProgressRow key={i} name={rs.lift} value={`${rs.multiple}×BW · ${rs.grade}`} pct={rs.barPct} tone={rs.barPct >= 66 ? 'good' : rs.barPct >= 40 ? 'warn' : 'bad'} />
-          ))}
-        </Card>
-      )}
-      {d?.prTimeline && d.prTimeline.length > 0 && show('card_pr') && (
-        <Card title="PR" chip={{ tone: 'good', label: `${d.prTimeline.length}건` }} editing={editing} hidden={hidden.has('card_pr')} onHide={() => toggle('card_pr')}>
-          {d.prTimeline.map((p, i) => (
-            <View key={i} style={s.lrow}><Text style={[s.lst, { color: p.isNew ? RT.good : RT.ink2 }]}>{p.isNew ? '＋' : '●'}</Text><Text style={s.lnm}>{p.name}</Text><Text style={[s.lvl, { color: RT.good }]}>{p.isNew ? '신규' : p.value}</Text></View>
-          ))}
-        </Card>
-      )}
-
-      {/* ── 몸(통합) ── */}
-      {hasBody && <Eyebrow label="몸" />}
-      {bc && bc.display !== 'none' && bc.weight && show('card_body') && (
-        <Card title="몸" caption="체성분 · 7일 이동평균" right={bc.weight.delta ? <Delta text={bc.weight.delta} tone={bc.weight.delta.startsWith('-') ? 'good' : undefined} /> : undefined} editing={editing} hidden={hidden.has('card_body')} onHide={() => toggle('card_body')}>
-          <View style={s.bigRow}><BigNum value={bc.weight.current ?? '–'} unit="kg" /></View>
-          {bc.weight.trend && bc.weight.trend.length >= 2 && (
-            <MiniLine points={bc.weight.trend.map(p => p.y)} band={goalWeight ? [goalWeight - 1, goalWeight + 1] : undefined} />
-          )}
-          <View style={s.tiles}>
-            {bc.bodyFat?.current != null && <Tile v={`${bc.bodyFat.current}%`} l="체지방" />}
-            {bc.waist?.current != null && <Tile v={`${bc.waist.current}`} l="허리(cm)" sub={bc.waist.delta ?? undefined} />}
-            {d?.lbm?.current != null && <Tile v={`${d.lbm.current}`} l="제지방 kg" />}
-            {!!bc.recomp && <Tile v="↓" l={bc.recomp} tone="good" />}
-          </View>
-          {!!d?.lbm?.comment && <Text style={s.cnote}>{d.lbm.comment}</Text>}
-          {d?.goals && d.goals.length > 0 && (
-            <View style={s.freq}>
-              <Text style={s.subh}>목표 진행률</Text>
-              {d.goals.map((g, i) => <ProgressRow key={i} name={g.label} value={g.detail} pct={g.pct} tone={g.tone} />)}
-            </View>
-          )}
-        </Card>
-      )}
-
-      {/* ── 참고(기본 접힘) ── */}
-      {hasRef && (
-        <>
-          <Pressable style={s.refHead} onPress={() => setRefOpen(o => !o)}>
-            <Text style={s.refLabel}>참고</Text>
-            <Text style={s.refChevron}>{refOpen ? '⌄' : '›'}</Text>
-          </Pressable>
-          {refOpen && <>
-            {d?.overload && show('card_overload') && (
-              <Card title="점진적 과부하" caption="지난 수행 대비 무게·렙이 오른 비율" chip={{ tone: d.overload.pct >= 50 ? 'good' : 'warn', label: d.overload.pct >= 50 ? '양호' : '주의' }} editing={editing} hidden={hidden.has('card_overload')} onHide={() => toggle('card_overload')}>
-                <View style={s.ringRow}>
-                  <Ring pct={d.overload.pct} label="진행" tone={d.overload.pct >= 50 ? 'good' : 'warn'} />
-                  <View style={s.tiles}>
-                    <Tile v={`${d.overload.up}`} l="상승" tone="good" />
-                    <Tile v={`${d.overload.hold}`} l="유지" />
-                    <Tile v={`${d.overload.stall}`} l="정체" tone={d.overload.stall > 0 ? 'warn' : undefined} />
-                    <Tile v={`${d.overload.total}`} l="전체" />
-                  </View>
-                </View>
-              </Card>
-            )}
-            {d?.recovery && d.recovery.length > 0 && show('card_recovery') && (
-              <Card title="부위별 회복 간격" caption="마지막 자극 후 경과일" editing={editing} hidden={hidden.has('card_recovery')} onHide={() => toggle('card_recovery')}>
-                {d.recovery.map((rc, i) => (
-                  <View key={i} style={s.lrow}><Text style={s.lnm}>{rc.part}</Text><Text style={[s.lvl, { color: toneColor(rc.tone) }]}>{rc.days}일</Text></View>
-                ))}
-              </Card>
-            )}
-            {d?.sessionStats && show('card_sessionstats') && (
-              <Card title="세션 통계" editing={editing} hidden={hidden.has('card_sessionstats')} onHide={() => toggle('card_sessionstats')}>
-                <StatGrid items={[
-                  { v: `${d.sessionStats.sessions}`, l: '총 세션' }, { v: `${d.sessionStats.sets}`, l: '총 세트' }, { v: `${d.sessionStats.reps}`, l: '총 렙' },
-                  { v: `${d.sessionStats.avgMin}분`, l: '평균 시간' }, { v: `${d.sessionStats.setsPerSession}`, l: '세션당 세트' }, { v: `${d.sessionStats.prs}`, l: 'PR' },
-                ]} />
-              </Card>
-            )}
-          </>}
-        </>
-      )}
+      {GROUPS.map(renderGroup)}
     </View>
   );
 }
@@ -542,6 +560,9 @@ const s = StyleSheet.create({
   refHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 9, paddingHorizontal: 4 },
   refLabel: { color: RT.ink3, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
   refChevron: { color: RT.ink3, fontSize: 16, fontWeight: '800' },
+  reorder: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14, paddingRight: 6, marginBottom: -4 },
+  reBtn: { color: RT.action, fontSize: 18, fontWeight: '800' },
+  reOff: { color: RT.ink3, opacity: 0.4 },
 
   lrow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RT.hair },
   lst: { width: 16, textAlign: 'center', fontSize: 13 },
