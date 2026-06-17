@@ -17,7 +17,6 @@ export type Exercise = {
 export type WorkoutSession = {
   id: number;
   date: string;
-  gym_id: number | null;
   duration_sec: number | null;
   note: string | null;
 };
@@ -43,12 +42,6 @@ export type BodyLog = {
   waist_cm: number | null;
 };
 
-export type Gym = {
-  id: number;
-  name: string;
-  location: string | null;
-};
-
 export type SessionSummary = {
   id: number;
   date: string;
@@ -58,7 +51,6 @@ export type SessionSummary = {
   exercise_names: string;
   title: string | null;
   note: string | null;
-  gym_id: number | null;
   tags: string | null;
 };
 
@@ -84,7 +76,6 @@ export type ExerciseNote = {
 export type SessionPatch = {
   title?: string;
   note?: string;
-  gymId?: number | null;
   date?: string;
   durationSec?: number;
   tags?: string;

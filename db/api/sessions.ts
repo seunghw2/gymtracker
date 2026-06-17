@@ -2,10 +2,10 @@ import { apiRequest } from '../../lib/api';
 import type { SessionSummary, SessionSetRow, SessionPatch, ExerciseNote } from './types';
 import { type ApiSessionSummary, type ApiSetDto, mapSetDtoToSessionSetRow } from './mappers';
 
-export async function createWorkoutSession(date: string, gym_id?: number | null, title?: string): Promise<number> {
+export async function createWorkoutSession(date: string, title?: string): Promise<number> {
   const result = await apiRequest<{ id: number }>('/api/v1/workouts/sessions', {
     method: 'POST',
-    body: { date, gymId: gym_id ?? null, title: title?.trim() || null },
+    body: { date, title: title?.trim() || null },
   });
   return result.id;
 }
@@ -54,7 +54,6 @@ export async function getSessionHistory(limit = 30): Promise<SessionSummary[]> {
     exercise_names: s.exerciseNames.join(', '),
     title: s.title ?? null,
     note: s.note ?? null,
-    gym_id: s.gymId ?? null,
     tags: s.tags ?? null,
   }));
 }

@@ -8,7 +8,6 @@ export * from './api/stats';
 export * from './api/bodylog';
 export * from './api/settings';
 export * from './api/templates';
-export * from './api/gyms';
 export * from './api/ai';
 export * from './api/notifications';
 export * from './api/chat';

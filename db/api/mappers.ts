@@ -26,7 +26,7 @@ export type ApiSessionSummary = {
   durationSec: number | null;
   exerciseCount: number; setCount: number;
   exerciseNames: string[];
-  title: string | null; note: string | null; gymId: number | null; tags: string | null;
+  title: string | null; note: string | null; tags: string | null;
 };
 
 export type ApiBodyLog = {

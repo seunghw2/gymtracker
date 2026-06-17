@@ -11,9 +11,6 @@ import {
   Switch,
 } from 'react-native';
 import {
-  getGyms,
-  addGym,
-  deleteGym,
   getBodyTags,
   setBodyTags,
   getCustomExercises,
@@ -24,7 +21,6 @@ import {
   setExerciseRest,
   setExerciseTrackingType,
   deleteAiProfile,
-  Gym,
   Exercise,
 } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
@@ -83,12 +79,9 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const [gyms, setGyms] = useState<Gym[]>([]);
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
   const [allExercises, setAllExercises] = useState<Exercise[]>([]);
   const [restByEx, setRestByEx] = useState<Record<number, string>>({});
-  const [gymName, setGymName] = useState('');
-  const [gymLocation, setGymLocation] = useState('');
   const [goalWeightInput, setGoalWeightInput] = useState(String(goalWeightKg));
   const [goalFatInput, setGoalFatInput] = useState(String(goalBodyFatPct));
   const [restInput, setRestInput] = useState(String(restDurationSec));
@@ -123,8 +116,7 @@ export default function SettingsScreen() {
   };
 
   const load = useCallback(async () => {
-    const [gymList, exList, allEx] = await Promise.all([getGyms(), getCustomExercises(), getExercises()]);
-    setGyms(gymList);
+    const [exList, allEx] = await Promise.all([getCustomExercises(), getExercises()]);
     setCustomExercises(exList);
     setAllExercises(allEx);
 
@@ -192,21 +184,6 @@ export default function SettingsScreen() {
     setGoalBodyFat(gf);
     setRestDuration(rd);
     Alert.alert('저장됨');
-  };
-
-  const handleAddGym = async () => {
-    if (!gymName.trim()) return;
-    await addGym(gymName.trim(), gymLocation.trim() || undefined);
-    setGymName('');
-    setGymLocation('');
-    load();
-  };
-
-  const handleDeleteGym = (gym: Gym) => {
-    Alert.alert('삭제', `"${gym.name}"을 삭제할까요?`, [
-      { text: '취소', style: 'cancel' },
-      { text: '삭제', style: 'destructive', onPress: async () => { await deleteGym(gym.id); load(); } },
-    ]);
   };
 
   const handleDeleteExercise = (ex: Exercise) => {
@@ -537,44 +514,6 @@ export default function SettingsScreen() {
           ))}
           {allExercises.length === 0 && (
             <Text style={styles.emptyText}>종목이 없습니다</Text>
-          )}
-        </View>
-        )}
-
-        {/* 헬스장 관리 */}
-        {Cat('gym', '📍', '헬스장 관리')}
-        {open === 'gym' && (
-        <View style={styles.card}>
-          <TextInput
-            style={styles.fullInput}
-            placeholder="헬스장 이름"
-            placeholderTextColor="#48484A"
-            value={gymName}
-            onChangeText={setGymName}
-          />
-          <TextInput
-            style={[styles.fullInput, { marginTop: 8 }]}
-            placeholder="위치 (선택)"
-            placeholderTextColor="#48484A"
-            value={gymLocation}
-            onChangeText={setGymLocation}
-          />
-          <Pressable style={styles.addBtn} onPress={handleAddGym}>
-            <Text style={styles.addBtnText}>+ 추가</Text>
-          </Pressable>
-          {gyms.map(gym => (
-            <View key={gym.id} style={styles.listItem}>
-              <View>
-                <Text style={styles.listItemName}>{gym.name}</Text>
-                {gym.location && <Text style={styles.listItemSub}>{gym.location}</Text>}
-              </View>
-              <Pressable onPress={() => handleDeleteGym(gym)}>
-                <Text style={styles.deleteText}>삭제</Text>
-              </Pressable>
-            </View>
-          ))}
-          {gyms.length === 0 && (
-            <Text style={styles.emptyText}>등록된 헬스장이 없습니다</Text>
           )}
         </View>
         )}

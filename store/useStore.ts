@@ -52,7 +52,6 @@ type WorkoutState = {
   sessionDate: string | null;
   sessionStartTime: number | null;
   sessionTitle: string | null;
-  sessionGymId: number | null;
   sessionTags: string[];
   exercises: ExerciseEntry[];
   restTimerActive: boolean;
@@ -60,9 +59,8 @@ type WorkoutState = {
   restTotalSec: number;
   restNextLabel: string | null;
 
-  startSession: (sessionId: number, date: string, title?: string | null, gymId?: number | null) => void;
+  startSession: (sessionId: number, date: string, title?: string | null) => void;
   setSessionTitle: (title: string) => void;
-  setSessionGym: (gymId: number | null) => void;
   setSessionTags: (tags: string[]) => void;
   finishSession: () => void;
   addExercise: (entry: ExerciseEntry) => void;
@@ -106,7 +104,6 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
   sessionDate: null,
   sessionStartTime: null,
   sessionTitle: null,
-  sessionGymId: null,
   sessionTags: [],
   exercises: [],
   restTimerActive: false,
@@ -114,15 +111,14 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
   restTotalSec: 0,
   restNextLabel: null,
 
-  startSession: (sessionId, date, title, gymId) =>
-    set({ activeSessionId: sessionId, sessionDate: date, sessionStartTime: Date.now(), sessionTitle: title ?? null, sessionGymId: gymId ?? null, sessionTags: [], exercises: [] }),
+  startSession: (sessionId, date, title) =>
+    set({ activeSessionId: sessionId, sessionDate: date, sessionStartTime: Date.now(), sessionTitle: title ?? null, sessionTags: [], exercises: [] }),
 
   setSessionTitle: (title) => set({ sessionTitle: title }),
-  setSessionGym: (gymId) => set({ sessionGymId: gymId }),
   setSessionTags: (tags) => set({ sessionTags: tags }),
 
   finishSession: () =>
-    set({ activeSessionId: null, sessionDate: null, sessionStartTime: null, sessionTitle: null, sessionGymId: null, sessionTags: [], exercises: [], restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
+    set({ activeSessionId: null, sessionDate: null, sessionStartTime: null, sessionTitle: null, sessionTags: [], exercises: [], restTimerActive: false, restTimerEnd: null, restNextLabel: null }),
 
   addExercise: (entry) =>
     set((state) => ({ exercises: [...state.exercises, entry] })),
@@ -301,7 +297,6 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
     sessionDate: s.sessionDate,
     sessionStartTime: s.sessionStartTime,
     sessionTitle: s.sessionTitle,
-    sessionGymId: s.sessionGymId,
     sessionTags: s.sessionTags,
     exercises: s.exercises,
   }),

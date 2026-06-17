@@ -11,22 +11,9 @@ CREATE TABLE IF NOT EXISTS exercise_master (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS gym (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  location TEXT
-);
-
-CREATE TABLE IF NOT EXISTS gym_equipment (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  gym_id INTEGER REFERENCES gym(id),
-  exercise_id INTEGER REFERENCES exercise_master(id)
-);
-
 CREATE TABLE IF NOT EXISTS workout_session (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL,
-  gym_id INTEGER REFERENCES gym(id),
   duration_sec INTEGER,
   note TEXT
 );

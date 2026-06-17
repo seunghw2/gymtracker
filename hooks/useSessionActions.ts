@@ -69,8 +69,8 @@ export function useSessionActions() {
     }
     const date = getTodayStr();
     const name = session.title || '';
-    const newId = await createWorkoutSession(date, null, name);
-    startSession(newId, date, name || null, null);
+    const newId = await createWorkoutSession(date, name);
+    startSession(newId, date, name || null);
     const entries = order.map(id => groups[id]);
     addExercises(entries);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
