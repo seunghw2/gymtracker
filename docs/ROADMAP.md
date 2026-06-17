@@ -1,6 +1,6 @@
 # GymTracker 프로젝트 현황 & 로드맵
 
-> 최종 업데이트: 2026-06-17
+> 최종 업데이트: 2026-06-18
 > 이 문서는 프로젝트의 진행 상황과 향후 작업을 추적하는 살아있는 문서입니다.
 
 ---
@@ -46,7 +46,7 @@
 
 **설정 (`settings/`)**: 유저별 key-value get/put
 
-**통계 (`stats/`)**: 1RM 히스토리, 캘린더(월별 날짜/카운트/시간), 스트릭, 주간 카운트, 전체 운동일(workout-dates)
+**통계 (`stats/`)**: 1RM 히스토리, 캘린더(월별 날짜/카운트/시간), 스트릭, 주간 카운트, 전체 운동일(workout-dates), 볼륨/부위빈도/기간요약/종목사용. 종목별 리포트용 `exercise-summary`(전 종목 요약 1쿼리)·`exercise-progress`(종목 시계열) — `ExerciseStatsService`
 
 **공통/설정 (`config/`, `common/`)**
 - 유저별 데이터 격리(모든 쿼리 userId 기준)
@@ -88,6 +88,24 @@
 - [x] **비동기 생성 + 실시간 진행률** — 캐시 미스 시 `GENERATING` 즉시 반환 + `@Async` 백그라운드, Anthropic 스트리밍 토큰 비례 진행률(`ReportJobs`/`ProgressSink`), 프론트 오비탈 로딩(`BriefingLoading`) + 폴링
 - [x] 온보딩 인테이크 채팅(9문항, `app/ai/intake.tsx`)
 - [ ] 목표 진척 게이지(분기+), 요일 히트맵(주간), 체중 추세 포인트, 일관성 score, 타임라인 세션 단위화
+
+### AI 코치 채팅(세션) 개편 — ✅ 완료 (2026-06-17)
+인라인 단일 대화 → **세션 기반**(허브+상세, 출처별 1세션 중복 방지). "계산은 코드, 해석만 LLM" 유지.
+- [x] 백엔드 `ai/chat`: `Conversation`(source/sourceKey 유니크·기간 맥락)·`ChatMessage` + `/api/v1/ai/conversations`(목록·메시지·findOrCreate·전송·삭제)
+- [x] 프론트 허브(`(tabs)/chat.tsx`: 알림 strip + 동적 스타터 + 최근 대화 + 새 대화 FAB) / 상세(`app/chat/[conversationId].tsx`: 클라 청크 스트리밍·타이핑·후속칩·빈 대화 자동삭제·스와이프 삭제)
+- [x] 알림 표시 그룹핑(`lib/groupNotifications.ts`, `stall:{종목}`/`report:{type}`) — 중복 묶음·횟수·최근시각
+- [x] `findOrCreateByKey(sourceKey)` 멱등 — 리포트 코치·정체 알림·종목 리포트가 같은 키면 같은 세션 복귀
+
+### 종목별 리포트 (E0~E5) — ✅ 완료 (2026-06-18)
+명세: 증권 watchlist식 **종목 탭** + 종목별 큰 숫자 헤더·지표 토글 차트·코치. 정체 판정은 기존 로직 재사용, 즐겨찾기는 리포트 '주력 핀'과 공유.
+- [x] **E0** 백엔드 집계: `GET /stats/exercise-summary`(전 종목 현재/PR 1RM·정체주수·trend·등락·스파크·최근일 1쿼리), `GET /stats/exercise-progress?exerciseId`(1RM·최대무게 일별 + 볼륨·빈도 주별). `ExerciseStatsService`가 `findPeriodSetRows` 메모리 그룹핑. 프론트 `db/api/stats.ts` 타입·호출
+- [x] **E0** 새 탭 '종목'(브리핑·기록·**종목**·리포트·Chat) — `(tabs)/exercises.tsx` 라우트 + `CustomTabBar` META·합성 리포트 앵커 이동
+- [x] **E1** 허브 watchlist: ★보유(즐겨찾기)/관심 섹션, 행=종목·부위+미니 스파크+현재 1RM+등락칩(상승/신기록 초록·정체 주황), 정렬 토글(1RM/정체/최근)·검색. 행 탭 → 리포트
+- [x] **E2** 종목 리포트 `app/exercise/[name].tsx`: 큰 숫자 헤더(부위·종목·현재 1RM·★PR/정체 배지·진단 한 줄). 리포트 종목 행·정체 알림·PR 알림 진입점 통합
+- [x] **E3** 지표 토글 차트(react-native-svg): [1RM][최대무게]=라인(1RM은 PR★ 마커+정체 음영)·기간칩(3M/6M/1Y/전체), [볼륨][빈도]=주간 막대(이번 주 감소 강조)
+- [x] **E4** 코치(코드 템플릿, 진단/처방/동기 3줄) + **💬 대화로 풀기** → `findOrCreateByKey('stall:{종목}')`(정체 알림과 동일 세션) + 빠른 칩(왜 멈췄어/리셋 방법/대체 운동) seed
+- [x] **E5** 즐겨찾기=`ai_pinned_lifts` 재사용(`lib/pinnedLifts`), 기존 `exercise-detail` 제거. `tsc`·백엔드 컴파일 통과
+- 비고: 백엔드 **읽기 전용** 엔드포인트라 스키마 변경 없음 — 배포 시 재시작만 필요
 
 ### CARBON 리디자인 — ✅ 1·2단계 완료 (2026-06-16)
 - [x] 디자인 토큰 레드 통일(`constants/colors.ts`), 의미색(증감/경고)은 분리 유지
