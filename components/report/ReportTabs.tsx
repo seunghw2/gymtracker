@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Svg, { Circle, Polyline, Rect } from 'react-native-svg';
-import { AI, ACCENT, COLORS } from '../../constants/colors';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import Svg, { Polyline } from 'react-native-svg';
 import { getSetting, setSetting } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import type { AiReportV2, RCoachItem } from '../../db/api/ai';
+import { RT, toneColor } from './theme';
+import {
+  Eyebrow, Card, Tile, Ring, Donut, VBars, StackedBar, BalanceSplit, ProgressRow,
+  BandRow, Sparkline, MiniLine, Strip, StatGrid, BigNum, Delta,
+} from './charts';
 
-const UP = COLORS.green;
-const WARN = '#FF9F0A';
 const HIDDEN_KEY = 'ai_report_hidden';
 const TONE_KEY = 'ai_coach_tone';
 const PINNED_KEY = 'ai_pinned_lifts';
@@ -39,7 +41,6 @@ export default function ReportTabs({ r, onAsk, onReload }: { r: AiReportV2; onAs
       return next;
     });
   };
-
   const toggleHidden = (key: string) => {
     setHidden(prev => {
       const next = new Set(prev);
@@ -55,15 +56,15 @@ export default function ReportTabs({ r, onAsk, onReload }: { r: AiReportV2; onAs
 
   return (
     <View>
-      <View style={styles.topRow}>
-        <View style={styles.seg}>
+      <View style={s.topRow}>
+        <View style={s.seg}>
           {([['brief', '브리핑'], ['data', '데이터'], ['coach', '코치']] as const).map(([k, label]) => (
-            <Pressable key={k} style={[styles.segItem, tab === k && styles.segItemOn]} onPress={() => setTab(k)}>
-              <Text style={[styles.segText, tab === k && styles.segTextOn]}>{label}</Text>
+            <Pressable key={k} style={[s.segItem, tab === k && s.segItemOn]} onPress={() => setTab(k)}>
+              <Text style={[s.segText, tab === k && s.segTextOn]}>{label}</Text>
             </Pressable>
           ))}
         </View>
-        <Pressable onPress={() => setEditing(e => !e)} hitSlop={8}><Text style={styles.edit}>{editing ? '완료' : '편집'}</Text></Pressable>
+        <Pressable onPress={() => setEditing(e => !e)} hitSlop={8}><Text style={s.edit}>{editing ? '완료' : '편집'}</Text></Pressable>
       </View>
       {tab === 'brief' && <BriefTab r={r} editing={editing} hidden={hidden} toggle={toggleHidden} />}
       {tab === 'data' && <DataTab r={r} editing={editing} hidden={hidden} toggle={toggleHidden} pinned={pinned} togglePin={togglePin} />}
@@ -73,33 +74,46 @@ export default function ReportTabs({ r, onAsk, onReload }: { r: AiReportV2; onAs
 }
 
 function EditDot({ on, onPress }: { on: boolean; onPress: () => void }) {
-  return <Pressable onPress={onPress} hitSlop={8}><Text style={[styles.editDot, { color: on ? AI.faint : ACCENT }]}>{on ? '추가' : '숨김'}</Text></Pressable>;
+  return <Pressable onPress={onPress} hitSlop={8}><Text style={[s.editDot, { color: on ? RT.ink3 : RT.action }]}>{on ? '추가' : '숨김'}</Text></Pressable>;
 }
 
 // ── 브리핑 ──────────────────────────────────────────────────────────
 function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: boolean; hidden: Set<string>; toggle: (k: string) => void }) {
   const c = r.consistency;
+  const cards = r.cards;
   const stallN = r.detail.stagnation?.length ?? 0;
-  const vol = r.detail.trends?.find(t => t.metric.includes('볼륨'))?.points.map(p => p.y) ?? [];
+  const vol = cards?.volumeBars?.map(b => b.tons) ?? r.detail.trends?.find(t => t.metric.includes('볼륨'))?.points.map(p => p.y) ?? [];
   const w = r.bodyComposition?.weight;
   const show = (k: string) => editing || !hidden.has(k);
-  const editDot = (k: string) => editing ? <View style={styles.kpiEdit}><EditDot on={hidden.has(k)} onPress={() => toggle(k)} /></View> : null;
+  const editDot = (k: string) => editing ? <View style={s.kpiEdit}><EditDot on={hidden.has(k)} onPress={() => toggle(k)} /></View> : null;
   return (
     <View>
-      <Text style={styles.hero}>{r.headline}</Text>
-      <View style={styles.kpiGrid}>
-        {show('kpi_attendance') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'up'} />{editDot('kpi_attendance')}</View>}
-        {show('kpi_weight') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_weight') && { opacity: 0.4 }]}><Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} />{editDot('kpi_weight')}</View>}
-        {show('kpi_volume') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_volume') && { opacity: 0.4 }]}><KpiSpark points={vol} l="주간 볼륨" />{editDot('kpi_volume')}</View>}
-        {show('kpi_stall') && <View style={[styles.kpiWrap, editing && hidden.has('kpi_stall') && { opacity: 0.4 }]}><Kpi v={`${stallN}건`} l="정체 종목" tone={stallN > 0 ? 'warn' : 'up'} />{editDot('kpi_stall')}</View>}
+      <Text style={s.hero}>{r.headline}</Text>
+      <View style={s.kpiGrid}>
+        {show('kpi_attendance') && <View style={[s.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'good'} />{editDot('kpi_attendance')}</View>}
+        {show('kpi_weight') && <View style={[s.kpiWrap, editing && hidden.has('kpi_weight') && { opacity: 0.4 }]}><Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} tone={w?.delta?.startsWith('-') ? 'good' : undefined} />{editDot('kpi_weight')}</View>}
+        {show('kpi_volume') && <View style={[s.kpiWrap, editing && hidden.has('kpi_volume') && { opacity: 0.4 }]}><View style={s.kpi}><Sparkline points={vol.length ? vol : [0]} /><Text style={s.kpiL}>주간 볼륨</Text></View>{editDot('kpi_volume')}</View>}
+        {show('kpi_stall') && <View style={[s.kpiWrap, editing && hidden.has('kpi_stall') && { opacity: 0.4 }]}><Kpi v={`${stallN}건`} l="정체 종목" tone={stallN > 0 ? 'warn' : 'good'} />{editDot('kpi_stall')}</View>}
       </View>
+
+      {cards?.highlights && cards.highlights.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hlRow}>
+          {cards.highlights.map((h, i) => (
+            <View key={i} style={s.hl}>
+              <Text style={s.hlL}>{h.label}</Text>
+              <Text style={[s.hlV, { color: toneColor(h.tone) }]}>{h.value}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
       {!!r.summary.oneLiner && (
-        <View style={styles.insight}><Text style={styles.insightK}>진단</Text><Text style={styles.insightX}>{r.summary.oneLiner}</Text></View>
+        <View style={[s.insight, s.diag]}><Text style={[s.insightK, { color: RT.purple }]}>진단</Text><Text style={s.insightX}>{r.summary.oneLiner}</Text></View>
       )}
       {!!r.prescription?.action && (
-        <View style={[styles.insight, styles.rxInsight]}><Text style={[styles.insightK, { color: ACCENT }]}>처방</Text><Text style={styles.insightX}>{r.prescription.action}</Text></View>
+        <View style={[s.insight, s.presc]}><Text style={[s.insightK, { color: RT.good }]}>처방 · 딱 하나</Text><Text style={s.insightX}>{r.prescription.action}</Text></View>
       )}
-      <Text style={styles.drill}>숫자는 데이터 탭 · 해설은 코치 탭</Text>
+      <View style={s.drill}><Text style={s.drillT}>숫자는 데이터 탭 · 해설은 코치 탭에서</Text></View>
     </View>
   );
 }
@@ -108,90 +122,226 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
 function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiReportV2; editing: boolean; hidden: Set<string>; toggle: (k: string) => void; pinned: Set<string>; togglePin: (n: string) => void }) {
   const c = r.consistency;
   const bc = r.bodyComposition;
-  const goalWeight = useSettingsStore(s => s.goalWeightKg);
+  const d = r.cards;
+  const goalWeight = useSettingsStore(st => st.goalWeightKg);
   const [exFilter, setExFilter] = useState<'pinned' | 'compound' | 'all'>('pinned');
   const show = (k: string) => editing || !hidden.has(k);
-  // 핀 설정이 있으면 그걸, 없으면 기본 빅스 이름 매칭
   const isPin = (name: string) => pinned.size > 0 ? pinned.has(name) : isPinned(name);
 
   const exRows = [
-    ...(r.detail.growth ?? []).map(g => ({ name: g.name, val: g.change, color: UP })),
-    ...(r.detail.stagnation ?? []).map(s => ({ name: s.name, val: `${s.weeksFlat}주 정체`, color: WARN })),
+    ...(r.detail.growth ?? []).map(g => ({ name: g.name, val: g.change, tone: 'good' as const })),
+    ...(r.detail.stagnation ?? []).map(st => ({ name: st.name, val: `${st.weeksFlat}주 정체`, tone: 'warn' as const })),
   ];
   const exFiltered = exRows.filter(e => exFilter === 'all' ? true : exFilter === 'compound' ? isCompound(e.name) : isPin(e.name));
 
+  // 섹션별 표시 여부
+  const hasA = !!c || !!d?.routineAdherence;
+  const hasB = !!d?.volumeBars || !!d?.weekdayFreq || !!r.detail.balance || !!d?.muscleVolumeShare || !!d?.muscleBalance;
+  const hasC = exRows.length > 0 || !!d?.overload || !!d?.repRange || !!d?.intensityScore || !!d?.relativeStrength || !!d?.prTimeline;
+  const hasD = (!!bc && bc.display !== 'none' && !!bc.weight) || !!d?.lbm || !!d?.goals;
+  const hasE = !!d?.sessionStats || !!d?.densityRest || !!d?.diversity || !!d?.timeOfDay || !!d?.recovery;
+
   return (
-    <View style={{ gap: 12 }}>
+    <View>
+      {/* ── A 일관성 ── */}
+      {hasA && <Eyebrow label="일관성" />}
       {c && show('card_consistency') && (
-        <Card title="🎯 일관성" badge={c.attendancePct < 80 ? { text: '주의', tone: 'warn' } : undefined} editing={editing} onHide={() => toggle('card_consistency')} hidden={hidden.has('card_consistency')}>
-          <View style={styles.ringRow}>
-            <Ring pct={c.attendancePct} />
-            <View style={styles.tiles}>
+        <Card title="출석 일관성" caption="목표 80–90%" chip={c.attendancePct < 80 ? { tone: 'warn', label: '주의' } : { tone: 'good', label: '양호' }} editing={editing} hidden={hidden.has('card_consistency')} onHide={() => toggle('card_consistency')}>
+          <View style={s.ringRow}>
+            <Ring pct={c.attendancePct} label="출석" tone={c.attendancePct < 80 ? 'warn' : 'good'} />
+            <View style={s.tiles}>
               <Tile v={`${c.sessions}/${c.planned}`} l="세션" />
               <Tile v={`${c.longestGapDays}일`} l="최장 공백" tone={c.longestGapDays >= 5 ? 'bad' : undefined} />
               <Tile v={`${c.weeklyAvg}`} l="주 평균" />
               <Tile v={`${c.streak}`} l="연속" />
             </View>
           </View>
-          {c.strip.length > 0 && <View style={styles.strip}>{c.strip.map((on, i) => <View key={i} style={[styles.stripCell, on ? styles.stripOn : null]} />)}</View>}
+          {c.strip.length > 0 && <Strip cells={c.strip} />}
+        </Card>
+      )}
+      {d?.routineAdherence && show('card_routine') && (
+        <Card title="루틴 준수율" caption="계획 빈도 대비 실제(근사)" chip={d.routineAdherence.completedSessions < d.routineAdherence.plannedSessions ? { tone: 'warn', label: '진행 중' } : { tone: 'good', label: '양호' }} editing={editing} hidden={hidden.has('card_routine')} onHide={() => toggle('card_routine')}>
+          <ProgressRow name="완료 세션" value={`${d.routineAdherence.completedSessions} / ${d.routineAdherence.plannedSessions}`} pct={pct(d.routineAdherence.completedSessions, d.routineAdherence.plannedSessions)} tone={tone3(pct(d.routineAdherence.completedSessions, d.routineAdherence.plannedSessions))} />
+          <ProgressRow name="계획대로 한 날" value={`${d.routineAdherence.onPlanDays} / ${d.routineAdherence.planTargetDays}`} pct={pct(d.routineAdherence.onPlanDays, d.routineAdherence.planTargetDays)} tone={tone3(pct(d.routineAdherence.onPlanDays, d.routineAdherence.planTargetDays))} />
         </Card>
       )}
 
+      {/* ── B 볼륨·구성 ── */}
+      {hasB && <Eyebrow label="볼륨 · 구성" />}
+      {d?.volumeBars && d.volumeBars.length > 0 && show('card_volume') && (
+        <Card title="주별 볼륨 추세" chip={volTone(d.volumeBars)} editing={editing} hidden={hidden.has('card_volume')} onHide={() => toggle('card_volume')}>
+          <View style={s.bigRow}><BigNum value={d.volumeBars.reduce((a, b) => a + b.tons, 0).toFixed(1)} unit="톤" /></View>
+          <VBars data={d.volumeBars.map(b => ({ label: b.label, value: b.tons, sub: `${b.tons}t`, color: b.tone === 'bad' ? RT.bad : b.tone === 'warn' ? RT.warn : RT.c3 }))} />
+        </Card>
+      )}
+      {d?.weekdayFreq && show('card_weekday') && (
+        <Card title="운동 빈도 · 요일" caption="요일별 세션" editing={editing} hidden={hidden.has('card_weekday')} onHide={() => toggle('card_weekday')}>
+          <VBars height={64} data={d.weekdayFreq.map(b => ({ label: b.day, value: b.count, color: b.active ? RT.good : RT.c5 }))} />
+        </Card>
+      )}
       {r.detail.balance && show('card_balance') && (
-        <Card title="🏋️ 부위 하드세트 / 주" sub="권장 10–20" editing={editing} onHide={() => toggle('card_balance')} hidden={hidden.has('card_balance')}>
-          {r.detail.balance.map((b, i) => {
-            const color = b.status === 'low' ? COLORS.red : b.status === 'over' ? WARN : UP;
-            return (
-              <View key={i} style={styles.barRow}>
-                <Text style={styles.barPart}>{b.part}</Text>
-                <View style={styles.barTrack}><View style={styles.barBand} /><View style={[styles.barFill, { width: `${Math.min(100, (b.sets / 20) * 100)}%`, backgroundColor: color }]} /></View>
-                <Text style={[styles.barNum, { color }]}>{b.sets}</Text>
-                {b.status !== 'ok' && <Text style={[styles.barBadge, { color }]}>{b.status === 'low' ? '부족' : '많음'}</Text>}
-              </View>
-            );
-          })}
-        </Card>
-      )}
-
-      {bc && bc.display !== 'none' && bc.weight && show('card_body') && (
-        <Card title="📉 체성분" editing={editing} onHide={() => toggle('card_body')} hidden={hidden.has('card_body')}>
-          <View style={styles.bodyTop}>
-            <Text style={styles.bodyWeight}>{bc.weight.current}<Text style={styles.bodyUnit}>kg</Text></Text>
-            {!!bc.weight.delta && <Text style={[styles.bodyDelta, { color: bc.weight.delta.startsWith('-') ? UP : AI.textSub }]}>{bc.weight.delta}</Text>}
-          </View>
-          {bc.weight.trend && bc.weight.trend.length >= 2 && (
-            <WeightChart points={bc.weight.trend.map(p => p.y)} goal={goalWeight} />
+        <Card title="부위 하드세트 / 주" caption="권장 10–20" editing={editing} hidden={hidden.has('card_balance')} onHide={() => toggle('card_balance')}>
+          {r.detail.balance.map((b, i) => <BandRow key={i} part={b.part} sets={b.sets} status={b.status} />)}
+          {d?.muscleFreqDays && d.muscleFreqDays.length > 0 && (
+            <View style={s.freq}>
+              <Text style={s.subh}>부위별 빈도 · 주 2–3회 권장</Text>
+              {d.muscleFreqDays.map((m, i) => (
+                <View key={i} style={s.frow}><Text style={s.fn}>{m.part}</Text><Text style={[s.ff, m.low && { color: toneColor('bad') }]}>주 {m.perWeek}회{m.low ? ' 부족' : ''}</Text></View>
+              ))}
+            </View>
           )}
-          <View style={styles.tiles}>
-            {bc.bodyFat?.current != null && <Tile v={`${bc.bodyFat.current}%`} l="체지방" />}
-            {bc.waist?.current != null && <Tile v={`${bc.waist.current}`} l="허리(cm)" sub={bc.waist.delta ?? undefined} />}
-            {!!bc.recomp && <Tile v="↓" l={bc.recomp} />}
-          </View>
+        </Card>
+      )}
+      {d?.muscleVolumeShare && d.muscleVolumeShare.length > 0 && show('card_share') && (
+        <Card title="부위별 볼륨 분배" caption="총 볼륨이 어디에 쏠렸나" editing={editing} hidden={hidden.has('card_share')} onHide={() => toggle('card_share')}>
+          <Donut slices={d.muscleVolumeShare} />
+        </Card>
+      )}
+      {d?.muscleBalance && d.muscleBalance.length > 0 && show('card_mbalance') && (
+        <Card title="근육군 밸런스" caption="밀기·당기기 / 상·하체 / 컴파운드·아이솔레이션" editing={editing} hidden={hidden.has('card_mbalance')} onHide={() => toggle('card_mbalance')}>
+          {d.muscleBalance.map((b, i) => <BalanceSplit key={i} {...b} />)}
         </Card>
       )}
 
+      {/* ── C 강도·진행 ── */}
+      {hasC && <Eyebrow label="강도 · 진행" />}
       {exRows.length > 0 && show('card_exercises') && (
-        <Card title="📈 종목" editing={editing} onHide={() => toggle('card_exercises')} hidden={hidden.has('card_exercises')}>
-          <View style={styles.chips}>
+        <Card title="종목별 진행" caption="3회+ 수행" editing={editing} hidden={hidden.has('card_exercises')} onHide={() => toggle('card_exercises')}>
+          <View style={s.chips}>
             {([['pinned', '주력'], ['compound', '대형 복합'], ['all', '전체']] as const).map(([k, label]) => (
-              <Pressable key={k} style={[styles.chip, exFilter === k && styles.chipOn]} onPress={() => setExFilter(k)}>
-                <Text style={[styles.chipText, exFilter === k && styles.chipTextOn]}>{label}</Text>
+              <Pressable key={k} style={[s.fchip, exFilter === k && s.fchipOn]} onPress={() => setExFilter(k)}>
+                <Text style={[s.fchipText, exFilter === k && s.fchipTextOn]}>{label}</Text>
               </Pressable>
             ))}
           </View>
-          {exFiltered.length === 0 ? <Text style={styles.exEmpty}>해당 종목이 없어요.</Text> :
+          {exFiltered.length === 0 ? <Text style={s.exEmpty}>해당 종목이 없어요.</Text> :
             exFiltered.map((e, i) => (
-              <View key={i} style={styles.exRow}>
+              <View key={i} style={s.exRow}>
                 {editing && (
                   <Pressable onPress={() => togglePin(e.name)} hitSlop={6}>
-                    <Text style={[styles.pinStar, { color: isPin(e.name) ? COLORS.gold : AI.faint }]}>{isPin(e.name) ? '★' : '☆'}</Text>
+                    <Text style={[s.pinStar, { color: isPin(e.name) ? '#FFD60A' : RT.ink3 }]}>{isPin(e.name) ? '★' : '☆'}</Text>
                   </Pressable>
                 )}
-                <Text style={styles.exName}>{!editing && isPin(e.name) ? '★ ' : ''}{e.name}</Text>
-                <Text style={[styles.exVal, { color: e.color }]}>{e.val}</Text>
+                <Text style={s.exName}>{!editing && isPin(e.name) ? '★ ' : ''}{e.name}</Text>
+                <Text style={[s.exVal, { color: toneColor(e.tone) }]}>{e.val}</Text>
               </View>
             ))}
-          {editing && <Text style={styles.exHint}>★ 탭하여 주력 종목 지정/해제</Text>}
+          {editing && <Text style={s.exHint}>★ 탭하여 주력 종목 지정/해제</Text>}
+        </Card>
+      )}
+      {d?.overload && show('card_overload') && (
+        <Card title="점진적 과부하" caption="지난 수행 대비 무게·렙이 오른 비율" chip={{ tone: d.overload.pct >= 50 ? 'good' : 'warn', label: d.overload.pct >= 50 ? '양호' : '주의' }} editing={editing} hidden={hidden.has('card_overload')} onHide={() => toggle('card_overload')}>
+          <View style={s.ringRow}>
+            <Ring pct={d.overload.pct} label="진행" tone={d.overload.pct >= 50 ? 'good' : 'warn'} />
+            <View style={s.tiles}>
+              <Tile v={`${d.overload.up}`} l="상승" tone="good" />
+              <Tile v={`${d.overload.hold}`} l="유지" />
+              <Tile v={`${d.overload.stall}`} l="정체" tone={d.overload.stall > 0 ? 'warn' : undefined} />
+              <Tile v={`${d.overload.total}`} l="전체" />
+            </View>
+          </View>
+        </Card>
+      )}
+      {d?.repRange && show('card_reprange') && (
+        <Card title="강도 · 렙 구간" caption={`평균 ${d.repRange.avgE1rmPct}% e1RM · 근비대 구간 비중`} editing={editing} hidden={hidden.has('card_reprange')} onHide={() => toggle('card_reprange')}>
+          <StackedBar segments={[
+            { pct: d.repRange.strengthPct, color: RT.c4, label: d.repRange.strengthPct >= 12 ? '근력' : undefined },
+            { pct: d.repRange.hyperPct, color: RT.c1, label: d.repRange.hyperPct >= 20 ? `근비대 ${d.repRange.hyperPct}%` : undefined, dark: true },
+            { pct: d.repRange.endurancePct, color: RT.c3, label: d.repRange.endurancePct >= 12 ? '지구력' : undefined, dark: true },
+          ]} />
+          <View style={s.legRow2}>
+            <Text style={s.leg2}><Text style={{ color: RT.c4 }}>■</Text> 1–5렙 {d.repRange.strengthPct}%</Text>
+            <Text style={s.leg2}><Text style={{ color: RT.c1 }}>■</Text> 6–12렙 {d.repRange.hyperPct}%</Text>
+            <Text style={s.leg2}><Text style={{ color: RT.c3 }}>■</Text> 13+렙 {d.repRange.endurancePct}%</Text>
+          </View>
+        </Card>
+      )}
+      {d?.intensityScore && show('card_score') && (
+        <Card title="종합 강도 점수" caption="주간 볼륨 기반 단일 지표" right={d.intensityScore.delta ? <Delta text={d.intensityScore.delta} tone={d.intensityScore.delta.startsWith('▲') ? 'good' : 'bad'} /> : undefined} editing={editing} hidden={hidden.has('card_score')} onHide={() => toggle('card_score')}>
+          <View style={s.bigRow}><BigNum value={d.intensityScore.value} /></View>
+          {d.intensityScore.spark.length >= 2 && <ScoreLine points={d.intensityScore.spark.map(p => p.y)} />}
+        </Card>
+      )}
+      {d?.relativeStrength && d.relativeStrength.length > 0 && show('card_rel') && (
+        <Card title="상대 강도" caption="체중 대비 배수 · 표준 등급" editing={editing} hidden={hidden.has('card_rel')} onHide={() => toggle('card_rel')}>
+          {d.relativeStrength.map((rs, i) => (
+            <ProgressRow key={i} name={rs.lift} value={`${rs.multiple}×BW · ${rs.grade}`} pct={rs.barPct} tone={rs.barPct >= 66 ? 'good' : rs.barPct >= 40 ? 'warn' : 'bad'} />
+          ))}
+        </Card>
+      )}
+      {d?.prTimeline && d.prTimeline.length > 0 && show('card_pr') && (
+        <Card title="PR 타임라인" chip={{ tone: 'good', label: `${d.prTimeline.length}건` }} editing={editing} hidden={hidden.has('card_pr')} onHide={() => toggle('card_pr')}>
+          {d.prTimeline.map((p, i) => (
+            <View key={i} style={s.lrow}><Text style={[s.lst, { color: p.isNew ? RT.good : RT.ink2 }]}>{p.isNew ? '＋' : '●'}</Text><Text style={s.lnm}>{p.name}</Text><Text style={[s.lvl, { color: RT.good }]}>{p.isNew ? '신규' : p.value}</Text></View>
+          ))}
+        </Card>
+      )}
+
+      {/* ── D 몸 ── */}
+      {hasD && <Eyebrow label="몸" />}
+      {bc && bc.display !== 'none' && bc.weight && show('card_body') && (
+        <Card title="체성분" caption="7일 이동평균" right={bc.weight.delta ? <Delta text={bc.weight.delta} tone={bc.weight.delta.startsWith('-') ? 'good' : undefined} /> : undefined} editing={editing} hidden={hidden.has('card_body')} onHide={() => toggle('card_body')}>
+          <View style={s.bigRow}><BigNum value={bc.weight.current ?? '–'} unit="kg" /></View>
+          {bc.weight.trend && bc.weight.trend.length >= 2 && (
+            <MiniLine points={bc.weight.trend.map(p => p.y)} band={goalWeight ? [goalWeight - 1, goalWeight + 1] : undefined} />
+          )}
+          <View style={s.tiles}>
+            {bc.bodyFat?.current != null && <Tile v={`${bc.bodyFat.current}%`} l="체지방" />}
+            {bc.waist?.current != null && <Tile v={`${bc.waist.current}`} l="허리(cm)" sub={bc.waist.delta ?? undefined} />}
+            {!!bc.recomp && <Tile v="↓" l={bc.recomp} tone="good" />}
+          </View>
+        </Card>
+      )}
+      {d?.lbm && d.lbm.current != null && show('card_lbm') && (
+        <Card title="제지방량 (LBM)" caption="체중 × (1−체지방%)" chip={d.lbm.delta === '유지' ? { tone: 'good', label: '유지' } : undefined} editing={editing} hidden={hidden.has('card_lbm')} onHide={() => toggle('card_lbm')}>
+          <View style={s.bigRow}><BigNum value={d.lbm.current} unit="kg" /></View>
+          {d.lbm.trend && d.lbm.trend.length >= 2 && <MiniLine points={d.lbm.trend.map(p => p.y)} />}
+          {!!d.lbm.comment && <Text style={s.cnote}>{d.lbm.comment}</Text>}
+        </Card>
+      )}
+      {d?.goals && d.goals.length > 0 && show('card_goals') && (
+        <Card title="목표 진행률" editing={editing} hidden={hidden.has('card_goals')} onHide={() => toggle('card_goals')}>
+          {d.goals.map((g, i) => <ProgressRow key={i} name={g.label} value={g.detail} pct={g.pct} tone={g.tone} />)}
+        </Card>
+      )}
+
+      {/* ── E 요약 ── */}
+      {hasE && <Eyebrow label="요약" />}
+      {d?.sessionStats && show('card_sessionstats') && (
+        <Card title="세션 통계" editing={editing} hidden={hidden.has('card_sessionstats')} onHide={() => toggle('card_sessionstats')}>
+          <StatGrid items={[
+            { v: `${d.sessionStats.sessions}`, l: '총 세션' }, { v: `${d.sessionStats.sets}`, l: '총 세트' }, { v: `${d.sessionStats.reps}`, l: '총 렙' },
+            { v: `${d.sessionStats.avgMin}분`, l: '평균 시간' }, { v: `${d.sessionStats.setsPerSession}`, l: '세션당 세트' }, { v: `${d.sessionStats.prs}`, l: 'PR' },
+          ]} />
+        </Card>
+      )}
+      {d?.densityRest && show('card_density') && (
+        <Card title="세션 밀도 · 휴식" caption="휴식은 근사치" chip={d.densityRest.note?.includes('긺') ? { tone: 'warn', label: '긴 편' } : undefined} editing={editing} hidden={hidden.has('card_density')} onHide={() => toggle('card_density')}>
+          <StatGrid items={[
+            { v: `${d.densityRest.densityKgPerMin}`, l: 'kg/분 밀도' },
+            { v: d.densityRest.avgRest ?? '–', l: '평균 휴식' },
+            { v: `${d.densityRest.totalRestMin}분`, l: '총 휴식' },
+          ]} />
+          {!!d.densityRest.note && <Text style={s.cnote}>{d.densityRest.note}</Text>}
+        </Card>
+      )}
+      {d?.diversity && show('card_diversity') && (
+        <Card title="종목 다양성" editing={editing} hidden={hidden.has('card_diversity')} onHide={() => toggle('card_diversity')}>
+          <StatGrid items={[
+            { v: `${d.diversity.exercises}`, l: '수행 종목' }, { v: `${d.diversity.equipment}`, l: '기구' }, { v: `${d.diversity.newCount}`, l: '신규' },
+          ]} />
+        </Card>
+      )}
+      {d?.timeOfDay && show('card_timeofday') && (
+        <Card title="운동 시간대" editing={editing} hidden={hidden.has('card_timeofday')} onHide={() => toggle('card_timeofday')}>
+          <VBars height={60} data={d.timeOfDay.map(t => ({ label: t.label, value: t.count, color: t.peak ? RT.good : RT.c3 }))} />
+        </Card>
+      )}
+      {d?.recovery && d.recovery.length > 0 && show('card_recovery') && (
+        <Card title="부위별 회복 간격" caption="마지막 자극 후 경과일" editing={editing} hidden={hidden.has('card_recovery')} onHide={() => toggle('card_recovery')}>
+          {d.recovery.map((rc, i) => (
+            <View key={i} style={s.lrow}><Text style={s.lnm}>{rc.part}</Text><Text style={[s.lvl, { color: toneColor(rc.tone) }]}>{rc.days}일</Text></View>
+          ))}
         </Card>
       )}
     </View>
@@ -206,218 +356,187 @@ function CoachTab({ r, onAsk, editing, hidden, toggle, tone, onTone }: { r: AiRe
   const items = all.filter(visible);
   return (
     <View>
-      <View style={styles.coachBanner}><Text style={styles.coachBannerText}>🤖 애널리스트가 이렇게 읽었어</Text></View>
-      <View style={styles.toneRow}>
-        <Text style={styles.toneLabel}>톤</Text>
+      <View style={s.toneRow}>
         {TONES.map(([k, label]) => (
-          <Pressable key={k} style={[styles.toneChip, tone === k && styles.toneChipOn]} onPress={() => onTone(k)}>
-            <Text style={[styles.toneText, tone === k && styles.toneTextOn]}>{label}</Text>
+          <Pressable key={k} style={[s.toneChip, tone === k && s.toneChipOn]} onPress={() => onTone(k)}>
+            <Text style={[s.toneText, tone === k && s.toneTextOn]}>{label}</Text>
           </Pressable>
         ))}
       </View>
-      {CHAPTERS.map(ch => {
-        const chItems = items.filter(it => it.chapter === ch.n);
-        if (chItems.length === 0) return null;
-        return (
-          <View key={ch.n} style={styles.chapter}>
-            <Text style={styles.chapterTitle}><Text style={styles.chapterNum}>{ch.n}</Text>  {ch.label}</Text>
-            {chItems.map((it, i) => {
-              const isAction = it.key === 'action';
-              const isHidden = hidden.has('coach_' + it.key);
-              return (
-                <View key={i} style={[styles.node, isAction && styles.nodeAction, editing && isHidden && { opacity: 0.4 }]}>
-                  <View style={styles.nodeHead}>
-                    <Text style={styles.nodeTitle}>{it.icon} {it.title}</Text>
-                    {!!it.badge && !editing && <Text style={styles.nodeBadge}>{it.badge}</Text>}
-                    {editing && <View style={{ marginLeft: 'auto' }}><EditDot on={isHidden} onPress={() => toggle('coach_' + it.key)} /></View>}
-                  </View>
-                  <Text style={[styles.nodeBody, isAction && styles.nodeBodyAction]}>{it.body}</Text>
-                </View>
-              );
-            })}
-          </View>
-        );
-      })}
-      {r.suggestedQuestions?.length > 0 && (
-        <>
-          <Text style={styles.qrLabel}>이 기간 추천 질문</Text>
-          <View style={styles.qr}>{r.suggestedQuestions.map((q, i) => <Pressable key={i} style={styles.qrChip} onPress={onAsk}><Text style={styles.qrText}>{q}</Text></Pressable>)}</View>
-        </>
-      )}
-      {onAsk && <Pressable style={styles.ask} onPress={onAsk}><Text style={styles.askText}>💬 애널리스트랑 대화 이어가기</Text></Pressable>}
-    </View>
-  );
-}
-
-// ── 공용 ────────────────────────────────────────────────────────────
-function Card({ title, sub, badge, editing, onHide, hidden, children }: { title: string; sub?: string; badge?: { text: string; tone: string }; editing?: boolean; onHide?: () => void; hidden?: boolean; children: React.ReactNode }) {
-  return (
-    <View style={[styles.card, editing && hidden && { opacity: 0.4 }]}>
-      <View style={styles.cardHead}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        {sub && <Text style={styles.cardSub}>{sub}</Text>}
-        {badge && !editing && <Text style={styles.cardBadge}>{badge.text}</Text>}
-        {editing && onHide && <View style={{ marginLeft: 'auto' }}><EditDot on={!!hidden} onPress={onHide} /></View>}
+      <View style={s.aTrans}>
+        <View style={s.av}><Text style={{ fontSize: 18 }}>🤖</Text></View>
+        <View style={{ flex: 1 }}><Text style={s.aNm}>애널리스트가 이렇게 읽었어</Text><Text style={s.aSub}>{r.period.label} · 단계로 풀어줄게</Text></View>
       </View>
-      {children}
-    </View>
-  );
-}
-function Kpi({ v, l, sub, tone }: { v: string; l: string; sub?: string; tone?: 'up' | 'warn' }) {
-  return (
-    <View style={styles.kpi}>
-      <Text style={[styles.kpiV, tone === 'warn' && { color: WARN }, tone === 'up' && { color: UP }]}>{v}</Text>
-      <Text style={styles.kpiL}>{l}</Text>
-      {!!sub && <Text style={styles.kpiSub}>{sub}</Text>}
-    </View>
-  );
-}
-function KpiSpark({ points, l }: { points: number[]; l: string }) {
-  const max = Math.max(...points, 1);
-  return (
-    <View style={styles.kpi}>
-      <View style={styles.spark}>{points.slice(-6).map((p, i) => <View key={i} style={[styles.sparkBar, { height: `${Math.max(8, (p / max) * 100)}%` }]} />)}</View>
-      <Text style={styles.kpiL}>{l}</Text>
-    </View>
-  );
-}
-function Tile({ v, l, sub, tone }: { v: string; l: string; sub?: string; tone?: 'bad' }) {
-  return (
-    <View style={styles.tile}>
-      <Text style={[styles.tileV, tone === 'bad' && { color: COLORS.red }]}>{v}</Text>
-      <Text style={styles.tileL} numberOfLines={1}>{l}</Text>
-      {!!sub && <Text style={styles.tileSub}>{sub}</Text>}
-    </View>
-  );
-}
-function Ring({ pct }: { pct: number }) {
-  const size = 84, sw = 9, rad = (size - sw) / 2, circ = 2 * Math.PI * rad;
-  const color = pct >= 80 ? UP : WARN;
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size}>
-        <Circle cx={size / 2} cy={size / 2} r={rad} stroke="#2C2C2E" strokeWidth={sw} fill="none" />
-        <Circle cx={size / 2} cy={size / 2} r={rad} stroke={color} strokeWidth={sw} fill="none" strokeDasharray={`${circ}`} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      </Svg>
-      <View style={{ position: 'absolute', alignItems: 'center' }}><Text style={styles.ringPct}>{pct}%</Text><Text style={styles.ringLbl}>출석</Text></View>
-    </View>
-  );
-}
-/** 체중 영역라인 + 목표 밴드(목표±1kg). */
-function WeightChart({ points, goal }: { points: number[]; goal?: number }) {
-  const W = 280, H = 90, pad = 6;
-  const vals = goal ? [...points, goal - 1, goal + 1] : points;
-  const min = Math.min(...vals), max = Math.max(...vals), span = Math.max(0.1, max - min);
-  const x = (i: number) => pad + (i / Math.max(1, points.length - 1)) * (W - pad * 2);
-  const y = (v: number) => pad + (1 - (v - min) / span) * (H - pad * 2);
-  const pts = points.map((v, i) => `${x(i)},${y(v)}`).join(' ');
-  return (
-    <View style={{ marginBottom: 12 }}>
-      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
-        {goal != null && <Rect x={0} y={y(goal + 1)} width={W} height={Math.max(2, y(goal - 1) - y(goal + 1))} fill="rgba(48,209,88,0.12)" />}
-        <Polyline points={pts} fill="none" stroke={ACCENT} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-        {points.map((v, i) => <Circle key={i} cx={x(i)} cy={y(v)} r={2.5} fill={ACCENT} />)}
-      </Svg>
-      {goal != null && <Text style={styles.bandLabel}>목표 밴드 {goal - 1}–{goal + 1}kg</Text>}
+      <View style={s.tl}>
+        {CHAPTERS.map(ch => {
+          const chItems = items.filter(it => it.chapter === ch.n);
+          if (chItems.length === 0) return null;
+          const mkColor = ch.n === 1 ? RT.purple : ch.n === 2 ? RT.good : RT.purpleD;
+          return (
+            <View key={ch.n}>
+              <View style={s.ph}>
+                <View style={[s.mk, { backgroundColor: mkColor }]}><Text style={s.mkN}>{ch.n}</Text></View>
+                <Text style={s.pt}>{ch.label}</Text>
+              </View>
+              {chItems.map((it, i) => {
+                const isAction = it.key === 'action';
+                const isHidden = hidden.has('coach_' + it.key);
+                if (isAction) {
+                  return (
+                    <View key={i} style={[s.tnAct, editing && isHidden && { opacity: 0.4 }]}>
+                      <View style={s.tnHead}><Text style={s.tactL}>{it.icon} {it.title}</Text>{editing && <View style={{ marginLeft: 'auto' }}><EditDot on={isHidden} onPress={() => toggle('coach_' + it.key)} /></View>}</View>
+                      <Text style={s.tactT}>{it.body}</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View key={i} style={[s.tn, editing && isHidden && { opacity: 0.4 }]}>
+                    <View style={s.tnHead}>
+                      <Text style={s.tnLab}>{it.icon} {it.title}</Text>
+                      {!!it.badge && !editing && <Text style={s.tnBadge}>{it.badge}</Text>}
+                      {editing && <View style={{ marginLeft: 'auto' }}><EditDot on={isHidden} onPress={() => toggle('coach_' + it.key)} /></View>}
+                    </View>
+                    <Text style={s.tnBody}>{it.body}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
+      {r.suggestedQuestions?.length > 0 && (
+        <View style={s.qa}>
+          <Text style={s.qh}>💬 더 물어보기</Text>
+          <View style={s.qchips}>{r.suggestedQuestions.map((q, i) => <Pressable key={i} style={s.qchip} onPress={onAsk}><Text style={s.qtext}>{q}</Text></Pressable>)}</View>
+        </View>
+      )}
+      {onAsk && <Pressable style={s.ask} onPress={onAsk}><Text style={s.askText}>애널리스트랑 대화 이어가기</Text></Pressable>}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  seg: { flex: 1, flexDirection: 'row', backgroundColor: AI.bubble, borderRadius: 12, padding: 4 },
-  segItem: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
-  segItemOn: { backgroundColor: '#fff' },
-  segText: { color: AI.textSub, fontSize: 13.5, fontWeight: '700' },
+// ── 소형 ────────────────────────────────────────────────────────────
+function Kpi({ v, l, sub, tone }: { v: string; l: string; sub?: string; tone?: string }) {
+  return (
+    <View style={s.kpi}>
+      <Text style={[s.kpiV, tone && { color: toneColor(tone) }]}>{v}</Text>
+      <Text style={s.kpiL}>{l}</Text>
+      {!!sub && <Text style={s.kpiSub}>{sub}</Text>}
+    </View>
+  );
+}
+function ScoreLine({ points }: { points: number[] }) {
+  const W = 300, H = 46, pad = 8, max = Math.max(...points) + 1, min = Math.min(...points) - 1, span = Math.max(0.1, max - min);
+  const x = (i: number) => pad + (i / (points.length - 1)) * (W - pad * 2);
+  const y = (v: number) => pad + (1 - (v - min) / span) * (H - pad * 2);
+  return (
+    <View style={{ marginTop: 10 }}>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+        <Polyline points={points.map((v, i) => `${x(i)},${y(v)}`).join(' ')} fill="none" stroke={RT.good} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
+  );
+}
+
+// ── 헬퍼 ────────────────────────────────────────────────────────────
+const pct = (a: number, b: number) => b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0;
+const tone3 = (p: number) => p >= 80 ? 'good' : p >= 50 ? 'warn' : 'bad';
+function volTone(bars: { tone: string }[]): { tone: string; label: string } | undefined {
+  const last = bars[bars.length - 1];
+  if (last?.tone === 'bad') return { tone: 'bad', label: '하락' };
+  if (bars.some(b => b.tone === 'warn')) return { tone: 'warn', label: '둔화' };
+  return { tone: 'good', label: '양호' };
+}
+
+const s = StyleSheet.create({
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  seg: { flex: 1, flexDirection: 'row', backgroundColor: RT.surface, borderRadius: 13, padding: 4 },
+  segItem: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  segItemOn: { backgroundColor: '#f5f5f7' },
+  segText: { color: RT.ink2, fontSize: 13.5, fontWeight: '700' },
   segTextOn: { color: '#000' },
-  edit: { color: ACCENT, fontSize: 13, fontWeight: '700' },
+  edit: { color: RT.action, fontSize: 14, fontWeight: '700' },
   editDot: { fontSize: 11.5, fontWeight: '800' },
 
-  hero: { color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 30, letterSpacing: -0.4, marginBottom: 16 },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  // 브리핑
+  hero: { color: RT.ink, fontSize: 23, fontWeight: '800', lineHeight: 31, letterSpacing: -0.5, marginVertical: 8 },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 11 },
   kpiWrap: { width: '48%', position: 'relative' },
   kpiEdit: { position: 'absolute', top: 6, right: 8 },
-  kpi: { width: '100%', backgroundColor: AI.card, borderRadius: 12, padding: 14, minHeight: 72, justifyContent: 'center' },
-  kpiV: { color: '#fff', fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  kpiL: { color: AI.textSub, fontSize: 11.5, marginTop: 3 },
-  kpiSub: { color: AI.faint, fontSize: 11, marginTop: 1, fontVariant: ['tabular-nums'] },
-  spark: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 26 },
-  sparkBar: { flex: 1, backgroundColor: WARN, borderRadius: 2, opacity: 0.9 },
+  kpi: { width: '100%', backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, borderRadius: 14, padding: 13, minHeight: 74, justifyContent: 'center' },
+  kpiV: { color: RT.ink, fontSize: 21, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+  kpiL: { color: RT.ink2, fontSize: 11, marginTop: 5 },
+  kpiSub: { color: RT.ink3, fontSize: 11, marginTop: 3, fontVariant: ['tabular-nums'] },
+  hlRow: { gap: 8, paddingBottom: 12 },
+  hl: { backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, borderRadius: 13, padding: 11, paddingHorizontal: 13, minWidth: 124 },
+  hlL: { color: RT.ink2, fontSize: 11 },
+  hlV: { fontSize: 14, fontWeight: '800', marginTop: 4 },
+  insight: { backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, borderRadius: 14, padding: 13, paddingHorizontal: 14, marginBottom: 9 },
+  diag: { borderLeftWidth: 3, borderLeftColor: RT.purple },
+  presc: { borderLeftWidth: 3, borderLeftColor: RT.good },
+  insightK: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, marginBottom: 4 },
+  insightX: { color: RT.ink, fontSize: 13.5, lineHeight: 20 },
+  drill: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: RT.hair, borderStyle: 'dashed', borderRadius: 13, padding: 12, paddingHorizontal: 14, marginTop: 3 },
+  drillT: { color: RT.ink2, fontSize: 12 },
 
-  insight: { backgroundColor: AI.card, borderRadius: 12, padding: 13, marginBottom: 8 },
-  rxInsight: { borderLeftWidth: 3, borderLeftColor: ACCENT },
-  insightK: { color: AI.textSub, fontSize: 10.5, fontWeight: '800' },
-  insightX: { color: '#EDEDF0', fontSize: 14, lineHeight: 20, marginTop: 4 },
-  drill: { color: AI.faint, fontSize: 12, textAlign: 'center', marginTop: 8 },
-
-  card: { backgroundColor: AI.card, borderRadius: 14, padding: 15 },
-  cardHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  cardTitle: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  cardSub: { color: AI.textSub, fontSize: 11, marginLeft: 8 },
-  cardBadge: { marginLeft: 'auto', color: WARN, fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(255,159,10,.12)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-
+  // 데이터 공용
   ringRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  ringPct: { color: '#fff', fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  ringLbl: { color: AI.textSub, fontSize: 10 },
-  tiles: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tile: { flexGrow: 1, minWidth: '30%', backgroundColor: AI.bubble, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
-  tileV: { color: '#fff', fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  tileL: { color: AI.textSub, fontSize: 10, marginTop: 2 },
-  tileSub: { color: AI.faint, fontSize: 9.5, marginTop: 1 },
+  tiles: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4 },
+  cnote: { color: RT.ink2, fontSize: 12, marginTop: 10, lineHeight: 18 },
+  freq: { marginTop: 12, borderTopWidth: 1, borderTopColor: RT.hair, paddingTop: 8 },
+  subh: { color: RT.ink3, fontSize: 11.5, fontWeight: '800', marginBottom: 4 },
+  frow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: RT.hair },
+  fn: { color: RT.ink2, fontSize: 12.5 },
+  ff: { color: RT.ink, fontSize: 12.5, fontWeight: '800' },
+  legRow2: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 11 },
+  leg2: { color: RT.ink2, fontSize: 11.5 },
 
-  strip: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 12 },
-  stripCell: { width: 7, height: 12, borderRadius: 2, backgroundColor: '#26262B' },
-  stripOn: { backgroundColor: UP },
+  chips: { flexDirection: 'row', gap: 7, marginBottom: 6 },
+  fchip: { borderRadius: 999, paddingVertical: 7, paddingHorizontal: 15, backgroundColor: RT.surface2 },
+  fchipOn: { backgroundColor: RT.good },
+  fchipText: { color: RT.ink2, fontSize: 13, fontWeight: '600' },
+  fchipTextOn: { color: '#06270d', fontWeight: '800' },
+  exEmpty: { color: RT.ink3, fontSize: 12, paddingVertical: 6 },
+  exRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: RT.hair },
+  exName: { color: RT.ink, fontSize: 14.5, flex: 1 },
+  exVal: { fontSize: 14.5, fontWeight: '800' },
+  pinStar: { fontSize: 16, width: 20 },
+  exHint: { color: RT.ink3, fontSize: 11, marginTop: 8 },
 
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 9 },
-  barPart: { color: '#EDEDF0', fontSize: 12, width: 34 },
-  barTrack: { flex: 1, height: 9, borderRadius: 5, backgroundColor: AI.bubble, overflow: 'hidden', justifyContent: 'center' },
-  barBand: { position: 'absolute', left: '50%', width: '50%', top: 0, bottom: 0, backgroundColor: 'rgba(48,209,88,0.10)' },
-  barFill: { height: 9, borderRadius: 5 },
-  barNum: { fontSize: 12, fontWeight: '800', width: 22, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  barBadge: { fontSize: 10, fontWeight: '700', width: 26 },
+  lrow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RT.hair },
+  lst: { width: 16, textAlign: 'center', fontSize: 13 },
+  lnm: { color: RT.ink, fontSize: 14.5, flex: 1 },
+  lvl: { fontSize: 14.5, fontWeight: '800' },
 
-  bodyTop: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 12 },
-  bodyWeight: { color: '#fff', fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  bodyUnit: { color: AI.textSub, fontSize: 15, fontWeight: '600' },
-  bodyDelta: { fontSize: 13, fontWeight: '700' },
-  bandLabel: { color: AI.faint, fontSize: 10.5, marginTop: 4 },
-
-  chips: { flexDirection: 'row', gap: 6, marginBottom: 10 },
-  chip: { borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: AI.bubble, borderWidth: 1, borderColor: AI.line },
-  chipOn: { backgroundColor: ACCENT, borderColor: ACCENT },
-  chipText: { color: AI.textSub, fontSize: 11.5, fontWeight: '700' },
-  chipTextOn: { color: '#fff' },
-  exEmpty: { color: AI.faint, fontSize: 12, paddingVertical: 6 },
-  exRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
-  exName: { color: '#EDEDF0', fontSize: 13, flex: 1 },
-  exVal: { fontSize: 13, fontWeight: '800' },
-  pinStar: { fontSize: 15, width: 18 },
-  exHint: { color: AI.faint, fontSize: 11, marginTop: 6 },
-
-  coachBanner: { backgroundColor: AI.tint, borderRadius: 10, padding: 11, marginBottom: 10 },
-  coachBannerText: { color: ACCENT, fontSize: 12.5, fontWeight: '700' },
-  toneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  toneLabel: { color: AI.textSub, fontSize: 11.5, fontWeight: '700', marginRight: 2 },
-  toneChip: { borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11, backgroundColor: AI.bubble, borderWidth: 1, borderColor: AI.line },
-  toneChipOn: { backgroundColor: AI.tint, borderColor: ACCENT },
-  toneText: { color: AI.textSub, fontSize: 11.5, fontWeight: '700' },
-  toneTextOn: { color: ACCENT },
-  chapter: { marginBottom: 14 },
-  chapterTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800', marginBottom: 10 },
-  chapterNum: { color: ACCENT },
-  node: { backgroundColor: AI.card, borderRadius: 11, padding: 12, marginBottom: 8 },
-  nodeAction: { backgroundColor: 'rgba(48,209,88,0.10)', borderWidth: 1, borderColor: 'rgba(48,209,88,0.4)' },
-  nodeHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nodeTitle: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
-  nodeBadge: { marginLeft: 'auto', color: WARN, fontSize: 10.5, fontWeight: '800' },
-  nodeBody: { color: '#D8D8DD', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  nodeBodyAction: { color: '#fff', fontWeight: '600' },
-
-  qrLabel: { color: AI.faint, fontSize: 10, marginTop: 4, marginBottom: 6 },
-  qr: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  qrChip: { borderColor: ACCENT, borderWidth: 1, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
-  qrText: { color: ACCENT, fontSize: 12.5, fontWeight: '600' },
-  ask: { marginTop: 14, backgroundColor: ACCENT, borderRadius: 13, paddingVertical: 13, alignItems: 'center' },
+  // 코치
+  toneRow: { flexDirection: 'row', gap: 6, marginBottom: 13 },
+  toneChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11, backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair },
+  toneChipOn: { backgroundColor: RT.purple, borderColor: RT.purple },
+  toneText: { color: RT.ink2, fontSize: 12.5, fontWeight: '700' },
+  toneTextOn: { color: '#fff', fontWeight: '800' },
+  aTrans: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, padding: 14, borderRadius: 16, backgroundColor: '#1b1922', borderWidth: 1, borderColor: RT.purpleLine },
+  av: { width: 40, height: 40, borderRadius: 13, backgroundColor: RT.purpleD, alignItems: 'center', justifyContent: 'center' },
+  aNm: { color: RT.ink, fontSize: 14.5, fontWeight: '800' },
+  aSub: { color: RT.ink2, fontSize: 11.5, marginTop: 2 },
+  tl: { borderLeftWidth: 2, borderLeftColor: RT.purpleLine, marginLeft: 14, paddingLeft: 24 },
+  ph: { marginBottom: 10, marginTop: 4 },
+  mk: { position: 'absolute', left: -39, top: -2, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: RT.bg },
+  mkN: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  pt: { color: RT.ink, fontSize: 14, fontWeight: '800' },
+  tn: { marginBottom: 12, paddingLeft: 2 },
+  tnHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  tnLab: { color: RT.ink3, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3 },
+  tnBadge: { color: RT.warn, fontSize: 10.5, fontWeight: '800' },
+  tnBody: { color: RT.ink2, fontSize: 13, lineHeight: 19 },
+  tnAct: { backgroundColor: RT.goodBg, borderWidth: 1, borderColor: 'rgba(48,209,88,0.4)', borderRadius: 13, padding: 13, paddingHorizontal: 14, marginBottom: 12 },
+  tactL: { color: RT.good, fontSize: 10.5, fontWeight: '800' },
+  tactT: { color: RT.ink, fontSize: 14, fontWeight: '700', lineHeight: 20, marginTop: 5 },
+  qa: { marginTop: 8, paddingTop: 15, borderTopWidth: 1, borderTopColor: RT.hair },
+  qh: { color: RT.purple, fontSize: 11, fontWeight: '800', letterSpacing: 0.3, marginBottom: 9 },
+  qchips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 12 },
+  qchip: { borderWidth: 1.3, borderColor: RT.purpleLine, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 13 },
+  qtext: { color: RT.ink, fontSize: 12.5, fontWeight: '600' },
+  ask: { backgroundColor: RT.purple, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   askText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });

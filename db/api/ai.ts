@@ -126,6 +126,49 @@ export type RCoachItem = {
 export type RGoalProgress = { goalLabel: string; value: number; comment: string } | null;
 export type RPrescription = { horizon: string; action: string; why: string; todo: string };
 
+// ── 데이터 탭 21카드 확장(명세 §6) — 없는 블록은 null → 자동 숨김 ──────────
+export type RTone = 'ok' | 'good' | 'warn' | 'bad';
+export type RRoutineAdherence = { completedSessions: number; plannedSessions: number; onPlanDays: number; planTargetDays: number };
+export type RVolBar = { label: string; tons: number; tone: RTone };
+export type RWeekdayBar = { day: string; count: number; active: boolean };
+export type RMuscleFreqDays = { part: string; perWeek: number; low: boolean };
+export type RSlice = { label: string; pct: number; rank: number };
+export type RBalancePair = { leftLabel: string; leftPct: number; rightLabel: string; rightPct: number };
+export type ROverload = { up: number; hold: number; stall: number; total: number; pct: number };
+export type RRepRange = { strengthPct: number; hyperPct: number; endurancePct: number; avgE1rmPct: number };
+export type RIntensityScore = { value: number; delta: string | null; spark: RPoint[] };
+export type RRelStrength = { lift: string; multiple: number; grade: string; barPct: number };
+export type RPrItem = { name: string; value: string; isNew: boolean };
+export type RLbm = { current: number | null; delta: string | null; trend: RPoint[] | null; comment: string | null };
+export type RGoalItem = { label: string; detail: string; pct: number; tone: RTone };
+export type RSessionStats = { sessions: number; sets: number; reps: number; avgMin: number; setsPerSession: number; prs: number };
+export type RDensityRest = { densityKgPerMin: number; avgRest: string | null; totalRestMin: number; note: string | null };
+export type RDiversity = { exercises: number; equipment: number; newCount: number };
+export type RTimeBucket = { label: string; count: number; peak: boolean };
+export type RRecoveryItem = { part: string; days: number; tone: RTone };
+export type RHighlight = { kind: string; label: string; value: string; tone: RTone };
+export type RCards = {
+  routineAdherence: RRoutineAdherence | null;
+  volumeBars: RVolBar[] | null;
+  weekdayFreq: RWeekdayBar[] | null;
+  muscleFreqDays: RMuscleFreqDays[] | null;
+  muscleVolumeShare: RSlice[] | null;
+  muscleBalance: RBalancePair[] | null;
+  overload: ROverload | null;
+  repRange: RRepRange | null;
+  intensityScore: RIntensityScore | null;
+  relativeStrength: RRelStrength[] | null;
+  prTimeline: RPrItem[] | null;
+  lbm: RLbm | null;
+  goals: RGoalItem[] | null;
+  sessionStats: RSessionStats | null;
+  densityRest: RDensityRest | null;
+  diversity: RDiversity | null;
+  timeOfDay: RTimeBucket[] | null;
+  recovery: RRecoveryItem[] | null;
+  highlights: RHighlight[] | null;
+};
+
 export type AiReportV2 = {
   id: string;
   period: { type: ReportPeriodType; label: string; start: string; end: string; nextReportEtaDays: number | null };
@@ -150,6 +193,7 @@ export type AiReportV2 = {
   suggestedQuestions: string[];
   consistency: RConsistency | null;
   coaching: RCoachItem[] | null;
+  cards: RCards | null;
 };
 
 export type AiReportV2Response = {

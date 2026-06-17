@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, SafeAreaView, Modal, AccessibilityInfo } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AI, COLORS } from '../../constants/colors';
 import { getReportV2, getAllWorkoutDates, AiReportV2Response } from '../../db/queries';
 import { PERIOD_UNITS, PeriodUnit, buildBuckets, earliestDate } from '../../lib/periods';
 import ReportTabs from '../../components/report/ReportTabs';
 import BriefingLoading from '../../components/BriefingLoading';
+import { RT } from '../../components/report/theme';
 
-const GREEN = COLORS.green;
+const GREEN = RT.good;
+const GREEN_INK = '#06270d';
 const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기' };
 
 export default function AiReportsScreen() {
@@ -113,7 +114,7 @@ export default function AiReportsScreen() {
         {res?.status === 'GENERATING' ? (
           <BriefingLoading percent={res.percent} step={res.step} />
         ) : loading ? (
-          <View style={styles.center}><ActivityIndicator color={AI.accent} size="large" /><Text style={styles.dim}>분석 중…</Text></View>
+          <View style={styles.center}><ActivityIndicator color={RT.action} size="large" /><Text style={styles.dim}>분석 중…</Text></View>
         ) : res?.status === 'SUCCESS' && res.report ? (
           <>
             {res.report.period.nextReportEtaDays != null && (
@@ -168,48 +169,48 @@ function Empty({ icon, title, desc, cta, onPress }: { icon: string; title: strin
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: AI.line },
-  back: { color: AI.accent, fontSize: 30, width: 24, marginTop: -4 },
+  safe: { flex: 1, backgroundColor: RT.bg },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RT.hair },
+  back: { color: RT.action, fontSize: 30, width: 24, marginTop: -4 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  regen: { color: AI.accent, fontSize: 12.5, fontWeight: '700' },
+  regen: { color: RT.action, fontSize: 12.5, fontWeight: '700' },
 
   // 단위 세그먼트
   segRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
-  segItem: { flex: 1, paddingVertical: 9, borderRadius: 10, backgroundColor: AI.card, alignItems: 'center' },
+  segItem: { flex: 1, paddingVertical: 9, borderRadius: 10, backgroundColor: RT.surface, alignItems: 'center' },
   segItemOn: { backgroundColor: GREEN },
-  segText: { color: AI.textSub, fontSize: 13, fontWeight: '700' },
-  segTextOn: { color: COLORS.greenInk, fontWeight: '800' },
+  segText: { color: RT.ink2, fontSize: 13, fontWeight: '700' },
+  segTextOn: { color: GREEN_INK, fontWeight: '800' },
 
   // 📅 + 칩 한 줄
-  navRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: AI.line },
-  calBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: AI.card, alignItems: 'center', justifyContent: 'center' },
+  navRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RT.hair },
+  calBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: RT.surface, alignItems: 'center', justifyContent: 'center' },
   calIcon: { fontSize: 19 },
   chips: { gap: 7, paddingRight: 14, alignItems: 'stretch' },
-  chip: { borderRadius: 12, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: AI.card, borderWidth: 1, borderColor: AI.line, justifyContent: 'center', minWidth: 72 },
+  chip: { borderRadius: 12, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, justifyContent: 'center', minWidth: 72 },
   chipOn: { backgroundColor: GREEN, borderColor: GREEN },
   chipMain: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
-  chipMainOn: { color: COLORS.greenInk },
-  chipSub: { color: AI.textSub, fontSize: 10.5, fontWeight: '600', marginTop: 2, fontVariant: ['tabular-nums'] },
-  chipSubOn: { color: COLORS.greenInk, opacity: 0.75 },
+  chipMainOn: { color: GREEN_INK },
+  chipSub: { color: RT.ink2, fontSize: 10.5, fontWeight: '600', marginTop: 2, fontVariant: ['tabular-nums'] },
+  chipSubOn: { color: GREEN_INK, opacity: 0.75 },
 
   body: { padding: 16, paddingBottom: 48, flexGrow: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 8 },
-  dim: { color: AI.textSub, fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 24 },
+  dim: { color: RT.ink2, fontSize: 13, textAlign: 'center', lineHeight: 19, paddingHorizontal: 24 },
   emptyTitle: { color: '#fff', fontSize: 17, fontWeight: '800', marginBottom: 4 },
-  cta: { marginTop: 20, backgroundColor: AI.accent, borderRadius: 13, paddingVertical: 13, paddingHorizontal: 28 },
-  ctaText: { color: AI.ink, fontSize: 15, fontWeight: '800' },
+  cta: { marginTop: 20, backgroundColor: RT.action, borderRadius: 13, paddingVertical: 13, paddingHorizontal: 28 },
+  ctaText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
-  eta: { backgroundColor: AI.card, borderRadius: 8, padding: 9, marginBottom: 12 },
-  etaText: { color: AI.textSub, fontSize: 11.5 },
+  eta: { backgroundColor: RT.surface, borderRadius: 8, padding: 9, marginBottom: 12 },
+  etaText: { color: RT.ink2, fontSize: 11.5 },
 
   // 바텀시트
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { backgroundColor: '#161618', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingBottom: 36 },
+  sheet: { backgroundColor: RT.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingBottom: 36 },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#3A3A3C', marginTop: 10, marginBottom: 12 },
   sheetTitle: { color: '#fff', fontSize: 17, fontWeight: '800', marginBottom: 8 },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: AI.line },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: RT.hair },
   sheetLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  sheetSub: { color: AI.textSub, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] },
+  sheetSub: { color: RT.ink2, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] },
   check: { color: GREEN, fontSize: 18, fontWeight: '800', marginLeft: 12 },
 });
