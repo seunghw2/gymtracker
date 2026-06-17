@@ -25,3 +25,8 @@
 
 ## P4 · 편집(표시·숨김 + 순서) (2026-06-17)
 - DataTab을 블록 레지스트리로 전환. 편집모드에서 카드별 숨김(기존 ai_report_hidden) + 그룹 내 ↑↓ 순서변경(신규 ai_report_order) → 백엔드 AppSetting 저장. '참고' 그룹 기본 접힘.
+
+## P5 · 비주얼(C/레드) — 리포트 (2026-06-17)
+- `report/theme.ts`를 SEM에서 파생하도록 재배선: **bad=주황(#FF8A00)**·warn=노랑(#FFC53D)·good=초록(#2BD96A), action=브랜드 빨강(#FF3B30). 리포트의 '미달·부족·하락'이 빨강→주황으로 바뀌어 빨강 과부하 해소(빨강은 액션·활성 전용).
+- bg/surface도 SEM(#000/#0D0D0D)에서 파생. 분배색 c1~c5=CATS, 코치=COACH_PURPLE.
+- (보너스) Chat 알림 중복: 백엔드 NotificationService.create의 dedupeKey(REPORT_READY=기간키, STAGNATION=기간키+:stag, REMINDER=날짜/스트릭키)로 이미 멱등 — 같은 이벤트 중복 적재 없음. 추가 변경 불필요.
