@@ -1,182 +1,118 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, TextInput,
-  SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, RefreshControl,
+  SafeAreaView, KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AI } from '../../constants/colors';
-import { askGeneralChat, ChatTurn } from '../../db/api/ai';
-import { getNotifications, markAllNotificationsRead, parseLinkParams, AppNotification, NotificationType } from '../../db/api/notifications';
+import { getNotifications, AppNotification } from '../../db/api/notifications';
+import { useChatStore } from '../../store/useChatStore';
 import { useUiStore } from '../../store/useUiStore';
+import { groupNotifications, NotifGroup, stallExercise } from '../../lib/groupNotifications';
 
-const NOTIF_ICON: Record<NotificationType, string> = {
-  REPORT_READY: '📊', STAGNATION: '⚠️', PR: '💪', REMINDER: '🔔',
-};
-
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const sameDay = d.toDateString() === new Date().toDateString();
-  return sameDay ? `${hh}:${mm}` : `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
-}
-
+/** Chat 탭(허브): 접힌 알림 strip + 동적 스타터 + 최근 대화 + 입력창. 상세는 /chat/[id]. */
 export default function ChatTab() {
   const router = useRouter();
   const setUnread = useUiStore(s => s.setUnread);
-  const scrollRef = useRef<ScrollView>(null);
+  const conversations = useChatStore(s => s.conversations);
+  const loadConversations = useChatStore(s => s.loadConversations);
+  const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
-  const [notifs, setNotifs] = useState<AppNotification[] | null>(null);
-  const [msgs, setMsgs] = useState<ChatTurn[]>([]);
+  const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [suggested, setSuggested] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    loadConversations();
     try {
       const r = await getNotifications();
       setNotifs(r.items);
-      if (r.unreadCount > 0) markAllNotificationsRead().catch(() => {});
-      setUnread(0);
+      setUnread(r.unreadCount);
     } catch {
       setNotifs([]);
     }
-  }, [setUnread]);
+  }, [loadConversations, setUnread]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  const groups = groupNotifications(notifs);
+  const stalls = groups.filter(g => g.type === 'STAGNATION').length;
+  const reports = groups.filter(g => g.type === 'REPORT_READY').length;
 
-  const openNotif = (n: AppNotification) => {
-    if (!n.linkPath) return;
-    router.push({ pathname: n.linkPath as never, params: parseLinkParams(n.linkParams) as never });
+  // 동적 스타터: 정체 종목 반영
+  const stallEx = stallExercise(groups.find(g => g.type === 'STAGNATION')?.body);
+  const starters = [
+    '이번 주 어땠어',
+    stallEx ? `${stallEx} 정체 풀기` : '정체 풀기',
+    '루틴 짜줘',
+  ];
+
+  const goConv = (id: number, title: string, extra?: Record<string, string>) =>
+    router.push({ pathname: '/chat/[conversationId]', params: { conversationId: String(id), title, ...(extra ?? {}) } });
+
+  const startDirect = async (seed: string) => {
+    const q = seed.trim();
+    if (!q) return;
+    const conv = await findOrCreateByKey({ source: 'direct', title: q.length > 20 ? q.slice(0, 20) + '…' : q });
+    if (conv) { setInput(''); goConv(conv.id, conv.title, { seed: q }); }
   };
 
-  const send = async (q: string) => {
-    const question = q.trim();
-    if (!question || sending) return;
-    const history = [...msgs];
-    setMsgs(m => [...m, { role: 'user', content: question }]);
-    setInput('');
-    setSuggested([]);
-    setSending(true);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-    try {
-      const reply = await askGeneralChat(question, history);
-      setMsgs(m => [...m, { role: 'ai', content: reply.content }]);
-      setSuggested(reply.suggestedQuestions ?? []);
-    } catch {
-      setMsgs(m => [...m, { role: 'ai', content: '지금은 답하기 어려워요. 다시 시도해 주세요.' }]);
-      setInput(question);
-    } finally {
-      setSending(false);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-    }
-  };
-
-  const hasMsgs = msgs.length > 0;
-  const hasNotifs = notifs !== null && notifs.length > 0;
+  const tag = (src: string) => src === 'report' ? { t: '리포트', c: '#c3a8e8' } : src === 'alert' ? { t: '알림', c: AI.warn } : null;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={s.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.header}>
-          <View style={styles.avatar}><Text style={{ fontSize: 16 }}>🤖</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.hName}>AI 코치</Text>
-            <Text style={styles.hSub}>운동에 대해 뭐든 물어보세요</Text>
-          </View>
-        </View>
+        <View style={s.headTop}><Text style={s.title}>AI 코치</Text></View>
 
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => hasMsgs && scrollRef.current?.scrollToEnd({ animated: true })}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AI.accent} />}
-        >
-          {notifs === null && <ActivityIndicator color={AI.accent} style={{ marginVertical: 20 }} />}
+        <ScrollView contentContainerStyle={s.body}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AI.accent} />}>
 
-          {/* 알림 → AI 버블 */}
-          {notifs !== null && notifs.map(n => (
-            <Pressable
-              key={n.id}
-              style={[styles.bub, styles.aiBub, !!n.linkPath && styles.linkBub]}
-              disabled={!n.linkPath}
-              onPress={() => openNotif(n)}
-            >
-              <View style={styles.notifRow}>
-                <Text style={styles.notifIcon}>{NOTIF_ICON[n.type] ?? '🔔'}</Text>
-                <Text style={styles.notifTitle}>{n.title}</Text>
-                <Text style={styles.notifTime}>{fmtTime(n.createdAt)}</Text>
+          {groups.length > 0 && (
+            <Pressable style={s.strip} onPress={() => router.push('/ai/inbox')}>
+              <Text style={{ fontSize: 15 }}>🔔</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.stripT}>새 소식 {groups.length}건</Text>
+                <Text style={s.stripS}>{[stalls && `정체 ${stalls}`, reports && `리포트 ${reports}`].filter(Boolean).join(' · ') || '중복은 묶음 처리'}</Text>
               </View>
-              <Text style={styles.aiText}>{n.body}</Text>
-              {!!n.linkPath && <Text style={styles.goText}>보기 ›</Text>}
+              <Text style={s.go}>›</Text>
             </Pressable>
-          ))}
-
-          {/* 알림·대화 모두 없을 때 빈 상태 */}
-          {notifs !== null && !hasNotifs && !hasMsgs && (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🤖</Text>
-              <Text style={styles.emptyText}>안녕하세요!{'\n'}운동에 대해 뭐든 물어보세요.</Text>
-            </View>
           )}
 
-          {/* 알림과 직접 대화 사이 구분선 */}
-          {hasMsgs && hasNotifs && (
-            <View style={styles.divider}><Text style={styles.dividerText}>직접 대화</Text></View>
-          )}
+          <Text style={s.lbl}>바로 물어보기</Text>
+          <View style={s.starters}>
+            {starters.map((st, i) => (
+              <Pressable key={i} style={[s.start, i === 0 && s.startHl]} onPress={() => startDirect(st)}>
+                <Text style={[s.startT, i === 0 && s.startTHl]}>{st}</Text>
+              </Pressable>
+            ))}
+          </View>
 
-          {/* 채팅 메시지 */}
-          {msgs.map((m, i) => (
-            <View key={i} style={[styles.bub, m.role === 'ai' ? styles.aiBub : styles.usrBub]}>
-              <Text style={m.role === 'ai' ? styles.aiText : styles.usrText}>{m.content}</Text>
-            </View>
-          ))}
+          {conversations.length > 0 && <Text style={s.lbl}>최근 대화</Text>}
+          {conversations.map(c => {
+            const tg = tag(c.source);
+            return (
+              <Pressable key={c.id} style={s.ses} onPress={() => goConv(c.id, c.title)}>
+                <Text style={s.sesT} numberOfLines={1}>💬 {c.title}</Text>
+                {!!c.preview && <Text style={s.sesP} numberOfLines={1}>{c.preview}</Text>}
+                <View style={s.sesMeta}>
+                  {tg && <Text style={[s.tagx, { color: tg.c, backgroundColor: tg.c + '22' }]}>{tg.t}</Text>}
+                  <Text style={s.tm}>{fmtDay(c.updatedAt)}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
 
-          {sending && (
-            <View style={[styles.bub, styles.aiBub]}>
-              <ActivityIndicator color={AI.accent} />
-            </View>
-          )}
-
-          {!sending && suggested.length > 0 && (
-            <>
-              <Text style={styles.qrLabel}>추천 질문</Text>
-              <View style={styles.qrRow}>
-                {suggested.map((s, i) => (
-                  <Pressable key={i} style={styles.qrBtn} onPress={() => send(s)}>
-                    <Text style={styles.qrText}>{s}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
+          {conversations.length === 0 && groups.length === 0 && (
+            <View style={s.empty}><Text style={{ fontSize: 36, marginBottom: 10 }}>🤖</Text><Text style={s.emptyT}>운동에 대해 뭐든 물어보세요.</Text></View>
           )}
         </ScrollView>
 
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.inp}
-            placeholder="AI 코치에게 물어보기…"
-            placeholderTextColor={AI.faint}
-            value={input}
-            onChangeText={setInput}
-            onSubmitEditing={() => send(input)}
-            returnKeyType="send"
-          />
-          <Pressable
-            style={[styles.snd, (!input.trim() || sending) && { opacity: 0.4 }]}
-            disabled={!input.trim() || sending}
-            onPress={() => send(input)}
-          >
-            <Text style={styles.sndText}>↑</Text>
+        <View style={s.composer}>
+          <TextInput style={s.inp} placeholder="AI 코치에게 물어보기…" placeholderTextColor={AI.faint}
+            value={input} onChangeText={setInput} onSubmitEditing={() => startDirect(input)} returnKeyType="send" />
+          <Pressable style={[s.snd, !input.trim() && { opacity: 0.4 }]} disabled={!input.trim()} onPress={() => startDirect(input)}>
+            <Text style={s.sndText}>↑</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -184,61 +120,45 @@ export default function ChatTab() {
   );
 }
 
-const styles = StyleSheet.create({
+function fmtDay(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: AI.line,
-  },
-  avatar: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: AI.tint, borderWidth: 1, borderColor: AI.accent,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  hName: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  hSub: { color: AI.textSub, fontSize: 11, marginTop: 1 },
+  headTop: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  body: { padding: 14, paddingBottom: 24 },
 
-  body: { padding: 14, paddingBottom: 16, gap: 8 },
+  strip: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 12, padding: 12 },
+  stripT: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
+  stripS: { color: '#7a7a7e', fontSize: 10.5, marginTop: 2 },
+  go: { color: AI.textSub, fontSize: 15 },
 
-  bub: { maxWidth: '88%', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 16 },
-  aiBub: { alignSelf: 'flex-start', backgroundColor: AI.bubble, borderTopLeftRadius: 5 },
-  usrBub: { alignSelf: 'flex-end', backgroundColor: AI.accent, borderTopRightRadius: 5 },
-  linkBub: { borderWidth: 1, borderColor: 'rgba(255,59,48,0.35)' },
+  lbl: { color: '#6a6a6e', fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8, marginLeft: 2 },
+  starters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  start: { borderWidth: 1, borderColor: '#2a2a30', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#0d0d0f' },
+  startHl: { borderColor: AI.accent, backgroundColor: 'rgba(255,59,48,0.14)' },
+  startT: { color: '#e4e4ea', fontSize: 12.5, fontWeight: '700' },
+  startTHl: { color: '#fff' },
 
-  notifRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  notifIcon: { fontSize: 13 },
-  notifTitle: { color: '#fff', fontSize: 12.5, fontWeight: '700', flex: 1 },
-  notifTime: { color: AI.faint, fontSize: 10, fontVariant: ['tabular-nums'] },
-  goText: { color: AI.accent, fontSize: 11.5, fontWeight: '700', marginTop: 6 },
+  ses: { backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#15151a', borderRadius: 12, padding: 12, marginBottom: 8 },
+  sesT: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
+  sesP: { color: '#8a8a8e', fontSize: 11.5, marginTop: 4 },
+  sesMeta: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 7 },
+  tagx: { fontSize: 9.5, fontWeight: '800', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  tm: { color: '#6a6a6e', fontSize: 10, marginLeft: 'auto', fontVariant: ['tabular-nums'] },
 
-  aiText: { color: '#EDEDF0', fontSize: 14, lineHeight: 20 },
-  usrText: { color: AI.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  empty: { alignItems: 'center', paddingVertical: 60 },
+  emptyT: { color: AI.textSub, fontSize: 13 },
 
-  divider: { alignItems: 'center', paddingVertical: 2 },
-  dividerText: { color: AI.faint, fontSize: 11 },
-
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { color: AI.textSub, fontSize: 15, textAlign: 'center', lineHeight: 22 },
-
-  qrLabel: { color: AI.faint, fontSize: 10, marginTop: 4, marginLeft: 2 },
-  qrRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  qrBtn: { borderColor: AI.accent, borderWidth: 1, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
-  qrText: { color: AI.accent, fontSize: 12.5, fontWeight: '600' },
-
-  composer: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    padding: 10, borderTopWidth: 1, borderTopColor: AI.line,
-  },
-  inp: {
-    flex: 1, backgroundColor: AI.bubble, borderRadius: 999,
-    paddingHorizontal: 15, paddingVertical: 10,
-    color: '#fff', fontSize: 13.5,
-  },
-  snd: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center',
-  },
-  sndText: { color: AI.ink, fontSize: 18, fontWeight: '800' },
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: AI.line },
+  inp: { flex: 1, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 22, paddingHorizontal: 15, paddingVertical: 11, color: '#fff', fontSize: 14 },
+  snd: { width: 38, height: 38, borderRadius: 19, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center' },
+  sndText: { color: '#fff', fontSize: 18, fontWeight: '800' },
 });

@@ -35,3 +35,11 @@
 - 브리핑(index)·기록(calendar): 의미-빨강 오용 없음(빨강은 모두 브랜드 액션) → 별도 치환 불필요.
 - Chat 탭: 알림 인박스 + AI 코치 대화(askGeneralChat → /v2/chat, period=null=최근 1개월 컨텍스트)로 동작 확인.
 - 결론: "빨강 과부하"는 리포트 상태색(P5)에서 일괄 해소, 타 화면은 브랜드 액션이라 유지. P0~P5 완료.
+
+## AI 코치 채팅 개편 P0~P5 (2026-06-17)
+- P0: 백엔드 ai/chat(Conversation/ChatMessage + /api/v1/ai/conversations). 프론트 db/api/chat.ts + store/useChatStore.ts.
+- P1: lib/groupNotifications.ts — 알림 표시 그룹핑(stall:종목/report:type), 횟수·최근시각. inbox 재작성(그룹 + 대화로 풀기).
+- P2: Chat 탭=허브(알림 strip + 동적 스타터 + 최근 대화 + 입력창).
+- P3: app/chat/[conversationId].tsx — 청크 스트리밍 + 타이핑 인디케이터 + 후속칩.
+- P4: 리포트 코치 "이어가기/더 물어보기" → findOrCreateByKey(report:{type}:{start}) → 주차당 1세션 복귀.
+- P5: 화면 문구 "애널리스트"→"AI 코치" 통일.

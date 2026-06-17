@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getSetting, setSetting, getSessionHistory, SessionSummary } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
+import { useChatStore } from '../../store/useChatStore';
 import type { AiReportV2, RCoachItem } from '../../db/api/ai';
 import SessionPreviewSheet from '../SessionPreviewSheet';
 import { RT, toneColor } from './theme';
@@ -406,10 +407,26 @@ function PeriodSessions({ start, end }: { start: string; end: string }) {
 
 // ── 코치 ────────────────────────────────────────────────────────────
 const CHAPTERS = [{ n: 1, label: '진단 · 무슨 일이 있었나' }, { n: 2, label: '처방 · 뭘 하면 되나' }, { n: 3, label: '계속 가기 · 동기' }];
-function CoachTab({ r, onAsk, editing, hidden, toggle, tone, onTone }: { r: AiReportV2; onAsk?: () => void; editing: boolean; hidden: Set<string>; toggle: (k: string) => void; tone: string; onTone: (t: string) => void }) {
+function CoachTab({ r, editing, hidden, toggle, tone, onTone }: { r: AiReportV2; onAsk?: () => void; editing: boolean; hidden: Set<string>; toggle: (k: string) => void; tone: string; onTone: (t: string) => void }) {
+  const router = useRouter();
+  const findOrCreateByKey = useChatStore(st => st.findOrCreateByKey);
   const all = r.coaching ?? [];
   const visible = (it: RCoachItem) => editing ? true : (it.defaultOn && !hidden.has('coach_' + it.key));
   const items = all.filter(visible);
+
+  // 주차당 1세션 이어가기(중복 방지) — 같은 리포트면 기존 대화로 복귀
+  const continueChat = async (seed?: string) => {
+    const conv = await findOrCreateByKey({
+      source: 'report',
+      sourceKey: `report:${r.period.type}:${r.period.start}`,
+      title: `${r.period.label} 회고`,
+      periodType: r.period.type,
+      from: r.period.start,
+      to: r.period.end,
+    });
+    if (conv) router.push({ pathname: '/chat/[conversationId]', params: { conversationId: String(conv.id), title: conv.title, ctx: `${r.period.label} 리포트에서 이어옴`, ...(seed ? { seed } : {}) } });
+  };
+
   return (
     <View>
       <View style={s.toneRow}>
@@ -421,7 +438,7 @@ function CoachTab({ r, onAsk, editing, hidden, toggle, tone, onTone }: { r: AiRe
       </View>
       <View style={s.aTrans}>
         <View style={s.av}><Text style={{ fontSize: 18 }}>🤖</Text></View>
-        <View style={{ flex: 1 }}><Text style={s.aNm}>애널리스트가 이렇게 읽었어</Text><Text style={s.aSub}>{r.period.label} · 단계로 풀어줄게</Text></View>
+        <View style={{ flex: 1 }}><Text style={s.aNm}>AI 코치가 이렇게 읽었어</Text><Text style={s.aSub}>{r.period.label} · 단계로 풀어줄게</Text></View>
       </View>
       <View style={s.tl}>
         {CHAPTERS.map(ch => {
@@ -463,10 +480,10 @@ function CoachTab({ r, onAsk, editing, hidden, toggle, tone, onTone }: { r: AiRe
       {r.suggestedQuestions?.length > 0 && (
         <View style={s.qa}>
           <Text style={s.qh}>💬 더 물어보기</Text>
-          <View style={s.qchips}>{r.suggestedQuestions.map((q, i) => <Pressable key={i} style={s.qchip} onPress={onAsk}><Text style={s.qtext}>{q}</Text></Pressable>)}</View>
+          <View style={s.qchips}>{r.suggestedQuestions.map((q, i) => <Pressable key={i} style={s.qchip} onPress={() => continueChat(q)}><Text style={s.qtext}>{q}</Text></Pressable>)}</View>
         </View>
       )}
-      {onAsk && <Pressable style={s.ask} onPress={onAsk}><Text style={s.askText}>애널리스트랑 대화 이어가기</Text></Pressable>}
+      <Pressable style={s.ask} onPress={() => continueChat()}><Text style={s.askText}>AI 코치랑 대화 이어가기</Text></Pressable>
     </View>
   );
 }
