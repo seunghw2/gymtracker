@@ -2,6 +2,31 @@
  * 앱 공통 색 토큰. CARBON 디자인 시스템 — 블랙 배경 + 레드 액센트.
  * 브랜드 액센트(버튼·활성·헤더·진행바)는 레드로 통일하고, 증감/경고 같은 의미색은 따로 둔다.
  */
+
+/**
+ * 시맨틱 토큰(단일 소스). 색의 "의미"를 이름으로 고정한다.
+ * - brand/onBrand : 액션·활성(탭·버튼) 전용. 의미(경고)에는 쓰지 않는다.
+ * - good/warn/bad : 상태. **bad=주황**(미달·부족·위험), warn=노랑, good=초록.
+ * - bg/surface/line/muted/text : 표면·구분선·약한 글자.
+ * P1에선 토큰 정의만 추가하고 화면 값은 P5에서 점진 치환한다(여기선 렌더 변화 없음).
+ */
+export const SEM = {
+  brand: '#FF3B30',
+  onBrand: '#FFFFFF',
+  good: '#2BD96A',
+  warn: '#FFC53D',
+  bad: '#FF8A00',
+  bg: '#000000',
+  surface: '#0D0D0D',
+  line: '#1A1A1A',
+  muted: '#6A6A6A',
+  text: '#FFFFFF',
+} as const;
+
+/** 분배/카테고리 보조 팔레트(초록 단일 계열, 밝음→어두움). 시맨틱 외 보조색. */
+export const CATS = ['#3ee06a', '#26a64c', '#1c7a3a', '#15532a', '#2c2c31'] as const;
+/** 코치 페르소나 보조색(코치 탭 전용). */
+export const COACH_PURPLE = '#9f8fef';
 export const COLORS = {
   green: '#30D158',      // (의미색) 증가/긍정 — 브랜드 액센트 아님
   greenInk: '#06210F',
