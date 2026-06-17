@@ -36,6 +36,11 @@ export async function markAllNotificationsRead(): Promise<void> {
   await apiRequest<void>('/api/v1/notifications/read-all', { method: 'POST' });
 }
 
+/** 기기 Expo 푸시 토큰 등록(원격 푸시 — 앱 종료 상태 알림용). */
+export async function registerPushToken(token: string, platform: string): Promise<void> {
+  await apiRequest<void>('/api/v1/push/token', { method: 'POST', body: { token, platform } });
+}
+
 /** linkParams(JSON 문자열)를 라우터 params 객체로 파싱. 실패 시 undefined. */
 export function parseLinkParams(raw: string | null): Record<string, string> | undefined {
   if (!raw) return undefined;

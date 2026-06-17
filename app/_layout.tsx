@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/useAuthStore';
 import { configureNotifications, ensurePermission } from '../lib/notifications';
 import { refreshWorkoutReminder } from '../lib/reminders';
+import { registerForPushNotifications } from '../lib/push';
 import { configureAudio } from '../lib/sound';
 import NotificationBridge from '../components/NotificationBridge';
 
@@ -21,9 +22,12 @@ export default function RootLayout() {
     ensurePermission();
   }, []);
 
-  // 로그인되면 운동 리마인더를 마지막 운동일 기준으로 재예약
+  // 로그인되면 운동 리마인더 재예약 + 원격 푸시 토큰 등록(개발 빌드에서만 동작)
   useEffect(() => {
-    if (status === 'authenticated') refreshWorkoutReminder().catch(() => {});
+    if (status === 'authenticated') {
+      refreshWorkoutReminder().catch(() => {});
+      registerForPushNotifications().catch(() => {});
+    }
   }, [status]);
 
   useEffect(() => {
