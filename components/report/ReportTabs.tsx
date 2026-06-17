@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import Svg, { Polyline } from 'react-native-svg';
 import { getSetting, setSetting, getSessionHistory, SessionSummary } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
@@ -125,6 +126,7 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
   const c = r.consistency;
   const bc = r.bodyComposition;
   const d = r.cards;
+  const router = useRouter();
   const goalWeight = useSettingsStore(st => st.goalWeightKg);
   const [exFilter, setExFilter] = useState<'pinned' | 'compound' | 'all'>('pinned');
   const show = (k: string) => editing || !hidden.has(k);
@@ -221,7 +223,8 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
           </View>
           {exFiltered.length === 0 ? <Text style={s.exEmpty}>해당 종목이 없어요.</Text> :
             exFiltered.map((e, i) => (
-              <View key={i} style={s.exRow}>
+              <Pressable key={i} style={s.exRow} disabled={editing}
+                onPress={() => router.push({ pathname: '/exercise-detail', params: { name: e.name } })}>
                 {editing && (
                   <Pressable onPress={() => togglePin(e.name)} hitSlop={6}>
                     <Text style={[s.pinStar, { color: isPin(e.name) ? '#FFD60A' : RT.ink3 }]}>{isPin(e.name) ? '★' : '☆'}</Text>
@@ -229,9 +232,10 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
                 )}
                 <Text style={s.exName}>{!editing && isPin(e.name) ? '★ ' : ''}{e.name}</Text>
                 <Text style={[s.exVal, { color: toneColor(e.tone) }]}>{e.val}</Text>
-              </View>
+                {!editing && <Text style={s.exGo}>›</Text>}
+              </Pressable>
             ))}
-          {editing && <Text style={s.exHint}>★ 탭하여 주력 종목 지정/해제</Text>}
+          {editing ? <Text style={s.exHint}>★ 탭하여 주력 종목 지정/해제</Text> : <Text style={s.exHint}>종목을 탭하면 1RM 추세 상세를 볼 수 있어요</Text>}
         </Card>
       )}
       {d?.overload && show('card_overload') && (
@@ -539,6 +543,7 @@ const s = StyleSheet.create({
   exRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: RT.hair },
   exName: { color: RT.ink, fontSize: 14.5, flex: 1 },
   exVal: { fontSize: 14.5, fontWeight: '800' },
+  exGo: { color: RT.ink3, fontSize: 16, marginLeft: 8 },
   pinStar: { fontSize: 16, width: 20 },
   exHint: { color: RT.ink3, fontSize: 11, marginTop: 8 },
 
