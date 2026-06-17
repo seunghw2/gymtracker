@@ -43,3 +43,4 @@
 - P3: app/chat/[conversationId].tsx — 청크 스트리밍 + 타이핑 인디케이터 + 후속칩.
 - P4: 리포트 코치 "이어가기/더 물어보기" → findOrCreateByKey(report:{type}:{start}) → 주차당 1세션 복귀.
 - P5: 화면 문구 "애널리스트"→"AI 코치" 통일.
+- E0~E5: 종목별 리포트 — 종목 탭(watchlist 허브: ★보유/관심·스파크·등락칩·정렬/검색), app/exercise/[name].tsx(큰 숫자 헤더 + 지표 토글 차트 1RM/최대무게/볼륨/빈도 + 코드템플릿 코치 + 대화로 풀기 stall:{종목}). 백엔드 /stats/exercise-summary·/exercise-progress 신설. 즐겨찾기=ai_pinned_lifts 재사용. exercise-detail 제거.
