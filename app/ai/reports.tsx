@@ -17,6 +17,7 @@ const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quart
 const reportCache = new Map<string, AiReportV2Response>();
 const CACHE_KEY = 'ai_report_cache_v1';
 const CACHE_MAX = 16;
+const FIRST_KEY = 'ai_first_workout_iso';   // 첫 기록일(기간 버킷 계산용) — 콜드 스타트 시 네트워크 대기 제거
 
 function persistCache() {
   try {
@@ -60,7 +61,16 @@ export default function AiReportsScreen() {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
     (async () => {
       await hydrateCache();   // 영속 캐시 먼저 메모리에 올림 → 첫 load도 즉시
-      try { setFirstISO(earliestDate(await getAllWorkoutDates())); } catch { setFirstISO(null); }
+      // 첫 기록일도 로컬에서 먼저 읽어 기간 버킷을 바로 만든다(네트워크 대기 없이 캐시 리포트 즉시 표시)
+      try {
+        const cachedFirst = await AsyncStorage.getItem(FIRST_KEY);
+        if (cachedFirst) { setFirstISO(cachedFirst); setDatesLoaded(true); }
+      } catch { /* ignore */ }
+      try {
+        const f = earliestDate(await getAllWorkoutDates());
+        setFirstISO(f);
+        if (f) AsyncStorage.setItem(FIRST_KEY, f).catch(() => {});
+      } catch { /* 캐시 first 있으면 그대로 사용 */ }
       setDatesLoaded(true);
     })();
   }, []);
@@ -169,7 +179,7 @@ export default function AiReportsScreen() {
         {res?.status === 'GENERATING' ? (
           <BriefingLoading percent={res.percent} step={res.step} />
         ) : loading ? (
-          <View style={styles.center}><ActivityIndicator color={RT.action} size="large" /><Text style={styles.dim}>분석 중…</Text></View>
+          <View style={styles.center}><ActivityIndicator color={RT.action} size="large" /><Text style={styles.dim}>로딩 중…</Text></View>
         ) : res?.status === 'SUCCESS' && res.report ? (
           <>
             {res.report.period.nextReportEtaDays != null && (
