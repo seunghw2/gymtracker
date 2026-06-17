@@ -12,12 +12,16 @@ export function configureNotifications() {
   configured = true;
 
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: false,
-      shouldShowList: false,
-    }),
+    // 휴식 타이머는 포그라운드에서 소리만(배너 X). 리포트·리마인더 등 data.banner=true 알림은 배너+목록 표시.
+    handleNotification: async (n) => {
+      const banner = !!(n.request.content.data as any)?.banner;
+      return {
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: banner,
+        shouldShowList: banner,
+      };
+    },
   });
 
   if (Platform.OS === 'android') {
@@ -26,6 +30,53 @@ export function configureNotifications() {
       importance: Notifications.AndroidImportance.HIGH,
       sound: 'default',
     }).catch(() => {});
+    Notifications.setNotificationChannelAsync('general', {
+      name: '리포트·리마인더',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+    }).catch(() => {});
+  }
+}
+
+/** 즉시 로컬 알림 표시(앱이 살아있을 때 서버 이벤트 브리지용). data.banner로 포그라운드 배너 보장. */
+export async function presentLocalNow(title: string, body: string, link?: string, params?: Record<string, string>): Promise<void> {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: 'default', data: { banner: true, link: link ?? null, params: params ?? null } },
+      trigger: null,
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 특정 시각에 로컬 알림 예약. id 반환(실패 시 null). */
+export async function scheduleLocalAt(date: Date, title: string, body: string, link?: string): Promise<string | null> {
+  if (date.getTime() <= Date.now()) return null;
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title, body, sound: 'default',
+        data: { banner: true, link: link ?? null },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+        channelId: Platform.OS === 'android' ? 'general' : undefined,
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** 예약 알림 취소(id). */
+export async function cancelScheduled(id: string | null) {
+  if (!id) return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(id);
+  } catch {
+    /* ignore */
   }
 }
 

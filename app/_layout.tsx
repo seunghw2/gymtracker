@@ -5,7 +5,9 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/useAuthStore';
 import { configureNotifications, ensurePermission } from '../lib/notifications';
+import { refreshWorkoutReminder } from '../lib/reminders';
 import { configureAudio } from '../lib/sound';
+import NotificationBridge from '../components/NotificationBridge';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -18,6 +20,11 @@ export default function RootLayout() {
     configureAudio();
     ensurePermission();
   }, []);
+
+  // 로그인되면 운동 리마인더를 마지막 운동일 기준으로 재예약
+  useEffect(() => {
+    if (status === 'authenticated') refreshWorkoutReminder().catch(() => {});
+  }, [status]);
 
   useEffect(() => {
     if (status === 'unknown') return;
@@ -44,6 +51,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" />
+      {status === 'authenticated' && <NotificationBridge />}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />

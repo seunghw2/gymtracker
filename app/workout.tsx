@@ -104,6 +104,7 @@ import { useRestRemaining, fmtClock } from '../hooks/useRestRemaining';
 import { playSetDoneSound } from '../lib/sound';
 import { buildExerciseEntry } from '../lib/exerciseEntry';
 import { epley, formatDuration } from '../lib/format';
+import { refreshWorkoutReminder } from '../lib/reminders';
 import { styles } from './workout.styles';
 
 type SelectStep = 'muscle' | 'equipment' | 'brand' | 'custom-brand' | 'list' | 'custom';
@@ -532,6 +533,7 @@ export default function WorkoutScreen() {
           if (activeSessionId) {
             await completeSession(activeSessionId, durationSec).catch(() => {});
           }
+          refreshWorkoutReminder().catch(() => {});  // 운동했으니 다음 리마인더를 뒤로 미룸
           // 종료 전 요약 계산
           const doneSets = exercises.flatMap(e => e.sets.filter(s => s.done));
           const volume = doneSets

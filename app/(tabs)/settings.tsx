@@ -30,6 +30,14 @@ import {
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { exportWorkoutsCsv } from '../../lib/export';
+import { getReminderSettings, setReminderSettings, ReminderSettings } from '../../lib/reminders';
+
+const stepStyles = StyleSheet.create({
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stepBtn: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
+  stepText: { color: '#FF3B30', fontSize: 20, fontWeight: '800' },
+  stepVal: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', minWidth: 52, textAlign: 'center', fontVariant: ['tabular-nums'] },
+});
 
 export default function SettingsScreen() {
   const {
@@ -77,6 +85,13 @@ export default function SettingsScreen() {
   const [goalWeightInput, setGoalWeightInput] = useState(String(goalWeightKg));
   const [goalFatInput, setGoalFatInput] = useState(String(goalBodyFatPct));
   const [restInput, setRestInput] = useState(String(restDurationSec));
+  const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, days: 2, hour: 19 });
+
+  useEffect(() => { getReminderSettings().then(setReminder).catch(() => {}); }, []);
+  const updateReminder = (next: ReminderSettings) => {
+    setReminder(next);
+    setReminderSettings(next).catch(() => {});
+  };
   const [showSessionNote, setShowSessionNote] = useState(true);
   const [weightPrompt, setWeightPrompt] = useState(true);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
@@ -420,6 +435,47 @@ export default function SettingsScreen() {
               thumbColor="#FFFFFF"
             />
           </View>
+        </View>
+        )}
+
+        {/* 운동 리마인더 */}
+        {Cat('reminder', '📅', '운동 리마인더')}
+        {open === 'reminder' && (
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.label}>며칠 쉬면 알림</Text>
+              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
+                마지막 운동 후 설정한 날만큼 쉬면 알려줘요 (앱이 닫혀 있어도)
+              </Text>
+            </View>
+            <Switch
+              value={reminder.enabled}
+              onValueChange={v => updateReminder({ ...reminder, enabled: v })}
+              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          {reminder.enabled && (
+            <>
+              <View style={[styles.row, { marginTop: 14 }]}>
+                <Text style={styles.label}>쉬는 일수</Text>
+                <View style={stepStyles.stepper}>
+                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, days: Math.max(1, reminder.days - 1) })}><Text style={stepStyles.stepText}>−</Text></Pressable>
+                  <Text style={stepStyles.stepVal}>{reminder.days}일</Text>
+                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, days: Math.min(14, reminder.days + 1) })}><Text style={stepStyles.stepText}>+</Text></Pressable>
+                </View>
+              </View>
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <Text style={styles.label}>알림 시각</Text>
+                <View style={stepStyles.stepper}>
+                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, hour: (reminder.hour + 23) % 24 })}><Text style={stepStyles.stepText}>−</Text></Pressable>
+                  <Text style={stepStyles.stepVal}>{String(reminder.hour).padStart(2, '0')}:00</Text>
+                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, hour: (reminder.hour + 1) % 24 })}><Text style={stepStyles.stepText}>+</Text></Pressable>
+                </View>
+              </View>
+            </>
+          )}
         </View>
         )}
 
