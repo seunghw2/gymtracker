@@ -373,12 +373,11 @@ export default function ExerciseAddScreen() {
             </Pressable>
           </View>
 
-          {brandOpen && (
-            <View
-              ref={brandPanelRef}
-              style={styles.brandPanel}
-              onLayout={() => brandPanelRef.current?.measureInWindow((_x, y) => setBrandPanelTop(y))}
-            >
+          <Modal visible={brandOpen} transparent animationType="slide" onRequestClose={() => setBrandOpen(false)}>
+            <Pressable style={styles.brandBackdrop} onPress={() => setBrandOpen(false)} />
+            <View style={styles.brandSheet}>
+              <View style={styles.brandGrab} />
+              <Text style={styles.brandSheetTitle}>브랜드 선택</Text>
               <TextInput
                 style={[styles.input, { marginBottom: 8 }]}
                 placeholder="브랜드 검색"
@@ -388,7 +387,7 @@ export default function ExerciseAddScreen() {
                 clearButtonMode="while-editing"
                 autoCorrect={false}
               />
-              <ScrollView style={{ maxHeight: brandListMaxH }} contentContainerStyle={{ paddingBottom: 4 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+              <ScrollView style={{ maxHeight: winH * 0.42 }} contentContainerStyle={{ paddingBottom: 4 }} keyboardShouldPersistTaps="handled">
                 {/* 고정: 브랜드 전체 (검색과 무관하게 항상 맨 위) */}
                 <Pressable style={styles.brandRow} onPress={() => { setBrand('ALL'); setBrandOpen(false); }}>
                   <View style={styles.starBtn} />
@@ -438,7 +437,7 @@ export default function ExerciseAddScreen() {
                 <Text style={styles.brandAddRowText}>+ 새 브랜드 추가</Text>
               </Pressable>
             </View>
-          )}
+          </Modal>
         </View>
       )}
 
@@ -623,6 +622,10 @@ const styles = StyleSheet.create({
 
   // 브랜드 선택 인라인 패널
   brandPanel: { backgroundColor: '#161618', borderRadius: 14, marginHorizontal: 16, marginTop: 8, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 4 },
+  brandBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  brandSheet: { backgroundColor: '#161618', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28 },
+  brandGrab: { width: 36, height: 4, borderRadius: 3, backgroundColor: '#33333a', alignSelf: 'center', marginVertical: 6 },
+  brandSheetTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 10 },
   brandRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingVertical: 6 },
   brandRowText: { flex: 1, color: COLORS.textPrimary, fontSize: 16, fontWeight: '600' },
   brandCheck: { color: GREEN, fontSize: 16, fontWeight: '800', marginLeft: 10 },
