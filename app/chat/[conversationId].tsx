@@ -94,6 +94,18 @@ export default function ConversationDetail() {
           onContentSizeChange={scrollEnd}>
           {!!params.ctx && <Text style={s.ctxChip}>📊 {params.ctx}</Text>}
 
+          {/* 빈 새 대화 — AI 코치가 먼저 말 걸기 + 추천 질문 */}
+          {list.length === 0 && !params.seed && streaming === null && !sending && (
+            <>
+              <View style={[s.bub, s.aBub]}><Text style={s.aText}>{params.ctx ? '이거 같이 보면서 얘기해보자. 궁금한 거 있어? 💪' : '안녕! 오늘 운동은 어땠어? 궁금한 거 편하게 물어봐 💪'}</Text></View>
+              <View style={s.qr}>
+                {['이번 주 어땠어?', '내 약점이 뭐야?', '루틴 짜줘'].map((q, i) => (
+                  <Pressable key={i} style={s.qrChip} onPress={() => handleSend(q)}><Text style={s.qrText}>{q}</Text></Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
           {list.map(m => (
             <View key={m.id} style={[s.bub, m.role === 'user' ? s.uBub : s.aBub]}>
               <Text style={m.role === 'user' ? s.uText : s.aText}>{m.text}</Text>
