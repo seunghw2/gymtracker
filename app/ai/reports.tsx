@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, SafeAreaView, Modal, AccessibilityInfo } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { getReportV2, getAllWorkoutDates, getSetting, AiReportV2Response } from '../../db/queries';
@@ -10,6 +10,9 @@ import { RT } from '../../components/report/theme';
 const GREEN = RT.good;
 const GREEN_INK = '#06270d';
 const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기' };
+
+// 성공 리포트 메모리 캐시(앱 세션 동안 유지) — 한 번 본 기간은 재방문 시 스피너 없이 즉시 표시.
+const reportCache = new Map<string, AiReportV2Response>();
 
 export default function AiReportsScreen() {
   const router = useRouter();
@@ -25,6 +28,7 @@ export default function AiReportsScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [tonePref, setTonePref] = useState<string | null>(null);
+  const latestKey = useRef('');
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
@@ -42,11 +46,23 @@ export default function AiReportsScreen() {
 
   const load = useCallback((force = false) => {
     if (!selected) return;
-    setLoading(true);
+    const key = `${unitType}:${selected.start}:${selected.end}`;
+    latestKey.current = key;
+    const cached = reportCache.get(key);
+    if (cached && !force) {
+      setRes(cached);        // 캐시 즉시 표시 — 스피너 없이
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    // 백그라운드 갱신(stale-while-revalidate)
     getReportV2(unitType, 0, force, { from: selected.start, to: selected.end, label: selected.label })
-      .then(setRes)
-      .catch(() => setRes({ status: 'FAILED', message: '네트워크 오류로 불러오지 못했어요.', report: null }))
-      .finally(() => setLoading(false));
+      .then(r => {
+        if (r.status === 'SUCCESS') reportCache.set(key, r);
+        if (latestKey.current === key) setRes(r);   // 그새 기간 바뀌었으면 무시
+      })
+      .catch(() => { if (latestKey.current === key && !cached) setRes({ status: 'FAILED', message: '네트워크 오류로 불러오지 못했어요.', report: null }); })
+      .finally(() => { if (latestKey.current === key) setLoading(false); });
   }, [unitType, selected?.start, selected?.end, selected?.label]);
 
   useFocusEffect(useCallback(() => {
@@ -66,7 +82,10 @@ export default function AiReportsScreen() {
     if (res?.status !== 'GENERATING' || !selected) return;
     const id = setTimeout(() => {
       getReportV2(unitType, 0, false, { from: selected.start, to: selected.end, label: selected.label })
-        .then(setRes).catch(() => {});
+        .then(r => {
+          if (r.status === 'SUCCESS') reportCache.set(`${unitType}:${selected.start}:${selected.end}`, r);
+          setRes(r);
+        }).catch(() => {});
     }, 2000);
     return () => clearTimeout(id);
   }, [res, selected?.start, selected?.end, unitType]);
