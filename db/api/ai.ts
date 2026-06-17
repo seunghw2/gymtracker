@@ -238,6 +238,11 @@ export async function askReportChat(input: {
   return apiRequest<ChatReply>('/api/v1/ai/v2/chat', { method: 'POST', body: input });
 }
 
+/** 일반 채팅 — 기간 제한 없이 최근 1개월 컨텍스트로 자유 질문. */
+export async function askGeneralChat(question: string, history: ChatTurn[] = []): Promise<ChatReply> {
+  return apiRequest<ChatReply>('/api/v1/ai/v2/chat', { method: 'POST', body: { question, history, period: null } });
+}
+
 /** 주간 브리핑 생성/캐시 조회. */
 export async function generateAiReport(opts: { from?: string; to?: string; force?: boolean } = {}): Promise<AiReportResult> {
   const params = new URLSearchParams();
