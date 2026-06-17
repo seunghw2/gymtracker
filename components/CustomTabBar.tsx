@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ACCENT } from '../constants/colors';
+import { useUiStore } from '../store/useUiStore';
 
 const ACTIVE = ACCENT;
 const INACTIVE = '#7E7E83';
@@ -17,6 +18,7 @@ const META: Record<string, { active: IoniconName; inactive: IoniconName; label: 
   index: { active: 'sparkles', inactive: 'sparkles-outline', label: '브리핑' },
   calendar: { active: 'list', inactive: 'list-outline', label: '기록' },
   stats: { active: 'stats-chart', inactive: 'stats-chart-outline', label: '통계' },
+  chat: { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline', label: 'Chat' },
 };
 
 /**
@@ -27,6 +29,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const router = useRouter();
   const segments = useSegments();
   const reportActive = (segments as string[]).includes('ai');
+  const unread = useUiStore(s => s.unread);
 
   const reportTab = (
     <Pressable
@@ -70,7 +73,12 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             accessibilityLabel={meta.label}
           >
             <View style={[styles.indicator, focused && styles.indicatorOn]} />
-            <Ionicons name={focused ? meta.active : meta.inactive} size={26} color={color} />
+            <View>
+              <Ionicons name={focused ? meta.active : meta.inactive} size={26} color={color} />
+              {route.name === 'chat' && unread > 0 && (
+                <View style={styles.badge}><Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text></View>
+              )}
+            </View>
             <Text style={[styles.label, { color }, focused && styles.labelOn]}>{meta.label}</Text>
           </Pressable>
         );
@@ -98,4 +106,6 @@ const styles = StyleSheet.create({
   indicatorOn: { backgroundColor: ACTIVE },
   label: { fontSize: 11, fontWeight: '500', marginTop: 3 },
   labelOn: { fontWeight: '700' },
+  badge: { position: 'absolute', top: -5, right: -9, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
 });

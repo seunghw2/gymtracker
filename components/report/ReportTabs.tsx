@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
-import { getSetting, setSetting } from '../../db/queries';
+import { getSetting, setSetting, getSessionHistory, SessionSummary } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
 import type { AiReportV2, RCoachItem } from '../../db/api/ai';
+import SessionPreviewSheet from '../SessionPreviewSheet';
 import { RT, toneColor } from './theme';
 import {
   Eyebrow, Card, Tile, Ring, Donut, VBars, StackedBar, BalanceSplit, ProgressRow,
@@ -18,6 +19,7 @@ const COMPOUND = ['squat', 'bench', 'deadlift', 'press', 'row', 'pulldown', 'pul
 const PINNED = ['squat', 'bench press', 'deadlift', 'overhead press', 'lat pulldown'];
 const isCompound = (n: string) => COMPOUND.some(k => n.toLowerCase().includes(k));
 const isPinned = (n: string) => PINNED.some(k => n.toLowerCase().includes(k));
+const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 리포트 3서브탭(브리핑·데이터·코치) + 편집모드 + 톤. */
 export default function ReportTabs({ r, onAsk, onReload }: { r: AiReportV2; onAsk?: () => void; onReload?: () => void }) {
@@ -143,6 +145,9 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
 
   return (
     <View>
+      {/* ── 이 기간 운동 기록 ── */}
+      <PeriodSessions start={r.period.start} end={r.period.end} />
+
       {/* ── A 일관성 ── */}
       {hasA && <Eyebrow label="일관성" />}
       {c && show('card_consistency') && (
@@ -348,6 +353,39 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
   );
 }
 
+// ── 이 기간 운동 기록(세션 목록) ──────────────────────────────────────
+function PeriodSessions({ start, end }: { start: string; end: string }) {
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [preview, setPreview] = useState<SessionSummary | null>(null);
+  useEffect(() => {
+    getSessionHistory(150)
+      .then(all => setSessions(all.filter(x => x.date >= start && x.date <= end)))
+      .catch(() => setSessions([]));
+  }, [start, end]);
+  if (sessions.length === 0) return null;
+  return (
+    <Card title="이 기간 운동 기록" caption={`${sessions.length}회 · 탭하면 상세`}>
+      {sessions.map(se => {
+        const dt = new Date(se.date + 'T00:00:00');
+        const dlabel = `${dt.getMonth() + 1}/${dt.getDate()} ${WD[dt.getDay()]}`;
+        const tags = (se.tags ?? '').split(/[,·]/).map(t => t.trim()).filter(Boolean);
+        const mins = se.duration_sec ? Math.round(se.duration_sec / 60) : null;
+        return (
+          <Pressable key={se.id} style={s.psRow} onPress={() => setPreview(se)}>
+            <Text style={s.psDate}>{dlabel}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.psTitle} numberOfLines={1}>{se.title || tags.join(' · ') || '운동'}</Text>
+              <Text style={s.psSub}>{se.set_count}세트{mins ? ` · ${mins}분` : ''} · {se.exercise_count}종목</Text>
+            </View>
+            <Text style={s.psGo}>›</Text>
+          </Pressable>
+        );
+      })}
+      <SessionPreviewSheet session={preview} onClose={() => setPreview(null)} />
+    </Card>
+  );
+}
+
 // ── 코치 ────────────────────────────────────────────────────────────
 const CHAPTERS = [{ n: 1, label: '진단 · 무슨 일이 있었나' }, { n: 2, label: '처방 · 뭘 하면 되나' }, { n: 3, label: '계속 가기 · 동기' }];
 function CoachTab({ r, onAsk, editing, hidden, toggle, tone, onTone }: { r: AiReportV2; onAsk?: () => void; editing: boolean; hidden: Set<string>; toggle: (k: string) => void; tone: string; onTone: (t: string) => void }) {
@@ -503,6 +541,12 @@ const s = StyleSheet.create({
   exVal: { fontSize: 14.5, fontWeight: '800' },
   pinStar: { fontSize: 16, width: 20 },
   exHint: { color: RT.ink3, fontSize: 11, marginTop: 8 },
+
+  psRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: RT.hair },
+  psDate: { color: RT.ink2, fontSize: 12, fontWeight: '700', width: 52, fontVariant: ['tabular-nums'] },
+  psTitle: { color: RT.ink, fontSize: 14, fontWeight: '600' },
+  psSub: { color: RT.ink3, fontSize: 11.5, marginTop: 2, fontVariant: ['tabular-nums'] },
+  psGo: { color: RT.ink3, fontSize: 18 },
 
   lrow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RT.hair },
   lst: { width: 16, textAlign: 'center', fontSize: 13 },

@@ -25,7 +25,6 @@ import {
   getAllWorkoutDates,
   getSetting,
   getReportV2,
-  getUnreadCount,
   AiReportV2,
   BodyLog,
 } from '../../db/queries';
@@ -81,7 +80,6 @@ export default function BriefingHome() {
   const [todayWaist, setTodayWaist] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     const today = getTodayStr();
@@ -112,9 +110,6 @@ export default function BriefingHome() {
       // 무시 — 폴백 UI
     }
     setLoaded(true);
-
-    // 알림 안읽음 수(배지) — 실패해도 화면엔 영향 없음
-    getUnreadCount().then(setUnreadCount).catch(() => {});
 
     // v2 주간 브리핑(비동기 — 생성 중이면 GENERATING, 폴링으로 완성 감지)
     try {
@@ -199,14 +194,6 @@ export default function BriefingHome() {
         <View style={styles.headerRow}>
           <Text style={styles.brand}>브리핑</Text>
           <View style={styles.headerIcons}>
-            <Pressable hitSlop={10} onPress={() => router.push('/ai/inbox')}>
-              <Ionicons name="notifications-outline" size={22} color={AI.textSub} />
-              {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                </View>
-              )}
-            </Pressable>
             <Pressable hitSlop={10} onPress={() => router.push('/(tabs)/settings')}>
               <Ionicons name="settings-outline" size={22} color={AI.textSub} />
             </Pressable>
@@ -317,8 +304,6 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  badge: { position: 'absolute', top: -5, right: -7, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { color: ACCENT_INK, fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
   brand: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
   dateChip: { color: AI.textSub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
 

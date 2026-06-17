@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { getNotifications, parseLinkParams } from '../db/api/notifications';
 import { presentLocalNow } from '../lib/notifications';
+import { useUiStore } from '../store/useUiStore';
 
 /**
  * 서버 인박스 알림 → 로컬 알림 브리지(Expo Go 한계 내 최대치).
@@ -39,6 +40,7 @@ export default function NotificationBridge() {
       try {
         const r = await getNotifications();
         if (!mounted) return;
+        useUiStore.getState().setUnread(r.unreadCount);   // Chat 탭 배지 갱신
         const maxId = r.items.reduce((m, n) => Math.max(m, n.id), 0);
         if (lastSeenId.current == null) {
           lastSeenId.current = maxId; // 최초엔 기준선만(기존 알림으로 울리지 않음)

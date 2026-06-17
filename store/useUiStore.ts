@@ -12,6 +12,9 @@ type UiState = {
   /** 운동 탭에서 앱 내 숫자패드가 떠 있는지 — 전역 휴식 타이머가 위로 비켜서기 위함 */
   numPadOpen: boolean;
   setNumPadOpen: (open: boolean) => void;
+  /** 안 읽은 알림 수 — Chat 탭 배지용(NotificationBridge가 폴링으로 갱신, Chat 진입 시 0). */
+  unread: number;
+  setUnread: (n: number) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -20,4 +23,6 @@ export const useUiStore = create<UiState>((set) => ({
   clearEditTarget: () => set({ editTarget: null }),
   numPadOpen: false,
   setNumPadOpen: (open) => set({ numPadOpen: open }),
+  unread: 0,
+  setUnread: (n) => set({ unread: n }),
 }));
