@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, SafeAreaView, Modal, AccessibilityInfo } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getReportV2, getAllWorkoutDates, getSetting, AiReportV2Response } from '../../db/queries';
 import { PERIOD_UNITS, PeriodUnit, buildBuckets, earliestDate } from '../../lib/periods';
 import ReportTabs from '../../components/report/ReportTabs';
@@ -11,8 +12,33 @@ const GREEN = RT.good;
 const GREEN_INK = '#06270d';
 const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기' };
 
-// 성공 리포트 메모리 캐시(앱 세션 동안 유지) — 한 번 본 기간은 재방문 시 스피너 없이 즉시 표시.
+// 성공 리포트 캐시 — 한 번 본 기간은 재방문 시 스피너 없이 즉시 표시.
+// 메모리 + AsyncStorage 영속(앱을 껐다 켜도 마지막 본 리포트가 바로 뜸). 최근 16개로 제한.
 const reportCache = new Map<string, AiReportV2Response>();
+const CACHE_KEY = 'ai_report_cache_v1';
+const CACHE_MAX = 16;
+
+function persistCache() {
+  try {
+    AsyncStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(reportCache))).catch(() => {});
+  } catch { /* ignore */ }
+}
+/** 성공 리포트만 캐시에 저장(+영속). 최근순 유지. */
+function cacheSet(key: string, r: AiReportV2Response) {
+  if (r.status !== 'SUCCESS') return;
+  reportCache.delete(key);
+  reportCache.set(key, r);
+  while (reportCache.size > CACHE_MAX) reportCache.delete(reportCache.keys().next().value as string);
+  persistCache();
+}
+async function hydrateCache() {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw) as Record<string, AiReportV2Response>;
+    for (const [k, v] of Object.entries(obj)) reportCache.set(k, v);
+  } catch { /* ignore */ }
+}
 
 export default function AiReportsScreen() {
   const router = useRouter();
@@ -32,10 +58,11 @@ export default function AiReportsScreen() {
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
-    getAllWorkoutDates()
-      .then(ds => setFirstISO(earliestDate(ds)))
-      .catch(() => setFirstISO(null))
-      .finally(() => setDatesLoaded(true));
+    (async () => {
+      await hydrateCache();   // 영속 캐시 먼저 메모리에 올림 → 첫 load도 즉시
+      try { setFirstISO(earliestDate(await getAllWorkoutDates())); } catch { setFirstISO(null); }
+      setDatesLoaded(true);
+    })();
   }, []);
 
   // 단위별 기간 버킷(최신이 맨 앞). 최초 기록일~현재.
@@ -58,7 +85,7 @@ export default function AiReportsScreen() {
     // 백그라운드 갱신(stale-while-revalidate)
     getReportV2(unitType, 0, force, { from: selected.start, to: selected.end, label: selected.label })
       .then(r => {
-        if (r.status === 'SUCCESS') reportCache.set(key, r);
+        cacheSet(key, r);
         if (latestKey.current === key) setRes(r);   // 그새 기간 바뀌었으면 무시
       })
       .catch(() => { if (latestKey.current === key && !cached) setRes({ status: 'FAILED', message: '네트워크 오류로 불러오지 못했어요.', report: null }); })
@@ -83,7 +110,7 @@ export default function AiReportsScreen() {
     const id = setTimeout(() => {
       getReportV2(unitType, 0, false, { from: selected.start, to: selected.end, label: selected.label })
         .then(r => {
-          if (r.status === 'SUCCESS') reportCache.set(`${unitType}:${selected.start}:${selected.end}`, r);
+          cacheSet(`${unitType}:${selected.start}:${selected.end}`, r);
           setRes(r);
         }).catch(() => {});
     }, 2000);
