@@ -42,9 +42,10 @@ export default function ExerciseAddScreen() {
   // 브랜드 목록 높이를 화면에 맞게 제한 — 하단 완료 바(절대 위치) 뒤로 "+ 새 브랜드 추가"가
   // 가려지지 않도록 패널의 실제 화면 위치(measureInWindow)에서 검색칸·하단바·여백을 뺀 만큼만 사용.
   // (검색칸 ~52 + 하단바 ~110 + 여백)
+  // 검색칸 ~52 + 하단바 ~110 + '새 브랜드 추가' 고정행 ~48 + 여백
   const brandListMaxH = brandPanelTop > 0
-    ? Math.max(160, winH - brandPanelTop - 52 - 110 - 12)
-    : 320;
+    ? Math.max(140, winH - brandPanelTop - 52 - 110 - 48 - 12)
+    : 280;
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>([]);
 
   // 직접 등록 폼
@@ -427,14 +428,15 @@ export default function ExerciseAddScreen() {
                     </>
                   );
                 })()}
-
-                <Pressable
-                  style={styles.brandAddRow}
-                  onPress={() => { setBrandOpen(false); setBrandAddInput(''); setTimeout(() => setShowBrandAdd(true), 220); }}
-                >
-                  <Text style={styles.brandAddRowText}>+ 새 브랜드 추가</Text>
-                </Pressable>
               </ScrollView>
+
+              {/* 목록과 무관하게 항상 보이는 고정 푸터 — 끝까지 스크롤 안 해도 보임 */}
+              <Pressable
+                style={styles.brandAddRow}
+                onPress={() => { setBrandOpen(false); setBrandAddInput(''); setTimeout(() => setShowBrandAdd(true), 220); }}
+              >
+                <Text style={styles.brandAddRowText}>+ 새 브랜드 추가</Text>
+              </Pressable>
             </View>
           )}
         </View>
