@@ -93,7 +93,7 @@ export default function ChatTab() {
           </View>
 
           {conversations.length > 0 && <Text style={s.lbl}>최근 대화</Text>}
-          {conversations.map(c => {
+          {[...conversations].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')).map(c => {
             const tg = tag(c.source);
             return (
               <Pressable key={c.id} style={s.ses} onPress={() => goConv(c.id, c.title)}>
