@@ -17,6 +17,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 const META: Record<string, { active: IoniconName; inactive: IoniconName; label: string }> = {
   index: { active: 'sparkles', inactive: 'sparkles-outline', label: '브리핑' },
   calendar: { active: 'list', inactive: 'list-outline', label: '기록' },
+  exercises: { active: 'barbell', inactive: 'barbell-outline', label: '종목' },
   chat: { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline', label: 'Chat' },
 };
 
@@ -82,8 +83,8 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           </Pressable>
         );
 
-        // 기록 뒤에 리포트 탭을 끼워 넣는다(브리핑·기록·리포트·Chat).
-        if (route.name === 'calendar') {
+        // 종목 뒤에 리포트 탭을 끼워 넣는다(브리핑·기록·종목·리포트·Chat).
+        if (route.name === 'exercises') {
           return <React.Fragment key={route.key}>{tab}{reportTab}</React.Fragment>;
         }
         return tab;

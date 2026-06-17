@@ -75,7 +75,7 @@ export default function NotifDetailSheet({ group, onClose }: { group: NotifGroup
     onClose();
     if (conv) router.push({ pathname: '/chat/[conversationId]', params: { conversationId: String(conv.id), title: conv.title, ctx: g.title, ...(seed ? { seed } : {}) } });
   };
-  const goExercise = () => { onClose(); if (ex) router.push({ pathname: '/exercise-detail', params: { name: ex } }); };
+  const goExercise = () => { onClose(); if (ex) router.push({ pathname: '/exercise/[name]', params: { name: ex } }); };
   const goReport = () => { onClose(); router.push({ pathname: '/ai/reports', params: { type: parseLinkParams(g.linkParams)?.type ?? 'month' } }); };
   const goWorkout = () => { onClose(); router.push('/workout'); };
 

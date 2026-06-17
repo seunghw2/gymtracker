@@ -187,7 +187,7 @@ function DataTab({ r, editing, hidden, toggle, pinned, togglePin }: { r: AiRepor
       </View>
       {exFiltered.length === 0 ? <Text style={s.exEmpty}>해당 종목이 없어요.</Text> :
         exFiltered.map((e, i) => (
-          <Pressable key={i} style={s.exRow} disabled={editing} onPress={() => router.push({ pathname: '/exercise-detail', params: { name: e.name } })}>
+          <Pressable key={i} style={s.exRow} disabled={editing} onPress={() => router.push({ pathname: '/exercise/[name]', params: { name: e.name } })}>
             {editing && (
               <Pressable onPress={() => togglePin(e.name)} hitSlop={6}>
                 <Text style={[s.pinStar, { color: isPin(e.name) ? '#FFD60A' : RT.ink3 }]}>{isPin(e.name) ? '★' : '☆'}</Text>

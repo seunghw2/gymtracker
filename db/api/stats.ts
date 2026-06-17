@@ -84,6 +84,50 @@ export async function getExerciseUsage(): Promise<ExerciseUsage[]> {
   return list.map(r => ({ exercise_id: r.exerciseId, count: r.count, last_date: r.lastDate }));
 }
 
+// ── 종목별 리포트 ──────────────────────────────────────────
+export type ExerciseTrend = 'up' | 'flat' | 'new' | 'down';
+
+export type ExerciseSummary = {
+  exerciseId: number;
+  name: string;
+  bodyPart: string;
+  currentE1rm: number | null;
+  prE1rm: number | null;
+  prDate: string | null;
+  plateauWeeks: number;
+  trend: ExerciseTrend;
+  delta: number | null;
+  spark: number[];
+  lastDate: string | null;
+};
+
+export type SeriesPoint = { date: string; value: number };
+
+export type ExerciseProgress = {
+  exerciseId: number;
+  name: string | null;
+  bodyPart: string | null;
+  currentE1rm: number | null;
+  prE1rm: number | null;
+  prDate: string | null;
+  plateauWeeks: number;
+  trend: ExerciseTrend;
+  e1rm: SeriesPoint[];
+  maxWeight: SeriesPoint[];
+  weeklyVolume: SeriesPoint[];
+  weeklyFreq: SeriesPoint[];
+};
+
+/** 허브용: 운동한 적 있는 전 종목 요약(1RM·PR·정체·스파크)을 한 번에. */
+export async function getExerciseSummaries(): Promise<ExerciseSummary[]> {
+  return apiRequest<ExerciseSummary[]>('/api/v1/stats/exercise-summary');
+}
+
+/** 종목 진척 시계열(1RM·최대무게 일별, 볼륨·빈도 주별). */
+export async function getExerciseProgress(exerciseId: number): Promise<ExerciseProgress> {
+  return apiRequest<ExerciseProgress>(`/api/v1/stats/exercise-progress?exerciseId=${exerciseId}`);
+}
+
 // Epley 추정 1RM → N-RM 무게 환산 (N=1이면 그대로).
 export function convertRm(estimated1rm: number, reps: number): number {
   if (reps <= 1) return estimated1rm;
