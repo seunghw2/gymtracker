@@ -429,13 +429,6 @@ function CoachTab({ r, editing, hidden, toggle, tone, onTone }: { r: AiReportV2;
 
   return (
     <View>
-      <View style={s.toneRow}>
-        {TONES.map(([k, label]) => (
-          <Pressable key={k} style={[s.toneChip, tone === k && s.toneChipOn]} onPress={() => onTone(k)}>
-            <Text style={[s.toneText, tone === k && s.toneTextOn]}>{label}</Text>
-          </Pressable>
-        ))}
-      </View>
       <View style={s.aTrans}>
         <View style={s.av}><Text style={{ fontSize: 18 }}>🤖</Text></View>
         <View style={{ flex: 1 }}><Text style={s.aNm}>AI 코치가 이렇게 읽었어</Text><Text style={s.aSub}>{r.period.label} · 단계로 풀어줄게</Text></View>

@@ -194,6 +194,7 @@ export type AiReportV2 = {
   consistency: RConsistency | null;
   coaching: RCoachItem[] | null;
   cards: RCards | null;
+  tone: string | null;
 };
 
 export type AiReportV2Response = {

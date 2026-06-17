@@ -37,6 +37,13 @@ const stepStyles = StyleSheet.create({
   stepBtn: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
   stepText: { color: '#FF3B30', fontSize: 20, fontWeight: '800' },
   stepVal: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', minWidth: 52, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  toneRow: { flexDirection: 'row', gap: 8 },
+  toneChip: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: '#2A2A2E' },
+  toneChipOn: { backgroundColor: '#241011', borderColor: '#FF3B30' },
+  toneLabel: { color: '#8E8E93', fontSize: 14, fontWeight: '800' },
+  toneLabelOn: { color: '#fff' },
+  toneDesc: { color: '#5E5E66', fontSize: 10.5, marginTop: 3 },
+  toneDescOn: { color: '#FF7A70' },
 });
 
 export default function SettingsScreen() {
@@ -92,6 +99,9 @@ export default function SettingsScreen() {
     setReminder(next);
     setReminderSettings(next).catch(() => {});
   };
+  const [coachTone, setCoachTone] = useState('plain');
+  useEffect(() => { getSetting('ai_coach_tone', 'plain').then(setCoachTone).catch(() => {}); }, []);
+  const changeTone = (t: string) => { setCoachTone(t); setSetting('ai_coach_tone', t).catch(() => {}); };
   const [showSessionNote, setShowSessionNote] = useState(true);
   const [weightPrompt, setWeightPrompt] = useState(true);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
@@ -476,6 +486,22 @@ export default function SettingsScreen() {
               </View>
             </>
           )}
+        </View>
+        )}
+
+        {/* AI 코치 톤 */}
+        {Cat('coachTone', '💬', 'AI 코치 톤')}
+        {open === 'coachTone' && (
+        <View style={styles.card}>
+          <Text style={[styles.listItemSub, { marginBottom: 12 }]}>리포트·코치·채팅의 말투를 정해요.</Text>
+          <View style={stepStyles.toneRow}>
+            {([['plain', '담백', '담담하게'], ['cheer', '응원', '밝게 격려'], ['blunt', '직설', '단도직입']] as const).map(([k, label, desc]) => (
+              <Pressable key={k} style={[stepStyles.toneChip, coachTone === k && stepStyles.toneChipOn]} onPress={() => changeTone(k)}>
+                <Text style={[stepStyles.toneLabel, coachTone === k && stepStyles.toneLabelOn]}>{label}</Text>
+                <Text style={[stepStyles.toneDesc, coachTone === k && stepStyles.toneDescOn]}>{desc}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
         )}
 

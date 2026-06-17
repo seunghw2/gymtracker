@@ -267,7 +267,7 @@ const cs = StyleSheet.create({
 
   vbars: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   vcol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 5 },
-  vbar: { width: '100%', borderRadius: 5, minHeight: 5 },
+  vbar: { width: '100%', maxWidth: 44, borderRadius: 5, minHeight: 5 },
   vct: { color: RT.ink2, fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
   vdy: { color: RT.ink3, fontSize: 10.5 },
 

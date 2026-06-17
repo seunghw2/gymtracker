@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, SafeAreaView, Modal, AccessibilityInfo } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { getReportV2, getAllWorkoutDates, AiReportV2Response } from '../../db/queries';
+import { getReportV2, getAllWorkoutDates, getSetting, AiReportV2Response } from '../../db/queries';
 import { PERIOD_UNITS, PeriodUnit, buildBuckets, earliestDate } from '../../lib/periods';
 import ReportTabs from '../../components/report/ReportTabs';
 import BriefingLoading from '../../components/BriefingLoading';
@@ -24,6 +24,7 @@ export default function AiReportsScreen() {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [tonePref, setTonePref] = useState<string | null>(null);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
@@ -49,8 +50,16 @@ export default function AiReportsScreen() {
   }, [unitType, selected?.start, selected?.end, selected?.label]);
 
   useFocusEffect(useCallback(() => {
+    getSetting('ai_coach_tone', 'plain').then(setTonePref).catch(() => {});
     if (datesLoaded && selected) load(false);
   }, [datesLoaded, selected?.start, selected?.end, load]));
+
+  // 설정에서 톤이 바뀌면, 캐시된 리포트의 톤과 달라 → 그 기간만 1회 자동 재생성(채팅은 즉시 반영됨)
+  useEffect(() => {
+    if (loading) return;
+    const t = res?.report?.tone;
+    if (res?.status === 'SUCCESS' && t && tonePref && t !== tonePref) load(true);
+  }, [res, tonePref]);
 
   // 생성 중이면 2초 폴링(스피너 토글 없이 res만 갱신) → 완료 시 자동 교체
   useEffect(() => {
