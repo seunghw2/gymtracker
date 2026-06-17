@@ -30,3 +30,8 @@
 - `report/theme.ts`를 SEM에서 파생하도록 재배선: **bad=주황(#FF8A00)**·warn=노랑(#FFC53D)·good=초록(#2BD96A), action=브랜드 빨강(#FF3B30). 리포트의 '미달·부족·하락'이 빨강→주황으로 바뀌어 빨강 과부하 해소(빨강은 액션·활성 전용).
 - bg/surface도 SEM(#000/#0D0D0D)에서 파생. 분배색 c1~c5=CATS, 코치=COACH_PURPLE.
 - (보너스) Chat 알림 중복: 백엔드 NotificationService.create의 dedupeKey(REPORT_READY=기간키, STAGNATION=기간키+:stag, REMINDER=날짜/스트릭키)로 이미 멱등 — 같은 이벤트 중복 적재 없음. 추가 변경 불필요.
+
+## P5 확장 · 브리핑/기록/Chat (2026-06-17)
+- 브리핑(index)·기록(calendar): 의미-빨강 오용 없음(빨강은 모두 브랜드 액션) → 별도 치환 불필요.
+- Chat 탭: 알림 인박스 + AI 코치 대화(askGeneralChat → /v2/chat, period=null=최근 1개월 컨텍스트)로 동작 확인.
+- 결론: "빨강 과부하"는 리포트 상태색(P5)에서 일괄 해소, 타 화면은 브랜드 액션이라 유지. P0~P5 완료.
