@@ -54,6 +54,11 @@ export default function BriefingLoading({ percent, step }: { percent?: number | 
       <View style={styles.dots}>
         {[0, 1, 2].map(i => <View key={i} style={[styles.dot, i === stage && styles.dotOn]} />)}
       </View>
+
+      <View style={styles.hint}>
+        <Text style={styles.hintText}>다른 화면으로 가도 백그라운드에서 계속 만들어요.</Text>
+        <Text style={styles.hintText}>완료되면 홈 🔔 알림함에 알려드릴게요.</Text>
+      </View>
     </View>
   );
 }
@@ -89,4 +94,7 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', gap: 7, marginTop: 14 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3A3A3C' },
   dotOn: { backgroundColor: ACCENT, width: 18 },
+
+  hint: { marginTop: 26, alignItems: 'center', gap: 3, paddingHorizontal: 24 },
+  hintText: { color: AI.faint, fontSize: 12, textAlign: 'center', lineHeight: 17 },
 });
