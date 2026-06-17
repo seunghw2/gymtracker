@@ -51,3 +51,8 @@ export async function createConversation(input: CreateConvInput): Promise<ChatCo
 export async function sendChatMessage(id: number, text: string): Promise<SendResult> {
   return apiRequest<SendResult>(`/api/v1/ai/conversations/${id}/messages`, { method: 'POST', body: { text } });
 }
+
+/** 대화 삭제(빈 대화 정리·스와이프 삭제). */
+export async function deleteConversation(id: number): Promise<void> {
+  await apiRequest<void>(`/api/v1/ai/conversations/${id}`, { method: 'DELETE' });
+}

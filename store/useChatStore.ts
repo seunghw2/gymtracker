@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   ChatConversation, ChatMsg, CreateConvInput, SendResult,
-  listConversations, getConversationMessages, createConversation, sendChatMessage,
+  listConversations, getConversationMessages, createConversation, sendChatMessage, deleteConversation,
 } from '../db/api/chat';
 
 /**
@@ -16,6 +16,7 @@ type ChatState = {
   findOrCreateByKey: (input: CreateConvInput) => Promise<ChatConversation | null>;
   appendLocal: (convId: number, role: 'user' | 'assistant', text: string) => ChatMsg;
   send: (convId: number, text: string) => Promise<SendResult | null>;
+  remove: (convId: number) => Promise<void>;
 };
 
 let tempId = -1;
@@ -67,5 +68,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       console.warn('메시지 전송 실패', e);
       return null;
     }
+  },
+
+  remove: async (convId) => {
+    set(s => ({
+      conversations: s.conversations.filter(c => c.id !== convId),
+      messagesByConv: Object.fromEntries(Object.entries(s.messagesByConv).filter(([k]) => Number(k) !== convId)),
+    }));
+    try { await deleteConversation(convId); } catch (e) { console.warn('대화 삭제 실패', e); }
   },
 }));

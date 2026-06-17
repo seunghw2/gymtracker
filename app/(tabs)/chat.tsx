@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Swipeable } from 'react-native-gesture-handler';
 import { AI } from '../../constants/colors';
 import { getNotifications, AppNotification } from '../../db/api/notifications';
 import { useChatStore } from '../../store/useChatStore';
@@ -17,6 +18,7 @@ export default function ChatTab() {
   const conversations = useChatStore(s => s.conversations);
   const loadConversations = useChatStore(s => s.loadConversations);
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
+  const removeConv = useChatStore(s => s.remove);
 
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,14 +98,18 @@ export default function ChatTab() {
           {[...conversations].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')).map(c => {
             const tg = tag(c.source);
             return (
-              <Pressable key={c.id} style={s.ses} onPress={() => goConv(c.id, c.title)}>
-                <Text style={s.sesT} numberOfLines={1}>💬 {c.title}</Text>
-                {!!c.preview && <Text style={s.sesP} numberOfLines={1}>{c.preview}</Text>}
-                <View style={s.sesMeta}>
-                  {tg && <Text style={[s.tagx, { color: tg.c, backgroundColor: tg.c + '22' }]}>{tg.t}</Text>}
-                  <Text style={s.tm}>{fmtDay(c.updatedAt)}</Text>
-                </View>
-              </Pressable>
+              <Swipeable key={c.id} renderRightActions={() => (
+                <Pressable style={s.swipeDel} onPress={() => removeConv(c.id)}><Text style={s.swipeDelT}>삭제</Text></Pressable>
+              )}>
+                <Pressable style={s.ses} onPress={() => goConv(c.id, c.title)}>
+                  <Text style={s.sesT} numberOfLines={1}>💬 {c.title}</Text>
+                  {!!c.preview && <Text style={s.sesP} numberOfLines={1}>{c.preview}</Text>}
+                  <View style={s.sesMeta}>
+                    {tg && <Text style={[s.tagx, { color: tg.c, backgroundColor: tg.c + '22' }]}>{tg.t}</Text>}
+                    <Text style={s.tm}>{fmtDay(c.updatedAt)}</Text>
+                  </View>
+                </Pressable>
+              </Swipeable>
             );
           })}
 
@@ -157,6 +163,8 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyT: { color: AI.textSub, fontSize: 13 },
 
+  swipeDel: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 76, marginBottom: 8, borderRadius: 12 },
+  swipeDelT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   fab: { position: 'absolute', right: 18, width: 56, height: 56, borderRadius: 28, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   fabIcon: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: -2 },
 });

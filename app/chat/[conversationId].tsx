@@ -26,13 +26,24 @@ export default function ConversationDetail() {
   const scrollRef = useRef<ScrollView>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const seeded = useRef(false);
+  const loadedEmpty = useRef(false);   // 로드 결과가 빈 대화였는지(성공 확인 후에만 true)
+  const sent = useRef(false);          // 이 화면에서 메시지를 보냈는지
 
   const scrollEnd = () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 40);
 
   useEffect(() => {
     loadMessages(convId);
-    return () => { if (timer.current) clearInterval(timer.current); };
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+      // 빈 대화는 나갈 때 정리(메시지 0 + 전송 안 함). 로드 전 이탈은 건드리지 않음.
+      if (loadedEmpty.current && !sent.current) useChatStore.getState().remove(convId);
+    };
   }, [convId]);
+
+  // 로드 완료 시 빈 대화 여부 갱신
+  useEffect(() => {
+    if (messages !== undefined) loadedEmpty.current = messages.length === 0;
+  }, [messages]);
 
   // 진입 시 seed 질문 자동 전송(중복 방지)
   useEffect(() => {
@@ -61,6 +72,7 @@ export default function ConversationDetail() {
   const handleSend = async (raw: string) => {
     const text = raw.trim();
     if (!text || sending) return;
+    sent.current = true;
     setInput('');
     setSuggested([]);
     setSending(true);
