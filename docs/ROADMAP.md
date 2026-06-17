@@ -182,7 +182,7 @@
 
 - [ ] **C1. 세션 메모(note)** 프론트 입력 UI (백엔드 지원됨)
 - [ ] **C2. 스트릭 로직 통일** — 클라 계산 제거하고 백엔드 `/stats/streak` 사용
-- [ ] **C3. 자동화 테스트** — 백엔드 단위/통합 테스트, 프론트 핵심 흐름 테스트
+- [x] **C3. 자동화 테스트** — ✅ (2026-06-18) 백엔드 43 + 프론트 35 = 78 테스트. 백엔드: 단위(ExerciseStats·detectStagnation·Epley/SetType·AiReportValidator) + 통합(h2 MockMvc: 인증 로테이션·운동 CRUD·종목 stats·채팅 멱등). 프론트: jest-expo + 순수 로직(units·format·date·periods·groupNotifications·pinnedLifts·exerciseEntry) + useChatStore 리듀서. 실행: 백 `./mvnw test`, 프론트 `npm test`
 - [ ] **C4. 운영 DB 마이그레이션** — `ddl-auto=validate` + Flyway 도입(README 권장사항)
 - [ ] **C5. 휴식 타이머 라이브 액티비티(다이나믹 아일랜드/잠금화면)** — 앱을 벗어나도 잠금화면·다이나믹 아일랜드에 휴식 카운트다운 실시간 표시.
   - 요구: iOS ActivityKit Live Activity → **Expo Go 불가**, 네이티브 위젯 익스텐션 + config plugin + **정식(dev) 빌드** 필요(Apple 개발자 설정 포함). 안드로이드는 대응 위젯/포그라운드 서비스 별도.

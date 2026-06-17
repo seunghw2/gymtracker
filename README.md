@@ -148,6 +148,18 @@ npx expo start --tunnel
 
 [백엔드 README →](../gymtracker-backend/README.md) (AI 리포트·알림 엔드포인트 포함)
 
+### 3. 테스트
+
+```bash
+# 프론트엔드 — jest-expo 순수 로직 유닛테스트
+npm test
+
+# 백엔드 — JUnit 단위 + 통합테스트(h2 인메모리, MockMvc)
+cd ../gymtracker-backend && ./mvnw test
+```
+
+백엔드 43 + 프론트 35 = 78개. 인증 흐름·운동 CRUD·종목 통계·AI 코치 대화 멱등·LLM 출력 검증·집계 로직을 커버한다.
+
 ---
 
 ## 📁 프로젝트 구조
