@@ -14,6 +14,7 @@ export type NotifGroup = {
   count: number;
   latestAt: string;
   times: string[];
+  unread: boolean;
   sample: AppNotification;
 };
 
@@ -47,11 +48,12 @@ export function groupNotifications(items: AppNotification[]): NotifGroup[] {
       byKey.set(key, {
         dedupKey: key, type: n.type, title: n.title, body: n.body,
         linkPath: n.linkPath, linkParams: n.linkParams,
-        count: 1, latestAt: n.createdAt, times: [n.createdAt], sample: n,
+        count: 1, latestAt: n.createdAt, times: [n.createdAt], unread: !n.read, sample: n,
       });
     } else {
       g.count += 1;
       g.times.push(n.createdAt);
+      if (!n.read) g.unread = true;
       if (n.createdAt > g.latestAt) g.latestAt = n.createdAt;
     }
   }

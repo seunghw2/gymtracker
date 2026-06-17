@@ -36,6 +36,11 @@ export async function markAllNotificationsRead(): Promise<void> {
   await apiRequest<void>('/api/v1/notifications/read-all', { method: 'POST' });
 }
 
+/** 모두 지우기 — 유저 알림 전체 삭제. */
+export async function clearNotifications(): Promise<void> {
+  await apiRequest<void>('/api/v1/notifications', { method: 'DELETE' });
+}
+
 /** 기기 Expo 푸시 토큰 등록(원격 푸시 — 앱 종료 상태 알림용). */
 export async function registerPushToken(token: string, platform: string): Promise<void> {
   await apiRequest<void>('/api/v1/push/token', { method: 'POST', body: { token, platform } });
