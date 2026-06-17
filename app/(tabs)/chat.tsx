@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, TextInput,
-  SafeAreaView, KeyboardAvoidingView, Platform, RefreshControl,
+  View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { getNotifications, AppNotification } from '../../db/api/notifications';
 import { useChatStore } from '../../store/useChatStore';
 import { useUiStore } from '../../store/useUiStore';
+import { useWorkoutStore } from '../../store/useStore';
 import { groupNotifications, NotifGroup, stallExercise } from '../../lib/groupNotifications';
 
 /** Chat 탭(허브): 접힌 알림 strip + 동적 스타터 + 최근 대화 + 입력창. 상세는 /chat/[id]. */
@@ -19,8 +19,8 @@ export default function ChatTab() {
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
-  const [input, setInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
 
   const load = useCallback(async () => {
     loadConversations();
@@ -55,14 +55,18 @@ export default function ChatTab() {
     const q = seed.trim();
     if (!q) return;
     const conv = await findOrCreateByKey({ source: 'direct', title: q.length > 20 ? q.slice(0, 20) + '…' : q });
-    if (conv) { setInput(''); goConv(conv.id, conv.title, { seed: q }); }
+    if (conv) goConv(conv.id, conv.title, { seed: q });
+  };
+  // 새 빈 대화 시작(FAB) — 상세 화면에서 입력
+  const newChat = async () => {
+    const conv = await findOrCreateByKey({ source: 'direct', title: '새 대화' });
+    if (conv) goConv(conv.id, conv.title);
   };
 
   const tag = (src: string) => src === 'report' ? { t: '리포트', c: '#c3a8e8' } : src === 'alert' ? { t: '알림', c: AI.warn } : null;
 
   return (
     <SafeAreaView style={s.safe}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.headTop}><Text style={s.title}>AI 코치</Text></View>
 
         <ScrollView contentContainerStyle={s.body}
@@ -108,14 +112,10 @@ export default function ChatTab() {
           )}
         </ScrollView>
 
-        <View style={s.composer}>
-          <TextInput style={s.inp} placeholder="AI 코치에게 물어보기…" placeholderTextColor={AI.faint}
-            value={input} onChangeText={setInput} onSubmitEditing={() => startDirect(input)} returnKeyType="send" />
-          <Pressable style={[s.snd, !input.trim() && { opacity: 0.4 }]} disabled={!input.trim()} onPress={() => startDirect(input)}>
-            <Text style={s.sndText}>↑</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
+        {/* 새 대화 FAB — 운동 중이면 배너 위로 올려 안 가리게 */}
+        <Pressable style={[s.fab, { bottom: workoutActive ? 78 : 22 }]} onPress={newChat} accessibilityLabel="새 대화 시작">
+          <Text style={s.fabIcon}>✎</Text>
+        </Pressable>
     </SafeAreaView>
   );
 }
@@ -157,8 +157,6 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyT: { color: AI.textSub, fontSize: 13 },
 
-  composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: AI.line },
-  inp: { flex: 1, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 22, paddingHorizontal: 15, paddingVertical: 11, color: '#fff', fontSize: 14 },
-  snd: { width: 38, height: 38, borderRadius: 19, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center' },
-  sndText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  fab: { position: 'absolute', right: 18, width: 56, height: 56, borderRadius: 28, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  fabIcon: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: -2 },
 });
