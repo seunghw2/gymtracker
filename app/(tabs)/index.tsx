@@ -31,7 +31,7 @@ import {
 import { useSettingsStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
 import BriefingLoading from '../../components/BriefingLoading';
-import { ACCENT, ACCENT_INK, AI } from '../../constants/colors';
+import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
@@ -225,6 +225,24 @@ export default function BriefingHome() {
             {!!rx.todo && <Text style={styles.rxTodo}>{rx.todo}</Text>}
           </Pressable>
         ) : null}
+
+        {/* 부위별 하드세트 · 빈도(주간) */}
+        {(report?.detail?.balance?.length ?? 0) > 0 && (
+          <Pressable style={styles.msCard} onPress={() => router.push('/ai/reports')}>
+            <Text style={styles.msTitle}>부위별 볼륨 <Text style={styles.msCap}>하드세트 · 빈도 / 주</Text></Text>
+            {report!.detail.balance!.map((b, i) => {
+              const f = report?.cards?.muscleFreqDays?.find(m => m.part === b.part);
+              const low = b.status === 'low';
+              return (
+                <View key={i} style={styles.msRow}>
+                  <Text style={styles.msPart}>{b.part}</Text>
+                  <Text style={[styles.msSets, low && { color: SEM.bad }]}>{b.sets}세트{low ? ' 부족' : ''}</Text>
+                  <Text style={[styles.msFreq, f?.low && { color: SEM.bad }]}>{f != null ? `주 ${f.perWeek}회` : '—'}</Text>
+                </View>
+              );
+            })}
+          </Pressable>
+        )}
         </>)}
 
         {/* 핵심 지표 3 */}
@@ -313,6 +331,14 @@ const styles = StyleSheet.create({
   rxCap: { color: ACCENT, fontSize: 11, fontWeight: '800' },
   rxAction: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
   rxTodo: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
+
+  msCard: { backgroundColor: '#161618', borderRadius: 12, padding: 15, marginTop: 11 },
+  msTitle: { color: '#fff', fontSize: 14, fontWeight: '800', marginBottom: 10 },
+  msCap: { color: AI.textSub, fontSize: 11, fontWeight: '600' },
+  msRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#222226' },
+  msPart: { color: '#EDEDF0', fontSize: 13.5, flex: 1 },
+  msSets: { color: '#fff', fontSize: 13.5, fontWeight: '800', width: 92, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  msFreq: { color: AI.textSub, fontSize: 12.5, fontWeight: '700', width: 70, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
   metrics: { flexDirection: 'row', gap: 10, marginTop: 18 },
   metric: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
