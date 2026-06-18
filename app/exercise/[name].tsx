@@ -272,9 +272,10 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
     return <LineChart pts={pts} unit={`kg · ${unit}`}
       prDate={metric === '1rm' ? data.prDate : null} plateauWeeks={metric === '1rm' ? data.plateauWeeks : 0} />;
   }
-  // 막대는 너무 많으면 읽기 어려우니 최근 ~1년치(52주)까지만(주로 '전체' 보호).
-  const pts = (metric === 'vol' ? data.weeklyVolume : data.weeklyFreq).filter(inRange).slice(-52);
-  if (pts.length < 1) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
+  const src = metric === 'vol' ? data.weeklyVolume : data.weeklyFreq;
+  if (src.filter(inRange).length < 1) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
+  // 쉰 주를 0으로 메우고(고스트 막대), 너무 많으면 최근 ~1년치(52주)까지만(주로 '전체' 보호).
+  const pts = fillWeeks(src, period).slice(-52);
   return <BarChart pts={pts} unit={metric === 'vol' ? '주간 볼륨' : '주 운동 횟수'} isVol={metric === 'vol'} />;
 }
 
@@ -340,10 +341,15 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
   const [act, setAct] = useState<number | null>(null);
   if (pts.length < 1) return <Empty />;
   const max = Math.max(...pts.map(p => p.value)) || 1;
-  const last = pts[pts.length - 1];
-  const drop = pts.length >= 2 && last.value < pts[pts.length - 2].value;
+  // 가장 최근 "활동한" 주(0인 주는 건너뜀) 기준으로 요약·강조
+  const active = pts.filter(p => p.value > 0);
+  const lastActive = active.length ? active[active.length - 1] : pts[pts.length - 1];
+  let lastActiveIdx = -1;
+  for (let i = pts.length - 1; i >= 0; i--) { if (pts[i].value > 0) { lastActiveIdx = i; break; } }
+  const drop = active.length >= 2 && active[active.length - 1].value < active[active.length - 2].value;
   const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
-  const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.floor((x / W) * pts.length))));
+  // 막대 사이 간격(gap 5)을 보정한 인덱스 매핑 — 누른 위치의 막대를 정확히 잡는다.
+  const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.floor((x * pts.length) / (W + 5)))));
   // 기간 변경으로 주 개수가 줄어도 안전하도록 범위 가드
   const a = act != null && act < pts.length ? act : null;
 
@@ -366,16 +372,15 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
         onResponderTerminate={() => setAct(null)}
       >
         {pts.map((p, i) => {
-          const isLast = i === pts.length - 1;
           // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
           if (p.value <= 0) return <View key={i} style={s.ghostBar} />;
-          const color = i === a ? '#fff' : isLast ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
+          const color = i === a ? '#fff' : i === lastActiveIdx ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
           return <View key={i} style={{ flex: 1, height: Math.max(4, (p.value / max) * 92), borderRadius: 3, backgroundColor: color }} />;
         })}
       </View>
       <View style={s.legend}>
         <Text style={[s.legT, drop && { color: SEM.bad }]}>
-          이번 주 {fmtVal(last.value)}{drop ? ' · 직전보다 감소' : ''}
+          최근 {fmtVal(lastActive.value)}{drop ? ' · 직전보다 감소' : ''}
         </Text>
       </View>
     </>
@@ -409,6 +414,33 @@ function fmtDate(date: string) {
   const parts = String(date).slice(0, 10).split('-');
   if (parts.length !== 3) return String(date);
   return `${parts[0].slice(2)}.${Number(parts[1])}.${Number(parts[2])}`;
+}
+
+// 'YYYY-MM-DD' → 로컬 자정 Date(타임존 안전)
+const parseLocal = (s: string) => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
+const mondayOf = (dt: Date) => { const x = new Date(dt); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+const ymd = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+/**
+ * 주간 시계열의 빈 주(쉰 주)를 0으로 메운다 — 백엔드는 활동한 주만 주므로
+ * 프론트에서 기간 시작(또는 첫 기록)부터 이번 주까지 연속 주를 채워 고스트 막대가 뜨게 한다.
+ */
+function fillWeeks(all: SeriesPoint[], period: Period): SeriesPoint[] {
+  if (all.length === 0) return [];
+  const map = new Map(all.map(p => [p.date.slice(0, 10), p.value]));
+  const firstData = mondayOf(parseLocal(all[0].date));
+  const end = mondayOf(new Date());
+  let start = firstData;
+  if (period !== 'all') {
+    const cut = mondayOf(new Date(Date.now() - PERIOD_DAYS[period] * 86400000));
+    start = cut > firstData ? cut : firstData;
+  }
+  const out: SeriesPoint[] = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
+    const key = ymd(d);
+    out.push({ date: key, value: map.get(key) ?? 0 });
+  }
+  return out;
 }
 
 function Cause({ label, dir }: { label: string; dir: Dir }) {
