@@ -111,6 +111,10 @@ export default function ExerciseReport() {
             <ChartArea data={data} metric={metric} period={period} />
           </View>
 
+          {/* 진단 + 핵심 지표 */}
+          <Diagnosis data={data} />
+          <KeyStats data={data} />
+
           {/* 코치 */}
           <Text style={s.secttl}>🤖 AI 코치</Text>
           {coach && (
@@ -260,6 +264,80 @@ const Legend = ({ color, label }: { color: string; label: string }) => (
   <View style={s.lg}><View style={[s.lgDot, { backgroundColor: color }]} /><Text style={s.legT}>{label}</Text></View>
 );
 
+// ── 진단 카드 + 핵심 지표 ─────────────────────────────────
+type Dir = 'up' | 'down' | 'flat';
+const seriesDir = (pts: SeriesPoint[]): Dir => {
+  if (pts.length < 2) return 'flat';
+  const a = pts[pts.length - 1].value, b = pts[pts.length - 2].value;
+  if (a > b * 1.02) return 'up';
+  if (a < b * 0.98) return 'down';
+  return 'flat';
+};
+const arrow = (d: Dir) => (d === 'up' ? '▲' : d === 'down' ? '▼' : '▬');
+function fmtAgo(date: string | null) {
+  if (!date) return '–';
+  const d = Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+  if (d <= 0) return '오늘';
+  if (d === 1) return '어제';
+  return `${d}일 전`;
+}
+
+function Cause({ label, dir }: { label: string; dir: Dir }) {
+  return <Text style={[s.cause, dir === 'up' && s.causeUp, dir === 'down' && s.causeBad]}>{label} {arrow(dir)}</Text>;
+}
+
+/** 사실 진단 — 정체=주황 카드, 신기록/성장=초록 카드 + 원인 칩(볼륨·빈도·무게). */
+function Diagnosis({ data }: { data: ExerciseProgress }) {
+  const chips = (
+    <View style={s.dchips}>
+      <Cause label="볼륨" dir={seriesDir(data.weeklyVolume)} />
+      <Cause label="빈도" dir={seriesDir(data.weeklyFreq)} />
+      <Cause label="무게" dir={seriesDir(data.maxWeight)} />
+    </View>
+  );
+  const isFlat = data.trend === 'flat' && data.plateauWeeks > 0;
+  const isNewPr = data.trend === 'new' || (data.prDate != null && data.prDate === lastDate(data.e1rm));
+  const e = data.e1rm;
+  const dk = e.length >= 2 ? Math.round((e[e.length - 1].value - e[e.length - 2].value) * 10) / 10 : 0;
+
+  let bad = false, head = '';
+  if (isFlat) { bad = true; head = `🩺 진단 · 정체 ${data.plateauWeeks}주`; }
+  else if (isNewPr) { head = `✅ 신기록${dk > 0 ? ` · 직전보다 +${trim(dk)}kg` : ''}`; }
+  else if (data.trend === 'down') { bad = true; head = `🩺 하락 · 최근 ${trim(dk)}kg`; }
+  else { head = `📈 성장 중${dk > 0 ? ` · 최근 +${trim(dk)}kg` : ''}`; }
+
+  return (
+    <View style={[s.dcard, bad ? s.dcardBad : s.dcardGood]}>
+      <Text style={[s.dcardH, { color: bad ? SEM.bad : SEM.good }]}>{head}</Text>
+      {chips}
+    </View>
+  );
+}
+
+function KV({ k, v, bad }: { k: string; v: string; bad?: boolean }) {
+  return <View style={s.kv}><Text style={s.kvK}>{k}</Text><Text style={[s.kvV, bad && { color: SEM.bad }]}>{v}</Text></View>;
+}
+
+/** 핵심 지표 2×2 — 최대무게·주간볼륨·주빈도·마지막 수행. 모두 코드 계산값. */
+function KeyStats({ data }: { data: ExerciseProgress }) {
+  const maxW = data.maxWeight.length ? data.maxWeight[data.maxWeight.length - 1].value : null;
+  const vol = data.weeklyVolume.length ? data.weeklyVolume[data.weeklyVolume.length - 1].value : 0;
+  const volDown = seriesDir(data.weeklyVolume) === 'down';
+  const freq = data.weeklyFreq.length ? data.weeklyFreq[data.weeklyFreq.length - 1].value : 0;
+  const freqDown = seriesDir(data.weeklyFreq) === 'down';
+  return (
+    <>
+      <Text style={s.secttl}>핵심 지표</Text>
+      <View style={s.kvgrid}>
+        <KV k="최대무게" v={maxW != null ? `${trim(maxW)}kg` : '–'} />
+        <KV k="주간 볼륨" v={`${(vol / 1000).toFixed(1)}t${volDown ? ' ▼' : ''}`} bad={volDown} />
+        <KV k="주 빈도" v={`${freq}회${freqDown ? ' ▼' : ''}`} bad={freqDown} />
+        <KV k="마지막" v={fmtAgo(lastDate(data.e1rm))} />
+      </View>
+    </>
+  );
+}
+
 // ── 코드 템플릿 코치 ─────────────────────────────────────
 function buildCoach(d: ExerciseProgress, name: string) {
   const cur = d.currentE1rm ?? 0;
@@ -333,6 +411,19 @@ const s = StyleSheet.create({
   lg: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lgDot: { width: 8, height: 8, borderRadius: 4 },
   legT: { color: '#9a9aa2', fontSize: 9.5 },
+
+  dcard: { marginHorizontal: 14, marginTop: 12, borderWidth: 1, borderRadius: 13, padding: 12 },
+  dcardBad: { borderColor: 'rgba(255,138,0,0.45)', backgroundColor: 'rgba(255,138,0,0.07)' },
+  dcardGood: { borderColor: 'rgba(43,217,106,0.4)', backgroundColor: 'rgba(43,217,106,0.06)' },
+  dcardH: { fontSize: 13.5, fontWeight: '800', marginBottom: 9 },
+  dchips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  cause: { fontSize: 11, fontWeight: '700', color: '#cfcfd6', backgroundColor: '#1c1c22', borderWidth: 1, borderColor: '#2a2a30', borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, overflow: 'hidden' },
+  causeUp: { color: SEM.good, borderColor: 'rgba(43,217,106,0.4)' },
+  causeBad: { color: SEM.bad, borderColor: 'rgba(255,138,0,0.45)' },
+  kvgrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: 14, marginTop: 2 },
+  kv: { width: '47%', flexGrow: 1, backgroundColor: '#0a0a0c', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 11, paddingVertical: 9, paddingHorizontal: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  kvK: { color: '#8a8a8e', fontSize: 11 },
+  kvV: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   secttl: { color: '#8a8a8e', fontSize: 9.5, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginHorizontal: 16, marginTop: 16, marginBottom: 7 },
   dig: { marginHorizontal: 14, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 14, padding: 13 },
