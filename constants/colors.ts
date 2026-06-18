@@ -11,14 +11,15 @@
  * P1에선 토큰 정의만 추가하고 화면 값은 P5에서 점진 치환한다(여기선 렌더 변화 없음).
  */
 export const SEM = {
-  brand: '#FF3B30',
+  brand: '#FF3B30',      // 액션·활성(버튼·탭·진행바). 의미(경고)에는 쓰지 않음.
   onBrand: '#FFFFFF',
-  good: '#2BD96A',
-  warn: '#FFC53D',
-  bad: '#FF8A00',
+  danger: '#FF453A',     // 위험·삭제·파괴적 액션(브랜드와 분리). 감소 의미색 겸용.
+  good: '#2BD96A',       // 증가·긍정·신기록
+  warn: '#FFC53D',       // 주의(노랑)
+  bad: '#FF8A00',        // 미달·부족(주황)
   bg: '#000000',
-  surface: '#0D0D0D',
-  line: '#1A1A1A',
+  surface: '#0D0D0D',    // = surface1 (레거시 별칭)
+  line: '#242427',       // 기본 하헤어라인(다크에서 카드 경계가 보이게 살짝 올림)
   muted: '#6A6A6A',
   text: '#FFFFFF',
 
@@ -28,12 +29,36 @@ export const SEM = {
   surface3: '#1C1C1E',   // 모달·지표·세그먼트
   line2: '#2C2C2E',      // 강한 구분선/입력 테두리
 
-  // 텍스트 잉크 스케일(밝음→어두움).
+  // 텍스트 잉크 스케일(밝음→어두움). 중간 회색(#6a6a6e·#7a7a7e·#9a9aa2 등)은 ink3로 수렴.
   ink1: '#FFFFFF',       // 1차 텍스트
   ink2: '#EDEDF0',       // 밝은 보조
   ink3: '#8E8E93',       // 약한 보조(캡션)
-  ink4: '#48484A',       // 가장 약함(placeholder)
+  ink4: '#48484A',       // 가장 약함(placeholder·disabled)
 } as const;
+
+/** 모서리 반경 스케일(5단). sm=칩 내부, md=작은 카드, lg=카드, xl=큰 카드·버튼, full=알약·원형. */
+export const RADIUS = { sm: 4, md: 8, lg: 12, xl: 16, full: 999 } as const;
+
+/** 4pt 간격 그리드. padding·gap·margin 공통. */
+export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;
+
+/**
+ * 타이포 스케일(8단 + 줄간). 한 줄 라벨엔 size만, 본문엔 lineHeight까지 적용.
+ * 큰 히어로 숫자(현재 1RM·체중 등)는 스케일 밖 1회성 값(displayXl)으로 둔다.
+ */
+export const TYPE = {
+  micro:    { fontSize: 10, lineHeight: 14 },   // 칩·뱃지
+  caption:  { fontSize: 12, lineHeight: 16 },   // 캡션·메타
+  footnote: { fontSize: 13, lineHeight: 18 },   // 보조 본문
+  body:     { fontSize: 15, lineHeight: 21 },   // 본문 기준
+  callout:  { fontSize: 17, lineHeight: 23 },   // 강조 본문·버튼
+  title:    { fontSize: 20, lineHeight: 25 },   // 섹션 제목
+  headline: { fontSize: 24, lineHeight: 30 },   // 화면 제목
+  display:  { fontSize: 30, lineHeight: 36 },   // 헤드라인
+} as const;
+
+/** 폰트 굵기 4단. */
+export const WEIGHT = { regular: '400', medium: '600', semibold: '700', bold: '800' } as const;
 
 /** 분배/카테고리 보조 팔레트(초록 단일 계열, 밝음→어두움). 시맨틱 외 보조색. */
 export const CATS = ['#3ee06a', '#26a64c', '#1c7a3a', '#15532a', '#2c2c31'] as const;
