@@ -88,6 +88,16 @@ export async function deleteAiProfile(): Promise<void> {
   await apiRequest<void>('/api/v1/ai/profile', { method: 'DELETE' });
 }
 
+/** 종목 코치 한 줄(해석만 LLM). 실패/미생성이면 null → 프론트는 코드 템플릿 문장으로 폴백. */
+export async function getExerciseCoachLine(exerciseId: number): Promise<string | null> {
+  try {
+    const r = await apiRequest<{ line: string | null }>(`/api/v1/ai/exercise-coach?exerciseId=${exerciseId}`);
+    return r?.line ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── 통합 리포트(명세 §7) — 6종 기간을 한 스키마로 ─────────────────────────
 
 export type ReportPeriodType = 'session' | 'week' | 'month' | 'quarter' | 'half' | 'year';

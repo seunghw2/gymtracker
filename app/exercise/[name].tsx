@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Polyline, Polygon, Circle, Rect, Line } from 'react-native-svg';
 import { SEM } from '../../constants/colors';
 import {
-  getExerciseProgress, getTrainedExercises, updateExerciseNote, ExerciseProgress, SeriesPoint,
+  getExerciseProgress, getTrainedExercises, updateExerciseNote, getExerciseCoachLine, ExerciseProgress, SeriesPoint,
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { useChatStore } from '../../store/useChatStore';
@@ -34,6 +34,7 @@ export default function ExerciseReport() {
   const [items, setItems] = useState<{ text: string; done: boolean }[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [llmLine, setLlmLine] = useState<string | null>(null);
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
   useEffect(() => {
@@ -71,6 +72,14 @@ export default function ExerciseReport() {
   // 체크리스트는 코드 계산값으로 프리필(사용자 편집 가능)
   useEffect(() => { if (data) setItems(buildChecklist(data)); }, [data]);
 
+  // 코치 한 줄 = LLM 해석(비동기·실패 시 코드 템플릿 폴백)
+  useEffect(() => {
+    if (!exId) return;
+    let on = true;
+    getExerciseCoachLine(exId).then(l => { if (on && l) setLlmLine(l); }).catch(() => {});
+    return () => { on = false; };
+  }, [exId]);
+
   // 목표·방법 = 코드값. 코치 한 줄(whyLine)은 지금은 코드 템플릿(추후 LLM로 교체).
   const cur = data?.currentE1rm ?? 0;
   const pr = data?.prE1rm ?? cur;
@@ -79,7 +88,7 @@ export default function ExerciseReport() {
   const goalMethod = isFlat
     ? `${trim(pr)}kg 회복 · ${trim(reset)} 리셋, 주당 +2.5kg`
     : `다음 목표 ${trim(cur + 2.5)}kg · 점진적 과부하`;
-  const whyLine = coach?.headline ?? '';
+  const whyLine = llmLine ?? coach?.headline ?? '';
 
   const saveMemo = async () => {
     if (!exId) return;
