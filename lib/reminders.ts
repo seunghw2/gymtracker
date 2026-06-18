@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllWorkoutDates } from '../db/queries';
-import { scheduleLocalAt, cancelScheduled } from './notifications';
+import { scheduleLocalAt, scheduleWeekly, cancelScheduled } from './notifications';
 
 /**
  * 운동 리마인더(기기-로컬). "마지막 운동 + N일째 HH시"에 한 번 로컬 알림을 예약한다.
@@ -69,6 +69,24 @@ export async function refreshWorkoutReminder(): Promise<void> {
     '/(tabs)/workout',
   );
   if (id) await AsyncStorage.setItem(K_SCHED_ID, id);
+}
+
+/**
+ * 주간 코치 알림 — 매주 월요일 06:00에 한 번. 탭하면 코치 탭(주간 채팅)으로.
+ * 실제 요약은 앱이 열릴 때 백엔드에서 로드되고, 여기선 "도착했어요" 배너만 띄운다.
+ */
+const K_WEEKLY_COACH_ID = 'weekly_coach_sched_id';
+export async function refreshWeeklyCoachNotification(): Promise<void> {
+  const prev = await AsyncStorage.getItem(K_WEEKLY_COACH_ID);
+  await cancelScheduled(prev);
+  // weekday: 1=일 … 2=월
+  const id = await scheduleWeekly(2, 6, 0,
+    '이번 주 코치 메시지 📋',
+    '지난주 요약과 이번 주 코치 메시지가 도착했어요.',
+    '/(tabs)/chat',
+  );
+  if (id) await AsyncStorage.setItem(K_WEEKLY_COACH_ID, id);
+  else await AsyncStorage.removeItem(K_WEEKLY_COACH_ID);
 }
 
 function clampInt(v: string | null, def: number, lo: number, hi: number): number {

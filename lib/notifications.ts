@@ -70,6 +70,22 @@ export async function scheduleLocalAt(date: Date, title: string, body: string, l
   }
 }
 
+/** 매주 반복 로컬 알림 예약(weekday: 1=일~7=토). id 반환(실패 시 null). */
+export async function scheduleWeekly(weekday: number, hour: number, minute: number, title: string, body: string, link?: string): Promise<string | null> {
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: 'default', data: { banner: true, link: link ?? null } },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday, hour, minute,
+        channelId: Platform.OS === 'android' ? 'general' : undefined,
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** 예약 알림 취소(id). */
 export async function cancelScheduled(id: string | null) {
   if (!id) return;

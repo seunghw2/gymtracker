@@ -5,7 +5,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/useAuthStore';
 import { configureNotifications, ensurePermission } from '../lib/notifications';
-import { refreshWorkoutReminder } from '../lib/reminders';
+import { refreshWorkoutReminder, refreshWeeklyCoachNotification } from '../lib/reminders';
 import { registerForPushNotifications } from '../lib/push';
 import { configureAudio } from '../lib/sound';
 import NotificationBridge from '../components/NotificationBridge';
@@ -26,6 +26,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (status === 'authenticated') {
       refreshWorkoutReminder().catch(() => {});
+      refreshWeeklyCoachNotification().catch(() => {});
       registerForPushNotifications().catch(() => {});
     }
   }, [status]);
