@@ -189,7 +189,7 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
 
   reorderExercise: (from, to) =>
     set((state) => {
-      if (from === to || from < 0 || to < 0 || from >= state.exercises.length || to >= state.exercises.length) return state;
+      if (from === to || from < 0 || to < 0 || from >= state.exercises.length || to > state.exercises.length) return state;
       const exercises = [...state.exercises];
       const [moved] = exercises.splice(from, 1);
       exercises.splice(to, 0, moved);

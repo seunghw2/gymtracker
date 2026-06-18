@@ -1571,10 +1571,9 @@ export default function WorkoutScreen() {
             <View style={[styles.exerciseCard, isActive && styles.exerciseCardDragging]}>
               <View style={styles.exerciseCardHeader}>
                 <Pressable
-                  onLongPress={onDragStart}
+                  onPressIn={onDragStart}
                   onPressOut={onDragEnd}
-                  delayLongPress={250}
-                  hitSlop={8}
+                  hitSlop={12}
                   style={[styles.dragHandle, { marginRight: 10 }]}
                 >
                   <Text style={styles.dragHandleText}>≡</Text>
