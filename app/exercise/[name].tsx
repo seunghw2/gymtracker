@@ -189,7 +189,10 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
     return <LineChart pts={pts.length >= 2 ? pts : all} unit={`kg · ${unit}`}
       prDate={metric === '1rm' ? data.prDate : null} plateauWeeks={metric === '1rm' ? data.plateauWeeks : 0} />;
   }
-  const pts = (metric === 'vol' ? data.weeklyVolume : data.weeklyFreq).slice(-12);
+  const src = metric === 'vol' ? data.weeklyVolume : data.weeklyFreq;
+  const cut = Date.now() - PERIOD_DAYS[period] * 86400000;
+  let pts = period === 'all' ? src : src.filter(p => new Date(p.date).getTime() >= cut);
+  if (pts.length < 4) pts = src.slice(-12);
   return <BarChart pts={pts} unit={metric === 'vol' ? '주간 볼륨' : '주 운동 횟수'} isVol={metric === 'vol'} />;
 }
 
@@ -215,6 +218,7 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
         <Polygon points={area} fill="rgba(43,217,106,0.10)" />
         <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         {prIdx >= 0 && <Circle cx={xs[prIdx]} cy={y(pts[prIdx].value)} r={4.5} fill="#FFC53D" stroke="#000" strokeWidth={1.5} />}
+        <Circle cx={xs[xs.length - 1]} cy={y(pts[pts.length - 1].value)} r={3.5} fill={SEM.good} stroke="#000" strokeWidth={1.5} />
       </Svg>
       <View style={s.legend}>
         <Legend color={SEM.good} label={unit.split('·').pop()?.trim() ?? ''} />
@@ -236,7 +240,10 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
       <View style={s.barrow}>
         {pts.map((p, i) => {
           const isLast = i === pts.length - 1;
-          return <View key={i} style={{ flex: 1, height: Math.max(3, (p.value / max) * 92), borderRadius: 3, backgroundColor: isLast && drop ? SEM.bad : '#26262e' }} />;
+          // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
+          if (p.value <= 0) return <View key={i} style={s.ghostBar} />;
+          const color = isLast ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
+          return <View key={i} style={{ flex: 1, height: Math.max(4, (p.value / max) * 92), borderRadius: 3, backgroundColor: color }} />;
         })}
       </View>
       <View style={s.legend}>
@@ -321,6 +328,7 @@ const s = StyleSheet.create({
   clabel: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
   clT: { color: '#6a6a6e', fontSize: 9.5 },
   barrow: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 92, paddingTop: 4 },
+  ghostBar: { flex: 1, height: 14, borderRadius: 3, borderWidth: 1, borderColor: '#2a2a30', borderStyle: 'dashed', opacity: 0.7 },
   legend: { flexDirection: 'row', gap: 12, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' },
   lg: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lgDot: { width: 8, height: 8, borderRadius: 4 },
