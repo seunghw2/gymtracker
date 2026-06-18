@@ -28,7 +28,7 @@ import {
   AiReportV2,
   BodyLog,
 } from '../../db/queries';
-import { useSettingsStore } from '../../store/useStore';
+import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
 import BriefingLoading from '../../components/BriefingLoading';
 import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
@@ -65,6 +65,7 @@ function computeStreak(dates: string[]): number {
 export default function BriefingHome() {
   const router = useRouter();
   const { goalWeightKg } = useSettingsStore();
+  const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
   const [report, setReport] = useState<AiReportV2 | null>(null);
   const [reportStatus, setReportStatus] = useState<string>('');
   const [reportPct, setReportPct] = useState(0);
@@ -187,6 +188,7 @@ export default function BriefingHome() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
       >
@@ -206,25 +208,28 @@ export default function BriefingHome() {
             <BriefingLoading percent={reportPct} step={reportStep} />
           </View>
         ) : (<>
-        {/* 큰 헤드라인 */}
-        <Pressable onPress={() => router.push('/ai/reports')}>
-          <Text style={styles.headline}>{headline}</Text>
-        </Pressable>
-
-        {/* 처방 / CTA */}
+        {/* 히어로 — 헤드라인 + 처방을 한 블록으로(목적지 통합) */}
         {profileNeeded ? (
-          <Pressable style={styles.rxCard} onPress={() => router.push('/ai/intake')}>
+          <Pressable style={styles.hero} onPress={() => router.push('/ai/intake')}>
+            <Text style={styles.headline}>{headline}</Text>
+            <View style={styles.heroDivider} />
             <Text style={styles.rxCap}>시작하기</Text>
             <Text style={styles.rxAction}>목표를 알려주면 매주 브리핑을 만들어줄게요.</Text>
             <Text style={styles.rxTodo}>탭하여 1분 설정 →</Text>
           </Pressable>
-        ) : rx ? (
-          <Pressable style={styles.rxCard} onPress={() => router.push('/ai/reports')}>
-            <Text style={styles.rxCap}>처방 · 이번 주</Text>
-            <Text style={styles.rxAction}>{rx.action}</Text>
-            {!!rx.todo && <Text style={styles.rxTodo}>{rx.todo}</Text>}
+        ) : (
+          <Pressable style={styles.hero} onPress={() => router.push('/ai/reports')}>
+            <Text style={styles.headline}>{headline}</Text>
+            {rx ? (
+              <>
+                <View style={styles.heroDivider} />
+                <Text style={styles.rxCap}>처방 · 이번 주</Text>
+                <Text style={styles.rxAction}>{rx.action}</Text>
+                {!!rx.todo && <Text style={styles.rxTodo}>{rx.todo}</Text>}
+              </>
+            ) : null}
           </Pressable>
-        ) : null}
+        )}
 
         {/* 부위별 하드세트 · 빈도(주간) */}
         {(report?.detail?.balance?.length ?? 0) > 0 && (
@@ -261,12 +266,17 @@ export default function BriefingHome() {
           </Pressable>
         </View>
 
-        {/* 운동 시작 */}
-        <Pressable style={styles.startBtn} onPress={() => router.push('/workout')}>
-          <Ionicons name="play" size={18} color={ACCENT_INK} />
-          <Text style={styles.startBtnText}>운동 시작</Text>
-        </Pressable>
       </ScrollView>
+
+      {/* 운동 시작 — 하단 고정 CTA. 진행 중이면 전역 배너가 복귀를 제공하므로 숨김 */}
+      {!workoutActive && (
+        <View style={styles.ctaBar}>
+          <Pressable style={styles.startBtn} onPress={() => router.push('/workout')}>
+            <Ionicons name="play" size={18} color={ACCENT_INK} />
+            <Text style={styles.startBtnText}>운동 시작</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* 체중 입력 모달 */}
       <Modal visible={showWeightModal} transparent animationType="slide" onRequestClose={closeWeightModal}>
@@ -316,47 +326,51 @@ export default function BriefingHome() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000000' },
+  safe: { flex: 1, backgroundColor: SEM.bg },
+  scroll: { flex: 1 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 28 },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  brand: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-  dateChip: { color: AI.textSub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
+  brand: { color: SEM.ink1, fontSize: 20, fontWeight: '800' },
+  dateChip: { color: SEM.ink3, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
 
-  headline: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', lineHeight: 38, letterSpacing: -0.5, marginTop: 18 },
+  // 히어로: 헤드라인 + 처방 통합 카드
+  hero: { backgroundColor: SEM.surface2, borderLeftWidth: 3, borderLeftColor: SEM.brand, borderRadius: 14, padding: 18, marginTop: 18 },
+  heroDivider: { height: 1, backgroundColor: SEM.line2, marginVertical: 12 },
+  headline: { color: SEM.ink1, fontSize: 28, fontWeight: '900', lineHeight: 36, letterSpacing: -0.5 },
+  rxCap: { color: SEM.brand, fontSize: 11, fontWeight: '800' },
+  rxAction: { color: SEM.ink1, fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
+  rxTodo: { color: SEM.ink3, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
 
-  rxCard: { backgroundColor: '#161618', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 12, padding: 15, marginTop: 18 },
-  rxCap: { color: ACCENT, fontSize: 11, fontWeight: '800' },
-  rxAction: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
-  rxTodo: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
-
-  msCard: { backgroundColor: '#161618', borderRadius: 12, padding: 15, marginTop: 11 },
-  msTitle: { color: '#fff', fontSize: 14, fontWeight: '800', marginBottom: 10 },
-  msCap: { color: AI.textSub, fontSize: 11, fontWeight: '600' },
-  msRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#222226' },
-  msPart: { color: '#EDEDF0', fontSize: 13.5, flex: 1 },
-  msSets: { color: '#fff', fontSize: 13.5, fontWeight: '800', width: 92, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  msFreq: { color: AI.textSub, fontSize: 12.5, fontWeight: '700', width: 70, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  msCard: { backgroundColor: SEM.surface2, borderRadius: 14, padding: 15, marginTop: 11 },
+  msTitle: { color: SEM.ink1, fontSize: 14, fontWeight: '800', marginBottom: 10 },
+  msCap: { color: SEM.ink3, fontSize: 11, fontWeight: '600' },
+  msRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: SEM.line2 },
+  msPart: { color: SEM.ink2, fontSize: 13.5, flex: 1 },
+  msSets: { color: SEM.ink1, fontSize: 13.5, fontWeight: '800', width: 92, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  msFreq: { color: SEM.ink3, fontSize: 12.5, fontWeight: '700', width: 70, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
   metrics: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  metric: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  metricV: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  metricL: { color: AI.textSub, fontSize: 11.5, marginTop: 4 },
+  metric: { flex: 1, backgroundColor: SEM.surface3, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  metricV: { color: SEM.ink1, fontSize: 26, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  metricL: { color: SEM.ink3, fontSize: 11.5, marginTop: 4 },
 
-  startBtn: { flexDirection: 'row', gap: 7, backgroundColor: ACCENT, borderRadius: 16, paddingVertical: 17, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-  startBtnText: { color: ACCENT_INK, fontSize: 17, fontWeight: '800' },
+  // 하단 고정 CTA 바
+  ctaBar: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, backgroundColor: SEM.bg, borderTopWidth: 1, borderTopColor: SEM.line },
+  startBtn: { flexDirection: 'row', gap: 7, backgroundColor: SEM.brand, borderRadius: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  startBtnText: { color: SEM.onBrand, fontSize: 17, fontWeight: '800' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 44, alignItems: 'center' },
-  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  weightReadout: { color: '#FFFFFF', fontSize: 56, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
-  weightUnit: { color: '#8E8E93', fontSize: 24, fontWeight: '600' },
-  saveBtn: { backgroundColor: ACCENT, borderRadius: 14, paddingVertical: 14, alignItems: 'center', alignSelf: 'stretch', marginTop: 20 },
-  saveBtnText: { color: ACCENT_INK, fontSize: 17, fontWeight: '700' },
+  modalCard: { backgroundColor: SEM.surface3, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 44, alignItems: 'center' },
+  modalTitle: { color: SEM.ink1, fontSize: 20, fontWeight: '700', marginBottom: 4 },
+  weightReadout: { color: SEM.ink1, fontSize: 56, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
+  weightUnit: { color: SEM.ink3, fontSize: 24, fontWeight: '600' },
+  saveBtn: { backgroundColor: SEM.brand, borderRadius: 14, paddingVertical: 14, alignItems: 'center', alignSelf: 'stretch', marginTop: 20 },
+  saveBtnText: { color: SEM.onBrand, fontSize: 17, fontWeight: '700' },
   fatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
-  fatLabel: { color: '#8E8E93', fontSize: 15 },
-  fatInput: { backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, color: '#FFFFFF', fontSize: 16, minWidth: 90, textAlign: 'center' },
-  fatUnit: { color: '#8E8E93', fontSize: 15 },
+  fatLabel: { color: SEM.ink3, fontSize: 15 },
+  fatInput: { backgroundColor: SEM.line2, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, color: SEM.ink1, fontSize: 16, minWidth: 90, textAlign: 'center' },
+  fatUnit: { color: SEM.ink3, fontSize: 15 },
 });

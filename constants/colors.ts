@@ -21,6 +21,18 @@ export const SEM = {
   line: '#1A1A1A',
   muted: '#6A6A6A',
   text: '#FFFFFF',
+
+  // 표면 elevation 스케일(어두움→밝음). 카드/모달/칩 배경 통일용.
+  surface1: '#0D0D0D',   // 기본 카드
+  surface2: '#161618',   // 한 단계 위(강조 카드)
+  surface3: '#1C1C1E',   // 모달·지표·세그먼트
+  line2: '#2C2C2E',      // 강한 구분선/입력 테두리
+
+  // 텍스트 잉크 스케일(밝음→어두움).
+  ink1: '#FFFFFF',       // 1차 텍스트
+  ink2: '#EDEDF0',       // 밝은 보조
+  ink3: '#8E8E93',       // 약한 보조(캡션)
+  ink4: '#48484A',       // 가장 약함(placeholder)
 } as const;
 
 /** 분배/카테고리 보조 팔레트(초록 단일 계열, 밝음→어두움). 시맨틱 외 보조색. */
