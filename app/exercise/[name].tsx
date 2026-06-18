@@ -272,7 +272,8 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
     return <LineChart pts={pts} unit={`kg · ${unit}`}
       prDate={metric === '1rm' ? data.prDate : null} plateauWeeks={metric === '1rm' ? data.plateauWeeks : 0} />;
   }
-  const pts = (metric === 'vol' ? data.weeklyVolume : data.weeklyFreq).filter(inRange);
+  // 막대는 너무 많으면 읽기 어려우니 최근 ~1년치(52주)까지만(주로 '전체' 보호).
+  const pts = (metric === 'vol' ? data.weeklyVolume : data.weeklyFreq).filter(inRange).slice(-52);
   if (pts.length < 1) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
   return <BarChart pts={pts} unit={metric === 'vol' ? '주간 볼륨' : '주 운동 횟수'} isVol={metric === 'vol'} />;
 }
@@ -294,14 +295,16 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
   const showPlateau = plateauWeeks >= 4 && prIdx >= 0 && prIdx < pts.length - 1;
   // 누르고 있는 지점 → 가장 가까운 데이터 인덱스(토스식 스크럽)
   const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.round((x / W) * (pts.length - 1)))));
+  // 지표·기간 변경으로 점 개수가 줄어도 안전하도록 범위 가드
+  const a = act != null && act < pts.length ? act : null;
 
   return (
     <>
       <View style={s.clabel}>
-        {act == null ? (
+        {a == null ? (
           <><Text style={s.clT}>kg</Text><Text style={s.clT}>{unit}</Text></>
         ) : (
-          <><Text style={s.clT}>{fmtDate(pts[act].date)}</Text><Text style={[s.clT, s.clActive]}>{trim(pts[act].value)}kg</Text></>
+          <><Text style={s.clT}>{fmtDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{trim(pts[a].value)}kg</Text></>
         )}
       </View>
       <View
@@ -320,14 +323,14 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
           <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
           {prIdx >= 0 && <Circle cx={xs[prIdx]} cy={y(pts[prIdx].value)} r={4.5} fill="#FFC53D" stroke="#000" strokeWidth={1.5} />}
           <Circle cx={xs[xs.length - 1]} cy={y(pts[pts.length - 1].value)} r={3.5} fill={SEM.good} stroke="#000" strokeWidth={1.5} />
-          {act != null && <Line x1={xs[act]} y1={0} x2={xs[act]} y2={CH - 6} stroke="#fff" strokeWidth={1} opacity={0.55} />}
-          {act != null && <Circle cx={xs[act]} cy={y(pts[act].value)} r={4.5} fill="#fff" stroke="#000" strokeWidth={1.5} />}
+          {a != null && <Line x1={xs[a]} y1={0} x2={xs[a]} y2={CH - 6} stroke="#fff" strokeWidth={1} opacity={0.55} />}
+          {a != null && <Circle cx={xs[a]} cy={y(pts[a].value)} r={4.5} fill="#fff" stroke="#000" strokeWidth={1.5} />}
         </Svg>
       </View>
       <View style={s.legend}>
         <Legend color={SEM.good} label={unit.split('·').pop()?.trim() ?? ''} />
         {showPlateau && <Legend color="rgba(255,138,0,0.5)" label="정체 구간" />}
-        <Legend color="#FFC53D" label="PR" />
+        {prIdx >= 0 && <Legend color="#FFC53D" label="PR" />}
       </View>
     </>
   );
@@ -341,14 +344,16 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
   const drop = pts.length >= 2 && last.value < pts[pts.length - 2].value;
   const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
   const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.floor((x / W) * pts.length))));
+  // 기간 변경으로 주 개수가 줄어도 안전하도록 범위 가드
+  const a = act != null && act < pts.length ? act : null;
 
   return (
     <>
       <View style={s.clabel}>
-        {act == null ? (
+        {a == null ? (
           <><Text style={s.clT}>{isVol ? 't' : '회'}</Text><Text style={s.clT}>{unit} · {pts.length}주</Text></>
         ) : (
-          <><Text style={s.clT}>{fmtDate(pts[act].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[act].value)}</Text></>
+          <><Text style={s.clT}>{fmtDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[a].value)}</Text></>
         )}
       </View>
       <View
@@ -364,7 +369,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
           const isLast = i === pts.length - 1;
           // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
           if (p.value <= 0) return <View key={i} style={s.ghostBar} />;
-          const color = i === act ? '#fff' : isLast ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
+          const color = i === a ? '#fff' : isLast ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
           return <View key={i} style={{ flex: 1, height: Math.max(4, (p.value / max) * 92), borderRadius: 3, backgroundColor: color }} />;
         })}
       </View>
