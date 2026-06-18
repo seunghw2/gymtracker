@@ -276,6 +276,7 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
 }
 
 function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; unit: string; prDate: string | null; plateauWeeks: number }) {
+  const [act, setAct] = useState<number | null>(null);
   if (pts.length < 2) return <Empty />;
   const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
   const vals = pts.map(p => p.value);
@@ -287,18 +288,38 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
   const prIdx = prDate ? pts.findIndex(p => p.date === prDate) : -1;
   // 정체 음영: PR 이후 구간
   const showPlateau = plateauWeeks >= 4 && prIdx >= 0 && prIdx < pts.length - 1;
+  // 누르고 있는 지점 → 가장 가까운 데이터 인덱스(토스식 스크럽)
+  const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.round((x / W) * (pts.length - 1)))));
 
   return (
     <>
-      <View style={s.clabel}><Text style={s.clT}>kg</Text><Text style={s.clT}>{unit}</Text></View>
-      <Svg width={W} height={CH}>
-        {showPlateau && <Rect x={xs[prIdx]} y={0} width={W - xs[prIdx]} height={CH - 6} fill="rgba(255,138,0,0.12)" />}
-        {showPlateau && <Line x1={xs[prIdx]} y1={0} x2={xs[prIdx]} y2={CH - 6} stroke="rgba(255,138,0,0.4)" strokeWidth={1} strokeDasharray="3 3" />}
-        <Polygon points={area} fill="rgba(43,217,106,0.10)" />
-        <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        {prIdx >= 0 && <Circle cx={xs[prIdx]} cy={y(pts[prIdx].value)} r={4.5} fill="#FFC53D" stroke="#000" strokeWidth={1.5} />}
-        <Circle cx={xs[xs.length - 1]} cy={y(pts[pts.length - 1].value)} r={3.5} fill={SEM.good} stroke="#000" strokeWidth={1.5} />
-      </Svg>
+      <View style={s.clabel}>
+        {act == null ? (
+          <><Text style={s.clT}>kg</Text><Text style={s.clT}>{unit}</Text></>
+        ) : (
+          <><Text style={s.clT}>{fmtDate(pts[act].date)}</Text><Text style={[s.clT, s.clActive]}>{trim(pts[act].value)}kg</Text></>
+        )}
+      </View>
+      <View
+        style={{ width: W, height: CH }}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={e => pick(e.nativeEvent.locationX)}
+        onResponderMove={e => pick(e.nativeEvent.locationX)}
+        onResponderRelease={() => setAct(null)}
+        onResponderTerminate={() => setAct(null)}
+      >
+        <Svg width={W} height={CH}>
+          {showPlateau && <Rect x={xs[prIdx]} y={0} width={W - xs[prIdx]} height={CH - 6} fill="rgba(255,138,0,0.12)" />}
+          {showPlateau && <Line x1={xs[prIdx]} y1={0} x2={xs[prIdx]} y2={CH - 6} stroke="rgba(255,138,0,0.4)" strokeWidth={1} strokeDasharray="3 3" />}
+          <Polygon points={area} fill="rgba(43,217,106,0.10)" />
+          <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          {prIdx >= 0 && <Circle cx={xs[prIdx]} cy={y(pts[prIdx].value)} r={4.5} fill="#FFC53D" stroke="#000" strokeWidth={1.5} />}
+          <Circle cx={xs[xs.length - 1]} cy={y(pts[pts.length - 1].value)} r={3.5} fill={SEM.good} stroke="#000" strokeWidth={1.5} />
+          {act != null && <Line x1={xs[act]} y1={0} x2={xs[act]} y2={CH - 6} stroke="#fff" strokeWidth={1} opacity={0.55} />}
+          {act != null && <Circle cx={xs[act]} cy={y(pts[act].value)} r={4.5} fill="#fff" stroke="#000" strokeWidth={1.5} />}
+        </Svg>
+      </View>
       <View style={s.legend}>
         <Legend color={SEM.good} label={unit.split('·').pop()?.trim() ?? ''} />
         {showPlateau && <Legend color="rgba(255,138,0,0.5)" label="정체 구간" />}
@@ -309,25 +330,43 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
 }
 
 function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVol: boolean }) {
+  const [act, setAct] = useState<number | null>(null);
   if (pts.length < 1) return <Empty />;
   const max = Math.max(...pts.map(p => p.value)) || 1;
   const last = pts[pts.length - 1];
   const drop = pts.length >= 2 && last.value < pts[pts.length - 2].value;
+  const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
+  const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.floor((x / W) * pts.length))));
+
   return (
     <>
-      <View style={s.clabel}><Text style={s.clT}>{isVol ? 't' : '회'}</Text><Text style={s.clT}>{unit} · {pts.length}주</Text></View>
-      <View style={s.barrow}>
+      <View style={s.clabel}>
+        {act == null ? (
+          <><Text style={s.clT}>{isVol ? 't' : '회'}</Text><Text style={s.clT}>{unit} · {pts.length}주</Text></>
+        ) : (
+          <><Text style={s.clT}>{fmtDate(pts[act].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[act].value)}</Text></>
+        )}
+      </View>
+      <View
+        style={s.barrow}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={e => pick(e.nativeEvent.locationX)}
+        onResponderMove={e => pick(e.nativeEvent.locationX)}
+        onResponderRelease={() => setAct(null)}
+        onResponderTerminate={() => setAct(null)}
+      >
         {pts.map((p, i) => {
           const isLast = i === pts.length - 1;
           // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
           if (p.value <= 0) return <View key={i} style={s.ghostBar} />;
-          const color = isLast ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
+          const color = i === act ? '#fff' : isLast ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
           return <View key={i} style={{ flex: 1, height: Math.max(4, (p.value / max) * 92), borderRadius: 3, backgroundColor: color }} />;
         })}
       </View>
       <View style={s.legend}>
         <Text style={[s.legT, drop && { color: SEM.bad }]}>
-          이번 주 {isVol ? `${(last.value / 1000).toFixed(1)}t` : `${last.value}회`}{drop ? ' · 직전보다 감소' : ''}
+          이번 주 {fmtVal(last.value)}{drop ? ' · 직전보다 감소' : ''}
         </Text>
       </View>
     </>
@@ -355,6 +394,12 @@ function fmtAgo(date: string | null) {
   if (d <= 0) return '오늘';
   if (d === 1) return '어제';
   return `${d}일 전`;
+}
+// 스크럽 라벨용 날짜 — 'YY.M.D'
+function fmtDate(date: string) {
+  const parts = String(date).slice(0, 10).split('-');
+  if (parts.length !== 3) return String(date);
+  return `${parts[0].slice(2)}.${Number(parts[1])}.${Number(parts[2])}`;
 }
 
 function Cause({ label, dir }: { label: string; dir: Dir }) {
@@ -480,6 +525,7 @@ const s = StyleSheet.create({
 
   clabel: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
   clT: { color: '#6a6a6e', fontSize: 9.5 },
+  clActive: { color: '#fff', fontSize: 12, fontWeight: '800' },
   barrow: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 92, paddingTop: 4 },
   ghostBar: { flex: 1, height: 14, borderRadius: 3, borderWidth: 1, borderColor: '#2a2a30', borderStyle: 'dashed', opacity: 0.7 },
   legend: { flexDirection: 'row', gap: 12, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' },
