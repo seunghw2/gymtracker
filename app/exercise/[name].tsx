@@ -77,41 +77,37 @@ export default function ExerciseReport() {
         <View style={s.center}><Text style={s.emptyT}>아직 기록이 충분하지 않아요.</Text></View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
-          {/* 히어로 */}
+          {/* 티커 헤더 — 부위·종목 eyebrow + 큰 1RM + 등락칩 + PR 기준선 스파크 */}
           <View style={s.hero}>
             <Text style={s.hcat}>{data.bodyPart}{data.bodyPart ? ' · ' : ''}{name}</Text>
-            <View style={s.hbig}>
-              <Text style={s.hv}>{data.currentE1rm ?? '–'}</Text>
-              <Text style={s.hu}>kg · 추정 1RM</Text>
-            </View>
-            <View style={s.hbadges}>
-              {data.prE1rm != null && <Text style={[s.rb, s.rbPr]}>★ PR {data.prE1rm}</Text>}
-              {data.trend === 'flat' && data.plateauWeeks > 0 && <Text style={[s.rb, s.rbFlat]}>▬ {data.plateauWeeks}주째 정체</Text>}
-              {data.trend !== 'flat' && data.prDate === lastDate(data.e1rm) && <Text style={[s.rb, s.rbPr]}>▲ 최근 신기록</Text>}
+            <View style={s.tickRow}>
+              <View style={s.hbig}>
+                <Text style={s.hv}>{data.currentE1rm ?? '–'}</Text>
+                <Text style={s.hu}>kg · 추정 1RM</Text>
+              </View>
+              <DeltaChip data={data} />
+              <Sparkline data={data} />
             </View>
           </View>
-          {coach && <Text style={s.hline}>{coach.headline}</Text>}
+
+          {/* 지표 세그먼트(활성=레드) + 기간 */}
+          <View style={s.seg}>
+            {METRICS.map(([k, lbl]) => (
+              <Pressable key={k} onPress={() => setMetric(k)} style={[s.segItem, metric === k && s.segOn]}>
+                <Text style={[s.segT, metric === k && s.segTOn]}>{lbl}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={s.periodRow}>
+            {PERIODS.map(([k, lbl]) => (
+              <Pressable key={k} onPress={() => setPeriod(k)} style={[s.pc, period === k && s.pcOn]}>
+                <Text style={[s.pcT, period === k && s.pcTOn]}>{lbl}</Text>
+              </Pressable>
+            ))}
+          </View>
 
           {/* 차트 카드 */}
           <View style={s.card}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.mtog}>
-              {METRICS.map(([k, lbl]) => (
-                <Pressable key={k} onPress={() => setMetric(k)} style={[s.mt, metric === k && (isLine(k) ? s.mtOn : s.mtOnB)]}>
-                  <Text style={[s.mtT, metric === k && s.mtTOn]}>{lbl}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            {isLine(metric) && (
-              <View style={s.periodRow}>
-                {PERIODS.map(([k, lbl]) => (
-                  <Pressable key={k} onPress={() => setPeriod(k)} style={[s.pc, period === k && s.pcOn]}>
-                    <Text style={[s.pcT, period === k && s.pcTOn]}>{lbl}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
             <ChartArea data={data} metric={metric} period={period} />
           </View>
 
@@ -139,6 +135,38 @@ export default function ExerciseReport() {
 
 const isLine = (m: Metric) => m === '1rm' || m === 'maxw';
 const lastDate = (pts: SeriesPoint[]) => (pts.length ? pts[pts.length - 1].date : null);
+
+/** 등락 칩 — 정체=주황 보합, 신기록/상승=초록. (의미색, 브랜드 레드와 분리) */
+function DeltaChip({ data }: { data: ExerciseProgress }) {
+  const isNewPr = data.trend === 'new' || (data.prDate != null && data.prDate === lastDate(data.e1rm));
+  if (data.trend === 'flat' && data.plateauWeeks > 0) return <Text style={[s.chipD, s.chipBad]}>▬ {data.plateauWeeks}주 보합</Text>;
+  if (isNewPr) return <Text style={[s.chipD, s.chipGood]}>▲ 신기록</Text>;
+  if (data.trend === 'up') return <Text style={[s.chipD, s.chipGood]}>▲ 상승세</Text>;
+  if (data.trend === 'down') return <Text style={[s.chipD, s.chipBad]}>▼ 하락</Text>;
+  return null;
+}
+
+/** PR 기준선 스파크라인 — 최근 추세선 + PR 점선 기준선 + PR 마커(노랑). 추세색=상태색. */
+function Sparkline({ data }: { data: ExerciseProgress }) {
+  const pts = data.e1rm.slice(-8);
+  if (pts.length < 2) return null;
+  const w = 84, h = 28;
+  const vals = pts.map(p => p.value);
+  const pr = data.prE1rm ?? Math.max(...vals);
+  const max = Math.max(...vals, pr), min = Math.min(...vals, pr), range = max - min || 1;
+  const x = (i: number) => (i / (pts.length - 1)) * w;
+  const y = (v: number) => 4 + (1 - (v - min) / range) * (h - 8);
+  const poly = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const color = data.trend === 'flat' || data.trend === 'down' ? SEM.bad : SEM.good;
+  const prIdx = data.prDate ? pts.findIndex(p => p.date === data.prDate) : -1;
+  return (
+    <Svg width={w} height={h} style={{ marginLeft: 'auto' }}>
+      <Line x1={0} y1={y(pr)} x2={w} y2={y(pr)} stroke={SEM.warn} strokeWidth={1} strokeDasharray="2 2" opacity={0.5} />
+      <Polyline points={poly} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
+      {prIdx >= 0 && <Circle cx={x(prIdx)} cy={y(pts[prIdx].value)} r={2.4} fill={SEM.warn} />}
+    </Svg>
+  );
+}
 
 function CoachRow({ tag, tagBg, tagColor, x }: { tag: string; tagBg: string; tagColor: string; x: string }) {
   return (
@@ -270,23 +298,21 @@ const s = StyleSheet.create({
 
   hero: { paddingHorizontal: 16, paddingTop: 4 },
   hcat: { color: '#8a8a8e', fontSize: 11, fontWeight: '700' },
-  hbig: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
+  hbig: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   hv: { color: '#fff', fontSize: 44, fontWeight: '800', letterSpacing: -1.4, lineHeight: 46 },
   hu: { color: '#8a8a8e', fontSize: 12, fontWeight: '700' },
-  hbadges: { flexDirection: 'row', gap: 7, marginTop: 12, flexWrap: 'wrap' },
-  rb: { fontSize: 10, fontWeight: '800', borderRadius: 7, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
-  rbPr: { backgroundColor: 'rgba(255,197,61,0.16)', color: '#FFC53D' },
-  rbFlat: { backgroundColor: 'rgba(255,138,0,0.16)', color: SEM.bad },
-  hline: { color: '#9a9aa2', fontSize: 12, lineHeight: 18, marginTop: 11, paddingHorizontal: 16 },
+  tickRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 8 },
+  chipD: { fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
+  chipBad: { color: SEM.bad, backgroundColor: 'rgba(255,138,0,0.14)' },
+  chipGood: { color: SEM.good, backgroundColor: 'rgba(43,217,106,0.14)' },
 
-  card: { marginHorizontal: 14, marginTop: 14, backgroundColor: '#0a0a0c', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 14, padding: 12 },
-  mtog: { gap: 6, paddingRight: 4 },
-  mt: { borderWidth: 1, borderColor: '#2a2a30', borderRadius: 13, paddingVertical: 6, paddingHorizontal: 12 },
-  mtOn: { backgroundColor: SEM.good, borderColor: SEM.good },
-  mtOnB: { backgroundColor: '#5b8def', borderColor: '#5b8def' },
-  mtT: { color: '#cfcfd6', fontSize: 11, fontWeight: '800' },
-  mtTOn: { color: '#06210f' },
-  periodRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  card: { marginHorizontal: 14, marginTop: 8, backgroundColor: '#0a0a0c', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 14, padding: 12 },
+  seg: { flexDirection: 'row', gap: 5, marginHorizontal: 16, marginTop: 14 },
+  segItem: { flex: 1, alignItems: 'center', borderWidth: 1, borderColor: '#2a2a30', borderRadius: 999, paddingVertical: 6 },
+  segOn: { backgroundColor: SEM.brand, borderColor: SEM.brand },
+  segT: { color: '#cfcfd6', fontSize: 11.5, fontWeight: '800' },
+  segTOn: { color: SEM.onBrand },
+  periodRow: { flexDirection: 'row', gap: 6, marginHorizontal: 16, marginTop: 8, marginBottom: 2 },
   pc: { borderWidth: 1, borderColor: '#2a2a30', borderRadius: 11, paddingVertical: 4, paddingHorizontal: 11 },
   pcOn: { backgroundColor: '#1c1c22', borderColor: '#3a3a42' },
   pcT: { color: '#7a7a7e', fontSize: 10.5, fontWeight: '700' },
