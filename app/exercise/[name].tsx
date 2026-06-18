@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, Dimensions, ActivityIndicator,
+  View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, Dimensions, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Polyline, Polygon, Circle, Rect, Line } from 'react-native-svg';
 import { SEM } from '../../constants/colors';
 import {
-  getExerciseProgress, getTrainedExercises, ExerciseProgress, SeriesPoint,
+  getExerciseProgress, getTrainedExercises, updateExerciseNote, ExerciseProgress, SeriesPoint,
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { useChatStore } from '../../store/useChatStore';
@@ -30,6 +30,10 @@ export default function ExerciseReport() {
   const [pinned, setPinned] = useState<Set<string>>(new Set());
   const [metric, setMetric] = useState<Metric>('1rm');
   const [period, setPeriod] = useState<Period>('1y');
+  const [exId, setExId] = useState<number | null>(null);
+  const [items, setItems] = useState<{ text: string; done: boolean }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
   useEffect(() => {
@@ -39,6 +43,7 @@ export default function ExerciseReport() {
         let id = params.id ? Number(params.id) : undefined;
         if (!id) id = (await getTrainedExercises()).find(e => e.name === name)?.id;
         if (id) {
+          if (on) setExId(id);
           const d = await getExerciseProgress(id);
           if (on) setData(d);
         }
@@ -62,6 +67,30 @@ export default function ExerciseReport() {
   };
 
   const coach = useMemo(() => data && buildCoach(data, name), [data, name]);
+
+  // 체크리스트는 코드 계산값으로 프리필(사용자 편집 가능)
+  useEffect(() => { if (data) setItems(buildChecklist(data)); }, [data]);
+
+  // 목표·방법 = 코드값. 코치 한 줄(whyLine)은 지금은 코드 템플릿(추후 LLM로 교체).
+  const cur = data?.currentE1rm ?? 0;
+  const pr = data?.prE1rm ?? cur;
+  const isFlat = !!data && data.trend === 'flat' && data.plateauWeeks > 0;
+  const reset = Math.round((cur * 0.88) / 2.5) * 2.5;
+  const goalMethod = isFlat
+    ? `${trim(pr)}kg 회복 · ${trim(reset)} 리셋, 주당 +2.5kg`
+    : `다음 목표 ${trim(cur + 2.5)}kg · 점진적 과부하`;
+  const whyLine = coach?.headline ?? '';
+
+  const saveMemo = async () => {
+    if (!exId) return;
+    setSaving(true);
+    const text = items.filter(it => it.text.trim()).map(it => `☐ ${it.text.trim()}`).join('\n');
+    try { await updateExerciseNote(exId, text); setSaved(true); } catch { /* keep silent */ } finally { setSaving(false); }
+  };
+  const editItem = (i: number, t: string) => { setSaved(false); setItems(arr => arr.map((x, j) => (j === i ? { ...x, text: t } : x))); };
+  const toggleItem = (i: number) => setItems(arr => arr.map((x, j) => (j === i ? { ...x, done: !x.done } : x)));
+  const removeItem = (i: number) => { setSaved(false); setItems(arr => arr.filter((_, j) => j !== i)); };
+  const addItem = () => { setSaved(false); setItems(arr => [...arr, { text: '', done: false }]); };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -115,21 +144,49 @@ export default function ExerciseReport() {
           <Diagnosis data={data} />
           <KeyStats data={data} />
 
-          {/* 코치 */}
+          {/* 코치 — 목표·방법(코드) + 해석 한 줄 + 편집 가능 체크리스트 메모 */}
           <Text style={s.secttl}>🤖 AI 코치</Text>
-          {coach && (
-            <View style={s.dig}>
-              <View style={s.dh}><View style={s.da}><Text style={{ fontSize: 13 }}>🤖</Text></View><Text style={s.dn}>{name}은 이렇게 봤어</Text></View>
-              <CoachRow tag="진단" tagBg="rgba(255,138,0,0.18)" tagColor={SEM.bad} x={coach.dx} />
-              <CoachRow tag="처방" tagBg="rgba(43,217,106,0.18)" tagColor={SEM.good} x={coach.rx} />
-              <CoachRow tag="동기" tagBg="rgba(155,123,214,0.18)" tagColor="#c3a8e8" x={coach.mt} />
+          <View style={s.cbox}>
+            <View style={s.rx}>
+              <Text style={s.rxK}>목표·방법</Text>
+              <Text style={s.rxB}>{goalMethod}</Text>
             </View>
-          )}
-          <Pressable style={s.cta} onPress={() => goChat()}><Text style={s.ctaT}>💬 대화로 풀기</Text></Pressable>
-          <View style={s.chips}>
-            {['왜 멈췄어?', '리셋 방법', '대체 운동'].map(c => (
-              <Pressable key={c} style={s.chip} onPress={() => goChat(`${name} ${c}`)}><Text style={s.chipT}>{c}</Text></Pressable>
-            ))}
+            {whyLine ? <Text style={s.rxWhy}>{whyLine}</Text> : null}
+
+            <View style={s.memo}>
+              <View style={s.memoH}>
+                <Text style={s.memoHT} numberOfLines={1}>📝 다음 {name} 세션 체크리스트</Text>
+                <Text style={s.memoHEd}>✏️ 편집 가능</Text>
+              </View>
+              {items.map((it, i) => (
+                <View key={i} style={s.ck}>
+                  <Pressable onPress={() => toggleItem(i)} style={[s.ckBox, it.done && s.ckBoxOn]} hitSlop={6}>
+                    {it.done && <Text style={s.ckMark}>✓</Text>}
+                  </Pressable>
+                  <TextInput
+                    style={s.ckInput}
+                    value={it.text}
+                    onChangeText={t => editItem(i, t)}
+                    placeholder="할 일 입력"
+                    placeholderTextColor="#5a5030"
+                  />
+                  <Pressable onPress={() => removeItem(i)} hitSlop={8}><Text style={s.ckDel}>×</Text></Pressable>
+                </View>
+              ))}
+              <Pressable onPress={addItem} hitSlop={6}><Text style={s.addRowT}>+ 항목 추가</Text></Pressable>
+            </View>
+
+            <View style={s.acts}>
+              <Pressable style={[s.pbtn, saved && s.pbtnDone]} onPress={saveMemo} disabled={saving}>
+                <Text style={s.pbtnT}>{saved ? '저장됨 ✓' : saving ? '저장 중…' : '메모에 저장'}</Text>
+              </Pressable>
+              <Pressable style={s.sbtn} onPress={() => goChat()}><Text style={s.sbtnT}>💬 대화로 풀기</Text></Pressable>
+            </View>
+            <View style={s.chips}>
+              {['왜 멈췄어?', '대체 운동'].map(c => (
+                <Pressable key={c} style={s.chip} onPress={() => goChat(`${name} ${c}`)}><Text style={s.chipT}>{c}</Text></Pressable>
+              ))}
+            </View>
           </View>
         </ScrollView>
       )}
@@ -172,13 +229,22 @@ function Sparkline({ data }: { data: ExerciseProgress }) {
   );
 }
 
-function CoachRow({ tag, tagBg, tagColor, x }: { tag: string; tagBg: string; tagColor: string; x: string }) {
-  return (
-    <View style={s.dr}>
-      <Text style={[s.tg, { backgroundColor: tagBg, color: tagColor }]}>{tag}</Text>
-      <Text style={s.drx}>{x}</Text>
-    </View>
-  );
+/** 체크리스트 기본값 — 숫자는 코드 계산값으로 프리필(사용자 수정 가능). */
+function buildChecklist(d: ExerciseProgress): { text: string; done: boolean }[] {
+  const cur = d.currentE1rm ?? 0;
+  const isFlat = d.trend === 'flat' && d.plateauWeeks > 0;
+  if (isFlat) {
+    const reset = Math.round((cur * 0.88) / 2.5) * 2.5;
+    return [
+      { text: `${trim(reset)}kg로 첫 세트 시작`, done: false },
+      { text: '주당 +2.5kg 점증', done: false },
+      { text: '볼륨 1세트 추가', done: false },
+    ];
+  }
+  return [
+    { text: `다음 목표 ${trim(cur + 2.5)}kg 도전`, done: false },
+    { text: '점진적 과부하 유지', done: false },
+  ];
 }
 
 // ── 차트 ─────────────────────────────────────────────────
@@ -433,9 +499,29 @@ const s = StyleSheet.create({
   dr: { flexDirection: 'row', gap: 7, marginBottom: 9 },
   tg: { fontSize: 8.5, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, overflow: 'hidden', alignSelf: 'flex-start' },
   drx: { color: '#e4e4ea', fontSize: 11, lineHeight: 16, fontWeight: '600', flex: 1 },
-  cta: { marginHorizontal: 14, marginTop: 11, backgroundColor: SEM.brand, borderRadius: 11, paddingVertical: 12, alignItems: 'center' },
-  ctaT: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
-  chips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', paddingHorizontal: 14, marginTop: 9 },
+  cbox: { marginHorizontal: 14, backgroundColor: '#0a0a0c', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 14, padding: 13 },
+  rx: { gap: 2 },
+  rxK: { color: SEM.good, fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  rxB: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
+  rxWhy: { color: '#9a9aa2', fontSize: 12, lineHeight: 17, marginTop: 7, marginBottom: 4 },
+  memo: { backgroundColor: '#14130d', borderWidth: 1, borderColor: '#3a3320', borderRadius: 11, padding: 11, marginTop: 11 },
+  memoH: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  memoHT: { color: '#caa94a', fontSize: 10.5, fontWeight: '800', flex: 1, marginRight: 8 },
+  memoHEd: { color: '#8fb4ff', fontSize: 10, fontWeight: '700' },
+  ck: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 },
+  ckBox: { width: 16, height: 16, borderWidth: 1.5, borderColor: '#6a5e38', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  ckBoxOn: { backgroundColor: '#caa94a', borderColor: '#caa94a' },
+  ckMark: { color: '#14130d', fontSize: 11, fontWeight: '900', lineHeight: 12 },
+  ckInput: { flex: 1, color: '#e7dcc0', fontSize: 12.5, fontWeight: '600', paddingVertical: 2, borderBottomWidth: 1, borderBottomColor: '#3a3320' },
+  ckDel: { color: '#6a5e38', fontSize: 18, fontWeight: '700', paddingHorizontal: 2 },
+  addRowT: { color: '#8fb4ff', fontSize: 11, fontWeight: '700', marginTop: 8 },
+  acts: { gap: 8, marginTop: 12 },
+  pbtn: { backgroundColor: SEM.brand, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  pbtnDone: { backgroundColor: '#1c3a24', borderWidth: 1, borderColor: SEM.good },
+  pbtnT: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  sbtn: { borderWidth: 1, borderColor: '#2a2a30', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  sbtnT: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  chips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 12 },
   chip: { borderWidth: 1, borderColor: '#2a2230', borderRadius: 13, paddingVertical: 6, paddingHorizontal: 11, backgroundColor: '#0d0d0f' },
   chipT: { color: SEM.brand, fontSize: 10.5, fontWeight: '700' },
 });
