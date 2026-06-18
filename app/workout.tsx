@@ -19,7 +19,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
-import DragList, { DragListRenderItemInfo } from 'react-native-draglist';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import * as Haptics from 'expo-haptics';
 import {
   getExercises,
@@ -243,7 +243,7 @@ export default function WorkoutScreen() {
   const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const replaceOnNextRef = useRef(true); // 숫자패드 첫 입력 시 기존 값 교체
-  const listRef = useRef<FlatList<ExerciseEntry>>(null);
+  const listRef = useRef<any>(null);
   const noteDraftRef = useRef(''); // 종목 메모 입력 중 임시값(타이핑마다 스토어 갱신 방지)
   const rowRefs = useRef<Map<string, View>>(new Map());
   const scrollY = useRef(0);
@@ -1488,15 +1488,15 @@ export default function WorkoutScreen() {
           <Text style={styles.stickyFinishText}>완료</Text>
         </Pressable>
       </View>
-      <DragList
+      <DraggableFlatList
         ref={listRef}
         data={exercises}
         keyExtractor={(ex) => String(ex.exerciseId)}
-        onReordered={(from, to) => reorderExercise(from, to)}
+        onDragEnd={({ from, to }) => reorderExercise(from, to)}
+        activationDistance={12}
         contentContainerStyle={[styles.scrollContent, edit && styles.scrollContentEditing]}
         keyboardShouldPersistTaps="handled"
-        onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
-        scrollEventThrottle={16}
+        onScrollOffsetChange={(off) => { scrollY.current = off; }}
         onScrollToIndexFailed={() => {}}
         ListHeaderComponent={(
           <>
@@ -1562,7 +1562,8 @@ export default function WorkoutScreen() {
             <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
           </Pressable>
         )}
-        renderItem={({ item: ex, index: exIdx, onDragStart, onDragEnd, isActive }: DragListRenderItemInfo<ExerciseEntry>) => {
+        renderItem={({ item: ex, getIndex, drag, isActive }: RenderItemParams<ExerciseEntry>) => {
+          const exIdx = getIndex() ?? 0;
           const bestORM = ex.sets
             .filter(s => s.done && s.estimated_1rm)
             .reduce((m, s) => Math.max(m, s.estimated_1rm ?? 0), 0);
@@ -1571,8 +1572,8 @@ export default function WorkoutScreen() {
             <View style={[styles.exerciseCard, isActive && styles.exerciseCardDragging]}>
               <View style={styles.exerciseCardHeader}>
                 <Pressable
-                  onPressIn={onDragStart}
-                  onPressOut={onDragEnd}
+                  onPressIn={drag}
+                  disabled={isActive}
                   hitSlop={12}
                   style={[styles.dragHandle, { marginRight: 10 }]}
                 >
