@@ -31,7 +31,7 @@ import {
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
 import RulerPicker from '../../components/RulerPicker';
 import BriefingLoading from '../../components/BriefingLoading';
-import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
+import { ACCENT, ACCENT_INK, AI, SEM, TYPE, RADIUS, SPACE, WEIGHT } from '../../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
@@ -329,48 +329,48 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: SEM.bg },
   scroll: { flex: 1 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 28 },
+  content: { padding: SPACE.xl, paddingBottom: SPACE.xxl },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  brand: { color: SEM.ink1, fontSize: 20, fontWeight: '800' },
-  dateChip: { color: SEM.ink3, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: SPACE.lg },
+  brand: { ...TYPE.title, fontWeight: WEIGHT.bold, color: SEM.ink1 },
+  dateChip: { ...TYPE.caption, color: SEM.ink3, marginTop: SPACE.xs, fontVariant: ['tabular-nums'] },
 
   // 히어로: 헤드라인 + 처방 통합 카드
-  hero: { backgroundColor: SEM.surface2, borderLeftWidth: 3, borderLeftColor: SEM.brand, borderRadius: 14, padding: 18, marginTop: 18 },
-  heroDivider: { height: 1, backgroundColor: SEM.line2, marginVertical: 12 },
-  headline: { color: SEM.ink1, fontSize: 28, fontWeight: '900', lineHeight: 36, letterSpacing: -0.5 },
-  rxCap: { color: SEM.brand, fontSize: 11, fontWeight: '800' },
-  rxAction: { color: SEM.ink1, fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
-  rxTodo: { color: SEM.ink3, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
+  hero: { backgroundColor: SEM.surface2, borderLeftWidth: 3, borderLeftColor: SEM.brand, borderRadius: RADIUS.xl, padding: SPACE.lg, marginTop: SPACE.lg },
+  heroDivider: { height: 1, backgroundColor: SEM.line2, marginVertical: SPACE.md },
+  headline: { ...TYPE.display, fontWeight: WEIGHT.bold, color: SEM.ink1, letterSpacing: -0.5 },
+  rxCap: { ...TYPE.caption, fontWeight: WEIGHT.bold, color: SEM.brand },
+  rxAction: { ...TYPE.body, fontWeight: WEIGHT.semibold, color: SEM.ink1, marginTop: SPACE.sm },
+  rxTodo: { ...TYPE.caption, color: SEM.ink3, marginTop: SPACE.sm },
 
-  msCard: { backgroundColor: SEM.surface2, borderRadius: 14, padding: 15, marginTop: 11 },
-  msTitle: { color: SEM.ink1, fontSize: 14, fontWeight: '800', marginBottom: 10 },
-  msCap: { color: SEM.ink3, fontSize: 11, fontWeight: '600' },
-  msRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: SEM.line2 },
-  msPart: { color: SEM.ink2, fontSize: 13.5, flex: 1 },
-  msSets: { color: SEM.ink1, fontSize: 13.5, fontWeight: '800', width: 92, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  msFreq: { color: SEM.ink3, fontSize: 12.5, fontWeight: '700', width: 70, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  msCard: { backgroundColor: SEM.surface2, borderRadius: RADIUS.xl, padding: SPACE.lg, marginTop: SPACE.md },
+  msTitle: { ...TYPE.body, fontWeight: WEIGHT.bold, color: SEM.ink1, marginBottom: SPACE.md },
+  msCap: { ...TYPE.caption, fontWeight: WEIGHT.medium, color: SEM.ink3 },
+  msRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACE.xs, borderBottomWidth: 1, borderBottomColor: SEM.line2 },
+  msPart: { ...TYPE.footnote, color: SEM.ink2, flex: 1 },
+  msSets: { ...TYPE.footnote, fontWeight: WEIGHT.bold, color: SEM.ink1, width: 92, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  msFreq: { ...TYPE.caption, fontWeight: WEIGHT.semibold, color: SEM.ink3, width: 70, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
-  metrics: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  metric: { flex: 1, backgroundColor: SEM.surface3, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  metricV: { color: SEM.ink1, fontSize: 26, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  metricL: { color: SEM.ink3, fontSize: 11.5, marginTop: 4 },
+  metrics: { flexDirection: 'row', gap: SPACE.md, marginTop: SPACE.lg },
+  metric: { flex: 1, backgroundColor: SEM.surface3, borderRadius: RADIUS.xl, paddingVertical: SPACE.lg, alignItems: 'center' },
+  metricV: { ...TYPE.headline, fontWeight: WEIGHT.bold, color: SEM.ink1, fontVariant: ['tabular-nums'] },
+  metricL: { ...TYPE.caption, color: SEM.ink3, marginTop: SPACE.xs },
 
   // 하단 고정 CTA 바
-  ctaBar: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, backgroundColor: SEM.bg, borderTopWidth: 1, borderTopColor: SEM.line },
-  startBtn: { flexDirection: 'row', gap: 7, backgroundColor: SEM.brand, borderRadius: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  startBtnText: { color: SEM.onBrand, fontSize: 17, fontWeight: '800' },
+  ctaBar: { paddingHorizontal: SPACE.xl, paddingTop: SPACE.sm, paddingBottom: SPACE.md, backgroundColor: SEM.bg, borderTopWidth: 1, borderTopColor: SEM.line },
+  startBtn: { flexDirection: 'row', gap: SPACE.sm, backgroundColor: SEM.brand, borderRadius: RADIUS.xl, paddingVertical: SPACE.lg, alignItems: 'center', justifyContent: 'center' },
+  startBtnText: { ...TYPE.callout, fontWeight: WEIGHT.bold, color: SEM.onBrand },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: SEM.surface3, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 44, alignItems: 'center' },
-  modalTitle: { color: SEM.ink1, fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  weightReadout: { color: SEM.ink1, fontSize: 56, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
-  weightUnit: { color: SEM.ink3, fontSize: 24, fontWeight: '600' },
-  saveBtn: { backgroundColor: SEM.brand, borderRadius: 14, paddingVertical: 14, alignItems: 'center', alignSelf: 'stretch', marginTop: 20 },
-  saveBtnText: { color: SEM.onBrand, fontSize: 17, fontWeight: '700' },
-  fatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
-  fatLabel: { color: SEM.ink3, fontSize: 15 },
-  fatInput: { backgroundColor: SEM.line2, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, color: SEM.ink1, fontSize: 16, minWidth: 90, textAlign: 'center' },
-  fatUnit: { color: SEM.ink3, fontSize: 15 },
+  modalCard: { backgroundColor: SEM.surface3, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: SPACE.xxl, paddingBottom: 44, alignItems: 'center' },
+  modalTitle: { ...TYPE.title, fontWeight: WEIGHT.semibold, color: SEM.ink1, marginBottom: SPACE.xs },
+  weightReadout: { fontSize: 56, lineHeight: 60, fontWeight: WEIGHT.bold, color: SEM.ink1, letterSpacing: -1, marginTop: SPACE.xs }, // displayXl(1회성)
+  weightUnit: { ...TYPE.headline, fontWeight: WEIGHT.medium, color: SEM.ink3 },
+  saveBtn: { backgroundColor: SEM.brand, borderRadius: RADIUS.lg, paddingVertical: SPACE.md, alignItems: 'center', alignSelf: 'stretch', marginTop: SPACE.lg },
+  saveBtnText: { ...TYPE.callout, fontWeight: WEIGHT.semibold, color: SEM.onBrand },
+  fatRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, marginTop: SPACE.lg },
+  fatLabel: { ...TYPE.body, color: SEM.ink3 },
+  fatInput: { ...TYPE.callout, backgroundColor: SEM.line2, borderRadius: RADIUS.md, paddingHorizontal: SPACE.lg, paddingVertical: SPACE.md, color: SEM.ink1, minWidth: 90, textAlign: 'center' },
+  fatUnit: { ...TYPE.body, color: SEM.ink3 },
 });
