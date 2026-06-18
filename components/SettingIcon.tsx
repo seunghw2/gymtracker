@@ -5,7 +5,7 @@ import { SEM } from '../constants/colors';
 export type IconName =
   | 'person' | 'target' | 'timer' | 'tag' | 'dumbbell'
   | 'bell' | 'calendar' | 'scale' | 'sliders' | 'chat'
-  | 'info' | 'download' | 'mail' | 'shield' | 'tool';
+  | 'info' | 'download' | 'mail' | 'shield' | 'tool' | 'logout';
 
 /** 설정 행용 모노라인 아이콘(뉴트럴 — 색은 의미를 담지 않음, N-U1 보존). */
 export function SettingIcon({ name, size = 16, color = SEM.ink3 }: { name: IconName; size?: number; color?: string }) {
@@ -58,6 +58,9 @@ export function SettingIcon({ name, size = 16, color = SEM.ink3 }: { name: IconN
       </>)}
       {name === 'tool' && (<>
         <Path d="M10.6 2.4a3 3 0 00-3.9 3.9l-4.1 4.1 1.5 1.5 4.1-4.1a3 3 0 003.9-3.9L10 3.8 9 4.8 8 3.8z" {...p} />
+      </>)}
+      {name === 'logout' && (<>
+        <Path d="M6 3.5H3.5v9H6M9 8h5M11.5 5.5 14 8l-2.5 2.5" {...p} />
       </>)}
     </Svg>
   );
