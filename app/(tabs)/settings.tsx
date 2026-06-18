@@ -9,7 +9,10 @@ import {
   Alert,
   SafeAreaView,
   Switch,
+  Linking,
 } from 'react-native';
+import Constants from 'expo-constants';
+import { SEM } from '../../constants/colors';
 import {
   getBodyTags,
   setBodyTags,
@@ -102,18 +105,6 @@ export default function SettingsScreen() {
   const [newBodyTag, setNewBodyTag] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const toggle = (id: string) => setOpen(o => (o === id ? null : id));
-  const Cat = (id: string, icon: string, title: string) => {
-    const on = open === id;
-    return (
-      <Pressable style={[styles.catRow, on && styles.catRowOpen]} onPress={() => toggle(id)}>
-        <View style={styles.catLeft}>
-          <Text style={styles.catIcon}>{icon}</Text>
-          <Text style={styles.catTitle}>{title}</Text>
-        </View>
-        <Text style={[styles.catChevron, on && styles.catChevronOpen]}>{on ? '⌄' : '›'}</Text>
-      </Pressable>
-    );
-  };
 
   const load = useCallback(async () => {
     const [exList, allEx] = await Promise.all([getCustomExercises(), getExercises()]);
@@ -264,338 +255,253 @@ export default function SettingsScreen() {
   };
 
   const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
+  const version = Constants.expoConfig?.version ?? '—';
+  const toneLabel = ({ plain: '담백', cheer: '응원', blunt: '직설' } as Record<string, string>)[coachTone] ?? '담백';
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={[styles.content, bannerActive && styles.bannerPad]}>
         <Text style={styles.header}>설정</Text>
 
-        {/* 계정 */}
+        {/* 계정 (PR C에서 전용 페이지로 분리 예정) */}
         {user && (
-          <>
-            {Cat('account', '👤', '계정')}
+          <View style={styles.group}>
+            <Row first icon="👤" label={user.name} sub={`${user.email ?? '카카오 로그인'} · ${user.provider}`}
+              onPress={() => toggle('account')} open={open === 'account'} />
             {open === 'account' && (
-            <View style={styles.card}>
+              <Body>
+                <Pressable onPress={handleLogout} style={styles.bodyRow}><Text style={styles.bodyAction}>로그아웃</Text></Pressable>
+                <View style={styles.divider} />
+                <Pressable onPress={handleDeleteAccount} style={styles.bodyRow}><Text style={styles.bodyMuted}>회원탈퇴</Text></Pressable>
+              </Body>
+            )}
+          </View>
+        )}
+
+        {/* 트레이닝 */}
+        <Section title="트레이닝">
+          <Row first icon="🎯" label="목표 설정" onPress={() => toggle('goals')} open={open === 'goals'} />
+          {open === 'goals' && (
+            <Body>
               <View style={styles.row}>
-                <View>
-                  <Text style={styles.label}>{user.name}</Text>
-                  <Text style={[styles.listItemSub, { marginTop: 4 }]}>
-                    {user.email ?? '카카오 로그인'}  ·  {user.provider}
-                  </Text>
-                </View>
+                <Text style={styles.label}>목표 체중 (kg)</Text>
+                <TextInput style={styles.input} value={goalWeightInput} onChangeText={setGoalWeightInput} keyboardType="decimal-pad" selectTextOnFocus />
               </View>
               <View style={styles.divider} />
-              <Pressable onPress={handleLogout} style={styles.row}>
-                <Text style={[styles.label, { color: '#FF453A' }]}>로그아웃</Text>
-              </Pressable>
+              <View style={styles.row}>
+                <Text style={styles.label}>목표 체지방률 (%)</Text>
+                <TextInput style={styles.input} value={goalFatInput} onChangeText={setGoalFatInput} keyboardType="decimal-pad" selectTextOnFocus />
+              </View>
               <View style={styles.divider} />
-              <Pressable onPress={handleDeleteAccount} style={styles.row}>
-                <Text style={[styles.label, { color: '#8E8E93' }]}>회원탈퇴</Text>
-              </Pressable>
-            </View>
-            )}
-          </>
-        )}
-
-        {/* 목표 설정 */}
-        {Cat('goals', '🎯', '목표 설정')}
-        {open === 'goals' && (
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.label}>목표 체중 (kg)</Text>
-            <TextInput
-              style={styles.input}
-              value={goalWeightInput}
-              onChangeText={setGoalWeightInput}
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <Text style={styles.label}>목표 체지방률 (%)</Text>
-            <TextInput
-              style={styles.input}
-              value={goalFatInput}
-              onChangeText={setGoalFatInput}
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <Text style={styles.label}>기본 휴식 시간 (초)</Text>
-            <TextInput
-              style={styles.input}
-              value={restInput}
-              onChangeText={setRestInput}
-              keyboardType="number-pad"
-              selectTextOnFocus
-            />
-          </View>
-          <Pressable style={styles.saveBtn} onPress={saveGoals}>
-            <Text style={styles.saveBtnText}>저장</Text>
-          </Pressable>
-        </View>
-        )}
-
-        {/* 단위 설정 */}
-        {Cat('unit', '⚖️', '단위')}
-        {open === 'unit' && (
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.label}>kg 단위 사용</Text>
-            <Switch
-              value={unitKg}
-              onValueChange={toggleUnit}
-              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
-        )}
-
-        {/* 표시·동작 */}
-        {Cat('display', '🎚', '표시·동작')}
-        {open === 'display' && (
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.label}>세션 메모 칸 표시</Text>
-              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
-                운동 화면에 세션 메모 입력칸을 표시
-              </Text>
-            </View>
-            <Switch
-              value={showSessionNote}
-              onValueChange={toggleShowSessionNote}
-              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          <View style={[styles.row, { marginTop: 12 }]}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.label}>체중 자동 팝업</Text>
-              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
-                홈 진입 시 당일 체중 미입력이면 자동으로 팝업
-              </Text>
-            </View>
-            <Switch
-              value={weightPrompt}
-              onValueChange={toggleWeightPrompt}
-              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          <View style={[styles.row, { marginTop: 12 }]}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.label}>시작 시 부위 선택 자동 표시</Text>
-              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
-                운동 시작하면 부위 선택 팝업을 바로 표시
-              </Text>
-            </View>
-            <Switch
-              value={autoTagPrompt}
-              onValueChange={toggleAutoTagPrompt}
-              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
-        )}
+              <View style={styles.row}>
+                <Text style={styles.label}>기본 휴식 시간 (초)</Text>
+                <TextInput style={styles.input} value={restInput} onChangeText={setRestInput} keyboardType="number-pad" selectTextOnFocus />
+              </View>
+              <Pressable style={styles.saveBtn} onPress={saveGoals}><Text style={styles.saveBtnText}>저장</Text></Pressable>
+            </Body>
+          )}
+          <Row icon="⏱" label="종목별 휴식시간" onPress={() => toggle('exRest')} open={open === 'exRest'} />
+          {open === 'exRest' && (
+            <Body>
+              <Text style={[styles.listItemSub, { marginBottom: 4 }]}>비워두면 기본 {restDurationSec}초 적용</Text>
+              {allExercises.map(ex => (
+                <View key={ex.id} style={styles.listItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.listItemName}>{ex.name}</Text>
+                    {ex.brand && <Text style={styles.listItemSub}>{ex.brand}</Text>}
+                  </View>
+                  <Pressable onPress={() => toggleTracking(ex)} style={[styles.trackChip, ex.tracking_type === 'TIME' && styles.trackChipOn]} hitSlop={6}>
+                    <Text style={[styles.trackChipText, ex.tracking_type === 'TIME' && styles.trackChipTextOn]}>{ex.tracking_type === 'TIME' ? '⏱ 시간' : '횟수'}</Text>
+                  </Pressable>
+                  <TextInput style={styles.restInput} value={restByEx[ex.id] ?? ''}
+                    onChangeText={t => setRestByEx(prev => ({ ...prev, [ex.id]: t.replace(/[^0-9]/g, '') }))}
+                    onEndEditing={() => saveExerciseRest(ex.id)} keyboardType="number-pad"
+                    placeholder={String(restDurationSec)} placeholderTextColor="#48484A" selectTextOnFocus />
+                </View>
+              ))}
+              {allExercises.length === 0 && <Text style={styles.emptyText}>종목이 없습니다</Text>}
+            </Body>
+          )}
+          <Row icon="🏷" label="부위 관리" onPress={() => toggle('bodyTags')} open={open === 'bodyTags'} />
+          {open === 'bodyTags' && (
+            <Body>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput style={[styles.fullInput, { flex: 1 }]} placeholder="부위 이름 (예: 가슴)" placeholderTextColor="#48484A"
+                  value={newBodyTag} onChangeText={setNewBodyTag} onSubmitEditing={handleAddBodyTag} returnKeyType="done" />
+                <Pressable style={[styles.addBtn, { marginTop: 0, paddingHorizontal: 18, justifyContent: 'center' }]} onPress={handleAddBodyTag}>
+                  <Text style={styles.addBtnText}>추가</Text>
+                </Pressable>
+              </View>
+              {bodyTags.map(t => (
+                <View key={t} style={styles.listItem}>
+                  <Text style={styles.listItemName}>{t}</Text>
+                  <Pressable onPress={() => handleDeleteBodyTag(t)}><Text style={styles.deleteText}>삭제</Text></Pressable>
+                </View>
+              ))}
+              {bodyTags.length === 0 && <Text style={styles.emptyText}>등록된 부위가 없습니다</Text>}
+            </Body>
+          )}
+          <Row icon="🏋️" label="커스텀 운동" onPress={() => toggle('custom')} open={open === 'custom'} />
+          {open === 'custom' && (
+            <Body>
+              {customExercises.map(ex => (
+                <View key={ex.id} style={styles.listItem}>
+                  <View>
+                    <Text style={styles.listItemName}>{ex.name}</Text>
+                    <Text style={styles.listItemSub}>{ex.muscle_group} / {ex.equipment_type}</Text>
+                  </View>
+                  <Pressable onPress={() => handleDeleteExercise(ex)}><Text style={styles.deleteText}>삭제</Text></Pressable>
+                </View>
+              ))}
+              {customExercises.length === 0 && <Text style={styles.emptyText}>등록된 커스텀 운동이 없습니다</Text>}
+            </Body>
+          )}
+        </Section>
 
         {/* 알림 */}
-        {Cat('rest', '🔔', '휴식 알림')}
-        {open === 'rest' && (
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.label}>무음 모드에서도 소리</Text>
-              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
-                휴대폰이 무음이어도 휴식 완료음 재생 (앱 사용 중)
-              </Text>
-            </View>
-            <Switch
-              value={soundOnSilent}
-              onValueChange={toggleSoundOnSilent}
-              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
-        )}
-
-        {/* 운동 리마인더 */}
-        {Cat('reminder', '📅', '운동 리마인더')}
-        {open === 'reminder' && (
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.label}>며칠 쉬면 알림</Text>
-              <Text style={[styles.listItemSub, { marginTop: 4 }]}>
-                마지막 운동 후 설정한 날만큼 쉬면 알려줘요 (앱이 닫혀 있어도)
-              </Text>
-            </View>
-            <Switch
-              value={reminder.enabled}
-              onValueChange={v => updateReminder({ ...reminder, enabled: v })}
-              trackColor={{ false: '#3A3A3C', true: '#FF3B30' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          {reminder.enabled && (
-            <>
-              <View style={[styles.row, { marginTop: 14 }]}>
-                <Text style={styles.label}>쉬는 일수</Text>
-                <View style={stepStyles.stepper}>
-                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, days: Math.max(1, reminder.days - 1) })}><Text style={stepStyles.stepText}>−</Text></Pressable>
-                  <Text style={stepStyles.stepVal}>{reminder.days}일</Text>
-                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, days: Math.min(14, reminder.days + 1) })}><Text style={stepStyles.stepText}>+</Text></Pressable>
+        <Section title="알림">
+          <Row first icon="🔔" label="휴식 알림" sub="무음에서도 휴식 완료음 (앱 사용 중)"
+            right={<Switch value={soundOnSilent} onValueChange={toggleSoundOnSilent} trackColor={{ false: '#3A3A3C', true: SEM.good }} thumbColor="#FFFFFF" />} />
+          <Row icon="📅" label="운동 리마인더" onPress={() => toggle('reminder')} open={open === 'reminder'} />
+          {open === 'reminder' && (
+            <Body>
+              <View style={styles.row}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.label}>며칠 쉬면 알림</Text>
+                  <Text style={[styles.listItemSub, { marginTop: 4 }]}>마지막 운동 후 설정한 날만큼 쉬면 알려줘요 (앱이 닫혀 있어도)</Text>
                 </View>
+                <Switch value={reminder.enabled} onValueChange={v => updateReminder({ ...reminder, enabled: v })} trackColor={{ false: '#3A3A3C', true: SEM.good }} thumbColor="#FFFFFF" />
+              </View>
+              {reminder.enabled && (
+                <>
+                  <View style={[styles.row, { marginTop: 14 }]}>
+                    <Text style={styles.label}>쉬는 일수</Text>
+                    <View style={stepStyles.stepper}>
+                      <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, days: Math.max(1, reminder.days - 1) })}><Text style={stepStyles.stepText}>−</Text></Pressable>
+                      <Text style={stepStyles.stepVal}>{reminder.days}일</Text>
+                      <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, days: Math.min(14, reminder.days + 1) })}><Text style={stepStyles.stepText}>+</Text></Pressable>
+                    </View>
+                  </View>
+                  <View style={[styles.row, { marginTop: 12 }]}>
+                    <Text style={styles.label}>알림 시각</Text>
+                    <View style={stepStyles.stepper}>
+                      <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, hour: (reminder.hour + 23) % 24 })}><Text style={stepStyles.stepText}>−</Text></Pressable>
+                      <Text style={stepStyles.stepVal}>{String(reminder.hour).padStart(2, '0')}:00</Text>
+                      <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, hour: (reminder.hour + 1) % 24 })}><Text style={stepStyles.stepText}>+</Text></Pressable>
+                    </View>
+                  </View>
+                </>
+              )}
+            </Body>
+          )}
+        </Section>
+
+        {/* 표시 */}
+        <Section title="표시">
+          <Row first icon="⚖️" label="단위" value={unitKg ? 'kg' : 'lb'} onPress={() => toggle('unit')} open={open === 'unit'} />
+          {open === 'unit' && (
+            <Body>
+              <View style={styles.row}>
+                <Text style={styles.label}>kg 단위 사용</Text>
+                <Switch value={unitKg} onValueChange={toggleUnit} trackColor={{ false: '#3A3A3C', true: SEM.brand }} thumbColor="#FFFFFF" />
+              </View>
+            </Body>
+          )}
+          <Row icon="🎚" label="표시·동작" onPress={() => toggle('display')} open={open === 'display'} />
+          {open === 'display' && (
+            <Body>
+              <View style={styles.row}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.label}>세션 메모 칸 표시</Text>
+                  <Text style={[styles.listItemSub, { marginTop: 4 }]}>운동 화면에 세션 메모 입력칸을 표시</Text>
+                </View>
+                <Switch value={showSessionNote} onValueChange={toggleShowSessionNote} trackColor={{ false: '#3A3A3C', true: SEM.brand }} thumbColor="#FFFFFF" />
               </View>
               <View style={[styles.row, { marginTop: 12 }]}>
-                <Text style={styles.label}>알림 시각</Text>
-                <View style={stepStyles.stepper}>
-                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, hour: (reminder.hour + 23) % 24 })}><Text style={stepStyles.stepText}>−</Text></Pressable>
-                  <Text style={stepStyles.stepVal}>{String(reminder.hour).padStart(2, '0')}:00</Text>
-                  <Pressable style={stepStyles.stepBtn} onPress={() => updateReminder({ ...reminder, hour: (reminder.hour + 1) % 24 })}><Text style={stepStyles.stepText}>+</Text></Pressable>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.label}>체중 자동 팝업</Text>
+                  <Text style={[styles.listItemSub, { marginTop: 4 }]}>홈 진입 시 당일 체중 미입력이면 자동으로 팝업</Text>
                 </View>
+                <Switch value={weightPrompt} onValueChange={toggleWeightPrompt} trackColor={{ false: '#3A3A3C', true: SEM.brand }} thumbColor="#FFFFFF" />
               </View>
-            </>
-          )}
-        </View>
-        )}
-
-        {/* AI 코치 톤 */}
-        {Cat('coachTone', '💬', 'AI 코치 톤')}
-        {open === 'coachTone' && (
-        <View style={styles.card}>
-          <Text style={[styles.listItemSub, { marginBottom: 12 }]}>리포트·코치·채팅의 말투를 정해요.</Text>
-          <View style={stepStyles.toneRow}>
-            {([['plain', '담백', '담담하게'], ['cheer', '응원', '밝게 격려'], ['blunt', '직설', '단도직입']] as const).map(([k, label, desc]) => (
-              <Pressable key={k} style={[stepStyles.toneChip, coachTone === k && stepStyles.toneChipOn]} onPress={() => changeTone(k)}>
-                <Text style={[stepStyles.toneLabel, coachTone === k && stepStyles.toneLabelOn]}>{label}</Text>
-                <Text style={[stepStyles.toneDesc, coachTone === k && stepStyles.toneDescOn]}>{desc}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-        )}
-
-        {/* 종목별 휴식시간 */}
-        {Cat('exRest', '⏱', '종목별 휴식시간')}
-        {open === 'exRest' && (
-        <View style={styles.card}>
-          <Text style={[styles.listItemSub, { marginBottom: 4 }]}>
-            비워두면 기본 {restDurationSec}초 적용
-          </Text>
-          {allExercises.map(ex => (
-            <View key={ex.id} style={styles.listItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.listItemName}>{ex.name}</Text>
-                {ex.brand && <Text style={styles.listItemSub}>{ex.brand}</Text>}
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.label}>시작 시 부위 선택 자동 표시</Text>
+                  <Text style={[styles.listItemSub, { marginTop: 4 }]}>운동 시작하면 부위 선택 팝업을 바로 표시</Text>
+                </View>
+                <Switch value={autoTagPrompt} onValueChange={toggleAutoTagPrompt} trackColor={{ false: '#3A3A3C', true: SEM.brand }} thumbColor="#FFFFFF" />
               </View>
-              <Pressable onPress={() => toggleTracking(ex)} style={[styles.trackChip, ex.tracking_type === 'TIME' && styles.trackChipOn]} hitSlop={6}>
-                <Text style={[styles.trackChipText, ex.tracking_type === 'TIME' && styles.trackChipTextOn]}>
-                  {ex.tracking_type === 'TIME' ? '⏱ 시간' : '횟수'}
-                </Text>
-              </Pressable>
-              <TextInput
-                style={styles.restInput}
-                value={restByEx[ex.id] ?? ''}
-                onChangeText={t => setRestByEx(prev => ({ ...prev, [ex.id]: t.replace(/[^0-9]/g, '') }))}
-                onEndEditing={() => saveExerciseRest(ex.id)}
-                keyboardType="number-pad"
-                placeholder={String(restDurationSec)}
-                placeholderTextColor="#48484A"
-                selectTextOnFocus
-              />
-            </View>
-          ))}
-          {allExercises.length === 0 && (
-            <Text style={styles.emptyText}>종목이 없습니다</Text>
+            </Body>
           )}
-        </View>
-        )}
-
-        {/* 부위 관리 */}
-        {Cat('bodyTags', '🏷', '부위 관리')}
-        {open === 'bodyTags' && (
-        <View style={styles.card}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
-              style={[styles.fullInput, { flex: 1 }]}
-              placeholder="부위 이름 (예: 가슴)"
-              placeholderTextColor="#48484A"
-              value={newBodyTag}
-              onChangeText={setNewBodyTag}
-              onSubmitEditing={handleAddBodyTag}
-              returnKeyType="done"
-            />
-            <Pressable style={[styles.addBtn, { marginTop: 0, paddingHorizontal: 18, justifyContent: 'center' }]} onPress={handleAddBodyTag}>
-              <Text style={styles.addBtnText}>추가</Text>
-            </Pressable>
-          </View>
-          {bodyTags.map(t => (
-            <View key={t} style={styles.listItem}>
-              <Text style={styles.listItemName}>{t}</Text>
-              <Pressable onPress={() => handleDeleteBodyTag(t)}>
-                <Text style={styles.deleteText}>삭제</Text>
-              </Pressable>
-            </View>
-          ))}
-          {bodyTags.length === 0 && (
-            <Text style={styles.emptyText}>등록된 부위가 없습니다</Text>
-          )}
-        </View>
-        )}
-
-        {/* 데이터 */}
-        {Cat('data', '💾', '데이터')}
-        {open === 'data' && (
-        <View style={styles.card}>
-          <Pressable style={styles.addBtn} onPress={handleExport} disabled={exporting}>
-            <Text style={styles.addBtnText}>{exporting ? '내보내는 중…' : '운동 기록 CSV 내보내기'}</Text>
-          </Pressable>
-        </View>
-        )}
-
-        {/* 커스텀 운동 관리 */}
-        {Cat('custom', '🏋️', '커스텀 운동')}
-        {open === 'custom' && (
-        <View style={styles.card}>
-          {customExercises.map(ex => (
-            <View key={ex.id} style={styles.listItem}>
-              <View>
-                <Text style={styles.listItemName}>{ex.name}</Text>
-                <Text style={styles.listItemSub}>{ex.muscle_group} / {ex.equipment_type}</Text>
+          <Row icon="💬" label="AI 코치 톤" value={toneLabel} onPress={() => toggle('coachTone')} open={open === 'coachTone'} />
+          {open === 'coachTone' && (
+            <Body>
+              <Text style={[styles.listItemSub, { marginBottom: 12 }]}>리포트·코치·채팅의 말투를 정해요.</Text>
+              <View style={stepStyles.toneRow}>
+                {([['plain', '담백', '담담하게'], ['cheer', '응원', '밝게 격려'], ['blunt', '직설', '단도직입']] as const).map(([k, label, desc]) => (
+                  <Pressable key={k} style={[stepStyles.toneChip, coachTone === k && stepStyles.toneChipOn]} onPress={() => changeTone(k)}>
+                    <Text style={[stepStyles.toneLabel, coachTone === k && stepStyles.toneLabelOn]}>{label}</Text>
+                    <Text style={[stepStyles.toneDesc, coachTone === k && stepStyles.toneDescOn]}>{desc}</Text>
+                  </Pressable>
+                ))}
               </View>
-              <Pressable onPress={() => handleDeleteExercise(ex)}>
-                <Text style={styles.deleteText}>삭제</Text>
-              </Pressable>
-            </View>
-          ))}
-          {customExercises.length === 0 && (
-            <Text style={styles.emptyText}>등록된 커스텀 운동이 없습니다</Text>
+            </Body>
           )}
-        </View>
-        )}
+        </Section>
 
-        {/* 개발자 도구 */}
-        {Cat('dev', '🛠', '개발자 도구')}
-        {open === 'dev' && (
-        <View style={styles.card}>
-          <Text style={[styles.listItemSub, { marginBottom: 4 }]}>
-            테스트용 도구입니다. 신중히 사용하세요.
-          </Text>
-          <Pressable style={[styles.addBtn, styles.devBtn]} onPress={handleResetOnboarding}>
-            <Text style={[styles.addBtnText, styles.devBtnText]}>온보딩 초기화 (AI 프로필 삭제)</Text>
-          </Pressable>
-        </View>
-        )}
+        {/* 정보 */}
+        <Section title="정보">
+          <Row first icon="ℹ️" label="버전" value={version} />
+          <Row icon="💾" label="운동 기록 내보내기" value={exporting ? '내보내는 중…' : undefined} onPress={handleExport} />
+          <Row icon="✉️" label="도움말·문의" onPress={() => Linking.openURL('mailto:seunghw2@gmail.com?subject=GymTracker 문의').catch(() => {})} />
+          <Row icon="🛡" label="개인정보처리방침" onPress={() => Alert.alert('개인정보처리방침', '준비 중이에요.')} />
+          <Row icon="🛠" label="개발자 도구" onPress={() => toggle('dev')} open={open === 'dev'} />
+          {open === 'dev' && (
+            <Body>
+              <Text style={[styles.listItemSub, { marginBottom: 4 }]}>테스트용 도구입니다. 신중히 사용하세요.</Text>
+              <Pressable style={[styles.addBtn, styles.devBtn]} onPress={handleResetOnboarding}>
+                <Text style={[styles.addBtnText, styles.devBtnText]}>온보딩 초기화 (AI 프로필 삭제)</Text>
+              </Pressable>
+            </Body>
+          )}
+        </Section>
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <>
+      {!!title && <Text style={styles.sectionHd}>{title}</Text>}
+      <View style={styles.group}>{children}</View>
+    </>
+  );
+}
+
+function Row({ icon, label, value, onPress, open, danger, right, first, sub }: {
+  icon?: string; label: string; value?: string; onPress?: () => void;
+  open?: boolean; danger?: boolean; right?: React.ReactNode; first?: boolean; sub?: string;
+}) {
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} style={[styles.settingRow, !first && styles.settingRowDivider]}>
+      {icon !== undefined && <View style={styles.iconChip}><Text style={styles.iconGlyph}>{icon}</Text></View>}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]} numberOfLines={1}>{label}</Text>
+        {!!sub && <Text style={styles.rowSub} numberOfLines={1}>{sub}</Text>}
+      </View>
+      {right ?? (
+        <View style={styles.rowRight}>
+          {value !== undefined && <Text style={styles.rowValue}>{value}</Text>}
+          {!!onPress && <Text style={styles.rowChev}>{open ? '⌄' : '›'}</Text>}
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function Body({ children }: { children: React.ReactNode }) {
+  return <View style={styles.body}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -604,30 +510,23 @@ const styles = StyleSheet.create({
   bannerPad: { paddingBottom: 100 },
   header: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 20 },
 
-  sectionTitle: { color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 16, textTransform: 'uppercase' },
-
-  catRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1C1C1E',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    marginTop: 10,
-  },
-  catRowOpen: { backgroundColor: '#242426', borderColor: '#FF3B30', borderWidth: 1, marginBottom: 2 },
-  catLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  catIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-  catTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  catChevron: { color: '#8E8E93', fontSize: 22, fontWeight: '700' },
-  catChevronOpen: { color: '#FF3B30' },
-
-  card: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 16,
-    padding: 16,
-  },
+  // 섹션 그룹 + 행
+  sectionHd: { color: SEM.ink3, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, marginLeft: 4 },
+  group: { backgroundColor: SEM.surface2, borderWidth: 1, borderColor: SEM.line, borderRadius: 14, overflow: 'hidden', marginBottom: 4 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 13, paddingVertical: 11 },
+  settingRowDivider: { borderTopWidth: 1, borderTopColor: SEM.line },
+  iconChip: { width: 30, height: 30, borderRadius: 8, backgroundColor: SEM.surface3, alignItems: 'center', justifyContent: 'center' },
+  iconGlyph: { fontSize: 15 },
+  rowLabel: { color: SEM.ink1, fontSize: 15, fontWeight: '600' },
+  rowLabelDanger: { color: SEM.brand },
+  rowSub: { color: SEM.ink3, fontSize: 11.5, marginTop: 2 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowValue: { color: SEM.ink3, fontSize: 13 },
+  rowChev: { color: SEM.ink3, fontSize: 17, fontWeight: '600' },
+  body: { paddingHorizontal: 13, paddingTop: 6, paddingBottom: 12, borderTopWidth: 1, borderTopColor: SEM.line, backgroundColor: SEM.surface1 },
+  bodyRow: { paddingVertical: 11 },
+  bodyAction: { color: SEM.brand, fontSize: 15, fontWeight: '600' },
+  bodyMuted: { color: SEM.ink3, fontSize: 15 },
 
   row: {
     flexDirection: 'row',
