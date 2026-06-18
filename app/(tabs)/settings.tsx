@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { SEM } from '../../constants/colors';
+import { SettingIcon, IconName } from '../../components/SettingIcon';
 import {
   getBodyTags,
   setBodyTags,
@@ -266,7 +267,7 @@ export default function SettingsScreen() {
         {/* 계정 (PR C에서 전용 페이지로 분리 예정) */}
         {user && (
           <View style={styles.group}>
-            <Row first icon="👤" label={user.name} sub={`${user.email ?? '카카오 로그인'} · ${user.provider}`}
+            <Row first icon="person" label={user.name} sub={`${user.email ?? '카카오 로그인'} · ${user.provider}`}
               onPress={() => toggle('account')} open={open === 'account'} />
             {open === 'account' && (
               <Body>
@@ -280,7 +281,7 @@ export default function SettingsScreen() {
 
         {/* 트레이닝 */}
         <Section title="트레이닝">
-          <Row first icon="🎯" label="목표 설정" onPress={() => toggle('goals')} open={open === 'goals'} />
+          <Row first icon="target" label="목표 설정" onPress={() => toggle('goals')} open={open === 'goals'} />
           {open === 'goals' && (
             <Body>
               <View style={styles.row}>
@@ -300,7 +301,7 @@ export default function SettingsScreen() {
               <Pressable style={styles.saveBtn} onPress={saveGoals}><Text style={styles.saveBtnText}>저장</Text></Pressable>
             </Body>
           )}
-          <Row icon="⏱" label="종목별 휴식시간" onPress={() => toggle('exRest')} open={open === 'exRest'} />
+          <Row icon="timer" label="종목별 휴식시간" onPress={() => toggle('exRest')} open={open === 'exRest'} />
           {open === 'exRest' && (
             <Body>
               <Text style={[styles.listItemSub, { marginBottom: 4 }]}>비워두면 기본 {restDurationSec}초 적용</Text>
@@ -322,7 +323,7 @@ export default function SettingsScreen() {
               {allExercises.length === 0 && <Text style={styles.emptyText}>종목이 없습니다</Text>}
             </Body>
           )}
-          <Row icon="🏷" label="부위 관리" onPress={() => toggle('bodyTags')} open={open === 'bodyTags'} />
+          <Row icon="tag" label="부위 관리" onPress={() => toggle('bodyTags')} open={open === 'bodyTags'} />
           {open === 'bodyTags' && (
             <Body>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -341,7 +342,7 @@ export default function SettingsScreen() {
               {bodyTags.length === 0 && <Text style={styles.emptyText}>등록된 부위가 없습니다</Text>}
             </Body>
           )}
-          <Row icon="🏋️" label="커스텀 운동" onPress={() => toggle('custom')} open={open === 'custom'} />
+          <Row icon="dumbbell" label="커스텀 운동" onPress={() => toggle('custom')} open={open === 'custom'} />
           {open === 'custom' && (
             <Body>
               {customExercises.map(ex => (
@@ -360,9 +361,9 @@ export default function SettingsScreen() {
 
         {/* 알림 */}
         <Section title="알림">
-          <Row first icon="🔔" label="휴식 알림" sub="무음에서도 휴식 완료음 (앱 사용 중)"
+          <Row first icon="bell" label="휴식 알림" sub="무음에서도 휴식 완료음 (앱 사용 중)"
             right={<Switch value={soundOnSilent} onValueChange={toggleSoundOnSilent} trackColor={{ false: '#3A3A3C', true: SEM.good }} thumbColor="#FFFFFF" />} />
-          <Row icon="📅" label="운동 리마인더" onPress={() => toggle('reminder')} open={open === 'reminder'} />
+          <Row icon="calendar" label="운동 리마인더" onPress={() => toggle('reminder')} open={open === 'reminder'} />
           {open === 'reminder' && (
             <Body>
               <View style={styles.row}>
@@ -398,7 +399,7 @@ export default function SettingsScreen() {
 
         {/* 표시 */}
         <Section title="표시">
-          <Row first icon="⚖️" label="단위" value={unitKg ? 'kg' : 'lb'} onPress={() => toggle('unit')} open={open === 'unit'} />
+          <Row first icon="scale" label="단위" value={unitKg ? 'kg' : 'lb'} onPress={() => toggle('unit')} open={open === 'unit'} />
           {open === 'unit' && (
             <Body>
               <View style={styles.row}>
@@ -407,7 +408,7 @@ export default function SettingsScreen() {
               </View>
             </Body>
           )}
-          <Row icon="🎚" label="표시·동작" onPress={() => toggle('display')} open={open === 'display'} />
+          <Row icon="sliders" label="표시·동작" onPress={() => toggle('display')} open={open === 'display'} />
           {open === 'display' && (
             <Body>
               <View style={styles.row}>
@@ -433,7 +434,7 @@ export default function SettingsScreen() {
               </View>
             </Body>
           )}
-          <Row icon="💬" label="AI 코치 톤" value={toneLabel} onPress={() => toggle('coachTone')} open={open === 'coachTone'} />
+          <Row icon="chat" label="AI 코치 톤" value={toneLabel} onPress={() => toggle('coachTone')} open={open === 'coachTone'} />
           {open === 'coachTone' && (
             <Body>
               <Text style={[styles.listItemSub, { marginBottom: 12 }]}>리포트·코치·채팅의 말투를 정해요.</Text>
@@ -451,11 +452,11 @@ export default function SettingsScreen() {
 
         {/* 정보 */}
         <Section title="정보">
-          <Row first icon="ℹ️" label="버전" value={version} />
-          <Row icon="💾" label="운동 기록 내보내기" value={exporting ? '내보내는 중…' : undefined} onPress={handleExport} />
-          <Row icon="✉️" label="도움말·문의" onPress={() => Linking.openURL('mailto:seunghw2@gmail.com?subject=GymTracker 문의').catch(() => {})} />
-          <Row icon="🛡" label="개인정보처리방침" onPress={() => Alert.alert('개인정보처리방침', '준비 중이에요.')} />
-          <Row icon="🛠" label="개발자 도구" onPress={() => toggle('dev')} open={open === 'dev'} />
+          <Row first icon="info" label="버전" value={version} />
+          <Row icon="download" label="운동 기록 내보내기" value={exporting ? '내보내는 중…' : undefined} onPress={handleExport} />
+          <Row icon="mail" label="도움말·문의" onPress={() => Linking.openURL('mailto:seunghw2@gmail.com?subject=GymTracker 문의').catch(() => {})} />
+          <Row icon="shield" label="개인정보처리방침" onPress={() => Alert.alert('개인정보처리방침', '준비 중이에요.')} />
+          <Row icon="tool" label="개발자 도구" onPress={() => toggle('dev')} open={open === 'dev'} />
           {open === 'dev' && (
             <Body>
               <Text style={[styles.listItemSub, { marginBottom: 4 }]}>테스트용 도구입니다. 신중히 사용하세요.</Text>
@@ -480,12 +481,12 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
 }
 
 function Row({ icon, label, value, onPress, open, danger, right, first, sub }: {
-  icon?: string; label: string; value?: string; onPress?: () => void;
+  icon?: IconName; label: string; value?: string; onPress?: () => void;
   open?: boolean; danger?: boolean; right?: React.ReactNode; first?: boolean; sub?: string;
 }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={[styles.settingRow, !first && styles.settingRowDivider]}>
-      {icon !== undefined && <View style={styles.iconChip}><Text style={styles.iconGlyph}>{icon}</Text></View>}
+      {icon !== undefined && <View style={styles.iconChip}><SettingIcon name={icon} /></View>}
       <View style={{ flex: 1 }}>
         <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]} numberOfLines={1}>{label}</Text>
         {!!sub && <Text style={styles.rowSub} numberOfLines={1}>{sub}</Text>}
