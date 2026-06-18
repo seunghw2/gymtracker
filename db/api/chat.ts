@@ -1,7 +1,7 @@
 import { apiRequest } from '../../lib/api';
 
 // ── AI 코치 대화(세션) — 백엔드 camelCase 응답과 1:1 ────────────────────
-export type ChatSource = 'report' | 'alert' | 'direct';
+export type ChatSource = 'report' | 'alert' | 'direct' | 'weekly';
 
 export type ChatConversation = {
   id: number;
@@ -55,4 +55,13 @@ export async function sendChatMessage(id: number, text: string): Promise<SendRes
 /** 대화 삭제(빈 대화 정리·스와이프 삭제). */
 export async function deleteConversation(id: number): Promise<void> {
   await apiRequest<void>(`/api/v1/ai/conversations/${id}`, { method: 'DELETE' });
+}
+
+/** 이번 주 코치 대화 보장(없으면 생성). 앱 진입 시 호출 — 실패해도 화면 안 죽게 null. */
+export async function ensureWeeklyConversation(): Promise<ChatConversation | null> {
+  try {
+    return await apiRequest<ChatConversation>('/api/v1/ai/weekly/ensure', { method: 'POST' });
+  } catch {
+    return null;
+  }
 }

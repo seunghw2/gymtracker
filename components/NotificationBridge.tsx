@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import { getNotifications, parseLinkParams } from '../db/api/notifications';
+import { getNotifications } from '../db/api/notifications';
 import { presentLocalNow } from '../lib/notifications';
 import { useUiStore } from '../store/useUiStore';
 
@@ -51,7 +51,8 @@ export default function NotificationBridge() {
           .filter(n => n.id > (lastSeenId.current ?? 0) && !n.read)
           .sort((a, b) => a.id - b.id);
         for (const n of fresh) {
-          await presentLocalNow(n.title, n.body, n.linkPath ?? undefined, parseLinkParams(n.linkParams));
+          // 알림은 이제 주간 채팅으로 모임 — 탭하면 코치 탭으로 이동
+          await presentLocalNow(n.title, n.body, '/(tabs)/chat');
         }
         lastSeenId.current = Math.max(lastSeenId.current, maxId);
       } catch { /* 네트워크 실패는 조용히 무시 */ }

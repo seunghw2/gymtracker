@@ -5,11 +5,11 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Swipeable } from 'react-native-gesture-handler';
 import { AI } from '../../constants/colors';
-import { getNotifications, AppNotification } from '../../db/api/notifications';
+import { markAllNotificationsRead } from '../../db/api/notifications';
 import { useChatStore } from '../../store/useChatStore';
 import { useUiStore } from '../../store/useUiStore';
 import { useWorkoutStore } from '../../store/useStore';
-import { groupNotifications, NotifGroup, stallExercise } from '../../lib/groupNotifications';
+import { ensureWeeklyConversation } from '../../db/api/chat';
 
 /** Chat 탭(허브): 접힌 알림 strip + 동적 스타터 + 최근 대화 + 입력창. 상세는 /chat/[id]. */
 export default function ChatTab() {
@@ -20,35 +20,21 @@ export default function ChatTab() {
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
   const removeConv = useChatStore(s => s.remove);
 
-  const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
 
   const load = useCallback(async () => {
-    loadConversations();
-    try {
-      const r = await getNotifications();
-      setNotifs(r.items);
-      setUnread(r.unreadCount);
-    } catch {
-      setNotifs([]);
-    }
+    // 이번 주 코치 대화 보장(크론이 못 돌았어도 보완) 후 목록 갱신
+    ensureWeeklyConversation().finally(() => loadConversations());
+    // 코치 허브 진입 → 알림 배지 비움(알림은 이제 주간 채팅 메시지로 들어옴)
+    markAllNotificationsRead().catch(() => {});
+    setUnread(0);
   }, [loadConversations, setUnread]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
-  const groups = groupNotifications(notifs);
-  const stalls = groups.filter(g => g.type === 'STAGNATION').length;
-  const reports = groups.filter(g => g.type === 'REPORT_READY').length;
-
-  // 동적 스타터: 정체 종목 반영
-  const stallEx = stallExercise(groups.find(g => g.type === 'STAGNATION')?.body);
-  const starters = [
-    '이번 주 어땠어',
-    stallEx ? `${stallEx} 정체 풀기` : '정체 풀기',
-    '루틴 짜줘',
-  ];
+  const starters = ['이번 주 어땠어', '정체 풀기', '루틴 짜줘'];
 
   const goConv = (id: number, title: string, extra?: Record<string, string>) =>
     router.push({ pathname: '/chat/[conversationId]', params: { conversationId: String(id), title, ...(extra ?? {}) } });
@@ -65,7 +51,7 @@ export default function ChatTab() {
     if (conv) goConv(conv.id, conv.title);
   };
 
-  const tag = (src: string) => src === 'report' ? { t: '리포트', c: '#c3a8e8' } : src === 'alert' ? { t: '알림', c: AI.warn } : null;
+  const tag = (src: string) => src === 'weekly' ? { t: '이번 주', c: AI.accent } : src === 'report' ? { t: '리포트', c: '#c3a8e8' } : src === 'alert' ? { t: '알림', c: AI.warn } : null;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -73,17 +59,6 @@ export default function ChatTab() {
 
         <ScrollView contentContainerStyle={s.body}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AI.accent} />}>
-
-          {groups.length > 0 && (
-            <Pressable style={s.strip} onPress={() => router.push('/ai/inbox')}>
-              <Text style={{ fontSize: 15 }}>🔔</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={s.stripT}>새 소식 {groups.length}건</Text>
-                <Text style={s.stripS}>{[stalls && `정체 ${stalls}`, reports && `리포트 ${reports}`].filter(Boolean).join(' · ') || '중복은 묶음 처리'}</Text>
-              </View>
-              <Text style={s.go}>›</Text>
-            </Pressable>
-          )}
 
           <Text style={s.lbl}>바로 물어보기</Text>
           <View style={s.starters}>
@@ -113,7 +88,7 @@ export default function ChatTab() {
             );
           })}
 
-          {conversations.length === 0 && groups.length === 0 && (
+          {conversations.length === 0 && (
             <View style={s.empty}><Text style={{ fontSize: 36, marginBottom: 10 }}>🤖</Text><Text style={s.emptyT}>운동에 대해 뭐든 물어보세요.</Text></View>
           )}
         </ScrollView>
