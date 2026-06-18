@@ -260,18 +260,20 @@ function buildChecklist(d: ExerciseProgress): { text: string; done: boolean }[] 
 const CH = 150;
 
 function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: Metric; period: Period }) {
+  // 선택한 기간만 — 기록이 없으면 전체로 폴백하지 않고 "기간 내 기록 없음"을 보여준다.
+  const cut = Date.now() - PERIOD_DAYS[period] * 86400000;
+  const inRange = (p: SeriesPoint) => period === 'all' || new Date(p.date).getTime() >= cut;
+  const periodLabel = PERIODS.find(([k]) => k === period)?.[1] ?? '';
+
   if (metric === '1rm' || metric === 'maxw') {
-    const all = metric === '1rm' ? data.e1rm : data.maxWeight;
-    const cut = Date.now() - PERIOD_DAYS[period] * 86400000;
-    const pts = period === 'all' ? all : all.filter(p => new Date(p.date).getTime() >= cut);
+    const pts = (metric === '1rm' ? data.e1rm : data.maxWeight).filter(inRange);
+    if (pts.length < 2) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
     const unit = metric === '1rm' ? '추정 1RM' : '최대 수행 무게';
-    return <LineChart pts={pts.length >= 2 ? pts : all} unit={`kg · ${unit}`}
+    return <LineChart pts={pts} unit={`kg · ${unit}`}
       prDate={metric === '1rm' ? data.prDate : null} plateauWeeks={metric === '1rm' ? data.plateauWeeks : 0} />;
   }
-  const src = metric === 'vol' ? data.weeklyVolume : data.weeklyFreq;
-  const cut = Date.now() - PERIOD_DAYS[period] * 86400000;
-  let pts = period === 'all' ? src : src.filter(p => new Date(p.date).getTime() >= cut);
-  if (pts.length < 4) pts = src.slice(-12);
+  const pts = (metric === 'vol' ? data.weeklyVolume : data.weeklyFreq).filter(inRange);
+  if (pts.length < 1) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
   return <BarChart pts={pts} unit={metric === 'vol' ? '주간 볼륨' : '주 운동 횟수'} isVol={metric === 'vol'} />;
 }
 
@@ -280,9 +282,11 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
   if (pts.length < 2) return <Empty />;
   const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
   const vals = pts.map(p => p.value);
-  const max = Math.max(...vals), min = Math.min(...vals);
-  const range = max - min || 1;
-  const y = (v: number) => 8 + (1 - (v - min) / range) * (CH - 20);
+  const rawMax = Math.max(...vals), rawMin = Math.min(...vals);
+  // 값 범위에 위아래 여백을 둬서 작은 차이가 화면 전체 높이로 과장되지 않게 한다.
+  const span = rawMax - rawMin || Math.max(1, rawMax * 0.05);
+  const lo = rawMin - span * 0.35, hi = rawMax + span * 0.35;
+  const y = (v: number) => 8 + (1 - (v - lo) / (hi - lo)) * (CH - 20);
   const poly = pts.map((p, i) => `${xs[i].toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const area = `${poly} ${W},${CH} 0,${CH}`;
   const prIdx = prDate ? pts.findIndex(p => p.date === prDate) : -1;
@@ -373,7 +377,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
   );
 }
 
-const Empty = () => <View style={[s.barrow, { alignItems: 'center', justifyContent: 'center' }]}><Text style={s.clT}>데이터가 부족해요</Text></View>;
+const Empty = ({ label }: { label?: string }) => <View style={[s.barrow, { alignItems: 'center', justifyContent: 'center', height: CH }]}><Text style={s.clT}>{label ?? '데이터가 부족해요'}</Text></View>;
 const Legend = ({ color, label }: { color: string; label: string }) => (
   <View style={s.lg}><View style={[s.lgDot, { backgroundColor: color }]} /><Text style={s.legT}>{label}</Text></View>
 );
