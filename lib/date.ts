@@ -6,6 +6,23 @@ export function parseLocalDate(dateStr: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
+/** Date → 로컬 기준 'YYYY-MM-DD' (toISOString은 UTC라 자정 전후로 하루 어긋남). */
+export function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 로컬 기준 오늘 'YYYY-MM-DD'. */
+export function todayStr(): string {
+  return toDateStr(new Date());
+}
+
+/** 'YYYY-MM-DD'에 n일 더한 로컬 날짜 문자열 (TZ 안전). */
+export function addDaysStr(dateStr: string, n: number): string {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + n);
+  return toDateStr(d);
+}
+
 /** 한국어 요일 한 글자 (일~토). */
 export function weekdayKo(date: Date): string {
   return WEEKDAYS_KO[date.getDay()];

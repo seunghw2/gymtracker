@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, SessionSummary } from '../../db/queries';
-import { formatShortWithDay, formatShortWithWeekday } from '../../lib/date';
+import { formatShortWithDay, formatShortWithWeekday, todayStr, toDateStr, addDaysStr } from '../../lib/date';
 import { formatDuration } from '../../lib/format';
 import SessionCard from '../../components/SessionCard';
 import SessionPreviewSheet from '../../components/SessionPreviewSheet';
@@ -19,16 +19,15 @@ import { useWorkoutStore } from '../../store/useStore';
 
 function calcStreak(dates: string[]): number {
   if (dates.length === 0) return 0;
-  const today = new Date().toISOString().slice(0, 10);
   const sorted = [...new Set(dates)].sort().reverse();
+  const cur = new Date(); cur.setHours(0, 0, 0, 0);
+  let current = toDateStr(cur);
   let streak = 0;
-  let current = today;
   for (const d of sorted) {
     if (d === current) {
       streak++;
-      const prev = new Date(current);
-      prev.setDate(prev.getDate() - 1);
-      current = prev.toISOString().slice(0, 10);
+      cur.setDate(cur.getDate() - 1);
+      current = toDateStr(cur);
     } else if (d < current) {
       break;
     }
@@ -79,7 +78,7 @@ export default function HistoryScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'timeline' | 'month'>('timeline');
   const [preview, setPreview] = useState<SessionSummary | null>(null);
-  const today = now.toISOString().slice(0, 10);
+  const today = todayStr();
 
   const load = useCallback(async () => {
     const [dates, allDates, monthStats, hist] = await Promise.all([
@@ -185,7 +184,7 @@ export default function HistoryScreen() {
                       <View style={styles.tlRow}>
                         <View style={styles.rail}><View style={styles.dotEmpty} /><View style={styles.railLine} /></View>
                         <Text style={styles.restText}>
-                          {mdShort(addDays(older.date, 1))}–{mdShort(addDays(s.date, -1))} 휴식 {gap}일
+                          {mdShort(addDaysStr(older.date, 1))}–{mdShort(addDaysStr(s.date, -1))} 휴식 {gap}일
                         </Text>
                       </View>
                     )}
@@ -242,11 +241,6 @@ export default function HistoryScreen() {
   );
 }
 
-function addDays(iso: string, n: number): string {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },

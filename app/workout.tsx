@@ -67,7 +67,7 @@ import DatePickerSheet from '../components/DatePickerSheet';
 import SessionCard from '../components/SessionCard';
 import RulerPicker from '../components/RulerPicker';
 import { useUiStore } from '../store/useUiStore';
-import { formatDateWithDay } from '../lib/date';
+import { formatDateWithDay, todayStr } from '../lib/date';
 import { toDisplay, fromInput, unitLabel } from '../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -112,7 +112,7 @@ const SET_TYPE_META: Record<SetType, { label: string; color: string } | null> = 
 };
 
 function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return todayStr();
 }
 
 function formatDate(dateStr: string) {

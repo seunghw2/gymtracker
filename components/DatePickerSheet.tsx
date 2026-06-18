@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { weekdayKo } from '../lib/date';
+import { weekdayKo, toDateStr } from '../lib/date';
 
 type Props = {
   visible: boolean;
@@ -26,7 +26,7 @@ export default function DatePickerSheet({ visible, value, onConfirm, onClose }: 
               <Text style={styles.cancel}>취소</Text>
             </Pressable>
             <Text style={styles.title}>날짜 선택</Text>
-            <Pressable onPress={() => onConfirm(temp.toISOString().slice(0, 10))} hitSlop={8}>
+            <Pressable onPress={() => onConfirm(toDateStr(temp))} hitSlop={8}>
               <Text style={styles.confirm}>확인</Text>
             </Pressable>
           </View>

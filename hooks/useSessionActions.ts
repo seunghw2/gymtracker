@@ -16,7 +16,9 @@ import { useWorkoutStore, ExerciseEntry } from '../store/useStore';
 import { useUiStore } from '../store/useUiStore';
 
 function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
+  // 로컬 기준 'YYYY-MM-DD' (toISOString은 UTC라 자정 전후로 하루 어긋남)
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /**

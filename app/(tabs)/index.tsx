@@ -38,10 +38,11 @@ const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return iso(new Date());
 }
 function iso(d: Date) {
-  return d.toISOString().slice(0, 10);
+  // 로컬 기준 'YYYY-MM-DD' (toISOString은 UTC라 자정 전후로 하루 어긋남)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function getWeekRange() {
   const today = new Date();
