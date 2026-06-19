@@ -80,6 +80,8 @@ export const COLORS = {
 export const ACCENT = '#FF3B30';
 /** 레드 액센트 위 텍스트(흰색). */
 export const ACCENT_INK = '#FFFFFF';
+/** 레드 액센트 연한 배경(틴트) — 처방·추가 버튼 등 강조 표면. */
+export const ACCENT_TINT = 'rgba(255,59,48,0.15)';
 /** 증가/긍정 의미색(브랜드색과 분리). */
 export const UP = COLORS.green;
 

@@ -9,8 +9,9 @@ import SessionPreviewSheet from '../SessionPreviewSheet';
 import { RT, toneColor } from './theme';
 import {
   Eyebrow, Card, Tile, Ring, Donut, VBars, StackedBar, BalanceSplit, ProgressRow,
-  BandRow, Sparkline, MiniLine, Strip, StatGrid, BigNum, Delta,
+  BandRow, Sparkline, MiniLine, Strip, StatGrid, BigNum, Delta, StatusDot,
 } from './charts';
+import { ACCENT, ACCENT_TINT } from '../../constants/colors';
 
 const HIDDEN_KEY = 'ai_report_hidden';
 const TONE_KEY = 'ai_coach_tone';
@@ -95,7 +96,7 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
       <View style={s.kpiGrid}>
         {show('kpi_attendance') && <View style={[s.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'good'} />{editDot('kpi_attendance')}</View>}
         {show('kpi_weight') && <View style={[s.kpiWrap, editing && hidden.has('kpi_weight') && { opacity: 0.4 }]}><Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} tone={w?.delta?.startsWith('-') ? 'good' : undefined} />{editDot('kpi_weight')}</View>}
-        {show('kpi_volume') && <View style={[s.kpiWrap, editing && hidden.has('kpi_volume') && { opacity: 0.4 }]}><View style={s.kpi}><Sparkline points={vol.length ? vol : [0]} /><Text style={s.kpiL}>주간 볼륨</Text></View>{editDot('kpi_volume')}</View>}
+        {show('kpi_volume') && <View style={[s.kpiWrap, editing && hidden.has('kpi_volume') && { opacity: 0.4 }]}><View style={s.kpi}><Sparkline points={vol.length ? vol : [0]} color="#9A9A9E" /><Text style={s.kpiL}>주간 볼륨</Text></View>{editDot('kpi_volume')}</View>}
         {show('kpi_stall') && <View style={[s.kpiWrap, editing && hidden.has('kpi_stall') && { opacity: 0.4 }]}><Kpi v={`${stallN}건`} l="정체 종목" tone={stallN > 0 ? 'warn' : 'good'} />{editDot('kpi_stall')}</View>}
       </View>
 
@@ -104,7 +105,10 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
           {cards.highlights.map((h, i) => (
             <View key={i} style={s.hl}>
               <Text style={s.hlL}>{h.label}</Text>
-              <Text style={[s.hlV, { color: toneColor(h.tone) }]}>{h.value}</Text>
+              <View style={s.hlVRow}>
+                <Text style={s.hlV}>{h.value}</Text>
+                <StatusDot tone={h.tone} size={7} />
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -114,7 +118,7 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
         <View style={[s.insight, s.diag]}><Text style={[s.insightK, { color: RT.purple }]}>진단</Text><Text style={s.insightX}>{r.summary.oneLiner}</Text></View>
       )}
       {!!r.prescription?.action && (
-        <View style={[s.insight, s.presc]}><Text style={[s.insightK, { color: RT.good }]}>처방 · 딱 하나</Text><Text style={s.insightX}>{r.prescription.action}</Text></View>
+        <View style={[s.insight, s.presc]}><Text style={[s.insightK, { color: ACCENT }]}>처방 · 딱 하나</Text><Text style={s.insightX}>{r.prescription.action}</Text></View>
       )}
       <View style={s.drill}><Text style={s.drillT}>숫자는 데이터 탭 · 해설은 코치 탭에서</Text></View>
     </View>
@@ -485,7 +489,10 @@ function CoachTab({ r, editing, hidden, toggle, tone, onTone }: { r: AiReportV2;
 function Kpi({ v, l, sub, tone }: { v: string; l: string; sub?: string; tone?: string }) {
   return (
     <View style={s.kpi}>
-      <Text style={[s.kpiV, tone && { color: toneColor(tone) }]}>{v}</Text>
+      <View style={s.kpiTop}>
+        <Text style={s.kpiV}>{v}</Text>
+        <StatusDot tone={tone} />
+      </View>
       <Text style={s.kpiL}>{l}</Text>
       {!!sub && <Text style={s.kpiSub}>{sub}</Text>}
     </View>
@@ -517,16 +524,18 @@ const s = StyleSheet.create({
   kpiWrap: { width: '48%', position: 'relative' },
   kpiEdit: { position: 'absolute', top: 6, right: 8 },
   kpi: { width: '100%', backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, borderRadius: 14, padding: 13, minHeight: 74, justifyContent: 'center' },
+  kpiTop: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   kpiV: { color: RT.ink, fontSize: 21, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
   kpiL: { color: RT.ink2, fontSize: 11, marginTop: 5 },
   kpiSub: { color: RT.ink3, fontSize: 11, marginTop: 3, fontVariant: ['tabular-nums'] },
   hlRow: { gap: 8, paddingBottom: 12 },
   hl: { backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, borderRadius: 13, padding: 11, paddingHorizontal: 13, minWidth: 124 },
   hlL: { color: RT.ink2, fontSize: 11 },
-  hlV: { fontSize: 14, fontWeight: '800', marginTop: 4 },
+  hlVRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  hlV: { color: RT.ink, fontSize: 14, fontWeight: '800' },
   insight: { backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair, borderRadius: 14, padding: 13, paddingHorizontal: 14, marginBottom: 9 },
   diag: { borderLeftWidth: 3, borderLeftColor: RT.purple },
-  presc: { borderLeftWidth: 3, borderLeftColor: RT.good },
+  presc: { borderLeftWidth: 3, borderLeftColor: ACCENT, backgroundColor: ACCENT_TINT },
   insightK: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, marginBottom: 4 },
   insightX: { color: RT.ink, fontSize: 13.5, lineHeight: 20 },
   drill: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: RT.hair, borderStyle: 'dashed', borderRadius: 13, padding: 12, paddingHorizontal: 14, marginTop: 3 },

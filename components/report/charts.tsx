@@ -2,7 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Svg, { Circle, Polyline, Rect, Path } from 'react-native-svg';
 import { RT, toneColor, toneBg, catColor } from './theme';
-import { ACCENT } from '../../constants/colors';
+import { ACCENT, COLORS } from '../../constants/colors';
+
+/** 상태 점 — 데이터 상태 표시 전용(good=초록, warn/bad=주황). 액션색(레드) 아님. */
+export function StatusDot({ tone, size = 8 }: { tone?: string; size?: number }) {
+  if (!tone || tone === 'flat' || tone === 'plain') return null;
+  const color = tone === 'good' ? COLORS.green : COLORS.orange;
+  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
+}
 
 // ── 타이포/공용 ────────────────────────────────────────────────────────
 export function Eyebrow({ label }: { label: string }) {

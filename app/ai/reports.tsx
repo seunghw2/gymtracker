@@ -8,8 +8,9 @@ import ReportTabs from '../../components/report/ReportTabs';
 import BriefingLoading from '../../components/BriefingLoading';
 import { RT } from '../../components/report/theme';
 
-const GREEN = RT.good;
-const GREEN_INK = '#06270d';
+// 기간탭·주차칩·선택체크 = 네비/액션 → 레드 액센트(상태색 아님).
+const GREEN = RT.action;
+const GREEN_INK = '#FFFFFF';
 const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기' };
 
 // 성공 리포트 캐시 — 한 번 본 기간은 재방문 시 스피너 없이 즉시 표시.
