@@ -148,7 +148,7 @@ export default function ExercisesTab() {
       </View>
 
       {/* 그룹 펠릿 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pellets}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pelletBar} contentContainerStyle={s.pellets}>
         {pellets.filter(p => p.kind === 'system').map(p => p.kind === 'system' && (
           <GroupPellet key={`sys:${p.key}`} label={p.name} locked active={selKey === `sys:${p.key}`} onPress={() => selectPellet(`sys:${p.key}`)} />
         ))}
@@ -235,7 +235,7 @@ function SystemGroupView({ kind, rows, pinned, sort, sortLabel, onSort, toggleFa
   const b = bucketExercises(rows, name => isPin(name, pinned), sort);
   const [staleOpen, setStaleOpen] = useState(false);
   return (
-    <ScrollView contentContainerStyle={s.body} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={SEM.brand} />}>
+    <ScrollView style={s.flex1} contentContainerStyle={s.body} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={SEM.brand} />}>
       {rows.length === 0 && <View style={s.empty}><Text style={s.emptyT}>{kind === 'all' ? '운동을 기록하면 종목별 추이가 여기 모여요.' : '이 기간에 한 운동이 없어요.'}</Text></View>}
       {b.pinned.length > 0 && <Section title="★ 보유">{b.pinned.map(r => <ExRow key={r.exerciseId} r={r} fav onStar={() => toggleFav(r.name)} onReport={() => goReport(r)} />)}</Section>}
       {b.highlight.length > 0 && <Section title="▲ 주목 · 신기록" tint={SEM.good}>{b.highlight.map(r => <ExRow key={r.exerciseId} r={r} fav={isPin(r.name, pinned)} onStar={() => toggleFav(r.name)} onReport={() => goReport(r)} />)}</Section>}
@@ -281,6 +281,7 @@ function CustomGroupView({ group, rows, search, brandById, onReorder, onRemove, 
       keyExtractor={r => String(r.exerciseId)}
       onDragEnd={({ from, to }) => onReorder(from, to)}
       activationDistance={12}
+      style={s.flex1}
       contentContainerStyle={s.body}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={SEM.brand} />}
       ListHeaderComponent={<View style={s.sech}><Text style={s.sechT}>{group.name} · 담은 순서</Text></View>}
@@ -358,6 +359,7 @@ function Spark({ data, up }: { data: number[]; up: boolean }) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
+  flex1: { flex: 1 },
   headTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 6, paddingBottom: 6 },
   title: { color: '#fff', fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
   doneT: { color: SEM.brand, fontSize: 16, fontWeight: '700' },
@@ -365,7 +367,8 @@ const s = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 9, marginHorizontal: 16, marginVertical: 6, backgroundColor: SEM.surface2, borderWidth: 1, borderColor: SEM.line, borderRadius: 13, paddingHorizontal: 13, paddingVertical: 11 },
   searchInput: { flex: 1, color: '#fff', fontSize: 15, padding: 0 },
 
-  pellets: { gap: 8, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' },
+  pelletBar: { flexGrow: 0, flexShrink: 0, height: 52 },
+  pellets: { gap: 8, paddingHorizontal: 16, alignItems: 'center', height: 52 },
   pellet: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 11, backgroundColor: '#16161a' },
   pelletOn: { backgroundColor: '#2a2a34' },
   pelletT: { color: SEM.ink3, fontSize: 15, fontWeight: '700' },
