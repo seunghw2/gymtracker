@@ -6,7 +6,7 @@ import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flat
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { SEM, COLORS } from '../../constants/colors';
+import { SEM, ACCENT_TINT } from '../../constants/colors';
 import { MUSCLE_KO, MUSCLE_COLOR } from '../../constants/exercises';
 import {
   getExerciseSummaries, getExercises, getSetting, setSetting, ExerciseSummary, Exercise,
@@ -22,7 +22,8 @@ const KO_COLOR: Record<string, string> = Object.fromEntries(
   Object.entries(MUSCLE_KO).map(([en, ko]) => [ko, MUSCLE_COLOR[en] ?? SEM.ink3]),
 );
 const partColor = (ko: string | null) => (ko && KO_COLOR[ko]) || SEM.ink3;
-const INFO = COLORS.blue;
+// 추가 버튼(그룹·종목) = 액션 → 레드 액센트(이 화면 파랑 info 제거).
+const INFO = SEM.brand;
 
 function weekRanges() {
   const d = new Date(); d.setHours(0, 0, 0, 0);
@@ -420,7 +421,7 @@ const s = StyleSheet.create({
   memDel: { color: SEM.ink3, fontSize: 15, paddingLeft: 4 },
 
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingVertical: 18 },
-  addPlus: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#15202e', alignItems: 'center', justifyContent: 'center' },
+  addPlus: { width: 30, height: 30, borderRadius: 15, backgroundColor: ACCENT_TINT, alignItems: 'center', justifyContent: 'center' },
   addRowT: { color: INFO, fontSize: 16, fontWeight: '700' },
 
   staleHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginTop: 14, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: SEM.surface2, borderRadius: 13 },
