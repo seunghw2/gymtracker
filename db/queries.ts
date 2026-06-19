@@ -11,3 +11,4 @@ export * from './api/templates';
 export * from './api/ai';
 export * from './api/notifications';
 export * from './api/chat';
+export * from './api/exerciseGroups';
