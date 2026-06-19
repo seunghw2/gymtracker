@@ -19,19 +19,13 @@ import { useWorkoutStore } from '../../store/useStore';
 
 function calcStreak(dates: string[]): number {
   if (dates.length === 0) return 0;
-  const sorted = [...new Set(dates)].sort().reverse();
+  // 오늘 아직 운동 안 했으면 어제부터 — 오늘은 안 끝났으니 연속을 끊지 않음(백엔드 streak와 동일 규칙)
+  const set = new Set(dates);
   const cur = new Date(); cur.setHours(0, 0, 0, 0);
-  let current = toDateStr(cur);
+  let key = toDateStr(cur);
+  if (!set.has(key)) { cur.setDate(cur.getDate() - 1); key = toDateStr(cur); }
   let streak = 0;
-  for (const d of sorted) {
-    if (d === current) {
-      streak++;
-      cur.setDate(cur.getDate() - 1);
-      current = toDateStr(cur);
-    } else if (d < current) {
-      break;
-    }
-  }
+  while (set.has(key)) { streak++; cur.setDate(cur.getDate() - 1); key = toDateStr(cur); }
   return streak;
 }
 
