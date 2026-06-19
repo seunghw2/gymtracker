@@ -162,6 +162,7 @@ export default function ExercisesTab() {
         {!edit && <Pressable style={s.addPellet} onPress={addGroup}><Text style={s.addPelletT}>+ 그룹추가</Text></Pressable>}
       </ScrollView>
 
+      <View style={s.flex1}>
       {sel?.kind === 'custom'
         ? <CustomGroupView
             group={groups.find(g => g.id === sel.id)!}
@@ -188,6 +189,7 @@ export default function ExercisesTab() {
             pinned={pinned} sort={sort} sortLabel={sortLabel}
             onSort={() => setShowSort(true)} toggleFav={toggleFav} goReport={goReport}
             refreshing={refreshing} onRefresh={onRefresh} />}
+      </View>
 
       {/* 정렬 시트 */}
       <Modal visible={showSort} transparent animationType="slide" onRequestClose={() => setShowSort(false)}>
