@@ -35,6 +35,7 @@ import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
+const REPORT_CACHE_KEY = 'home_report_week';
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function getTodayStr() {
@@ -120,11 +121,29 @@ export default function BriefingHome() {
       setReport(r.report);
       setReportPct(r.percent ?? 0);
       setReportStep(r.step ?? null);
+      // 마지막 성공 브리핑을 디스크에 저장 → 다음 실행 때 즉시 복원(아래 hydrate)
+      if (r.status === 'SUCCESS' && r.report) {
+        AsyncStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(r.report)).catch(() => {});
+      }
     } catch {
       setReportStatus('FAILED');
     } finally {
       setReportFetched(true);   // 리포트 응답 전엔 폴백 헤드라인 대신 스켈레톤(깜빡임 방지)
     }
+  }, []);
+
+  // 콜드 스타트 즉시 표시: 마지막 성공 브리핑을 디스크에서 바로 띄우고(네트워크 안 기다림),
+  // 위 load가 백그라운드로 갱신(stale-while-revalidate). 이미 본 화면이면 로딩 없이 바로 뜸.
+  useEffect(() => {
+    AsyncStorage.getItem(REPORT_CACHE_KEY).then(raw => {
+      if (!raw) return;
+      try {
+        const cached = JSON.parse(raw) as AiReportV2;
+        setReport(prev => prev ?? cached);
+        setReportStatus(prev => prev || 'SUCCESS');
+        setReportFetched(true);
+      } catch { /* ignore */ }
+    }).catch(() => {});
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));

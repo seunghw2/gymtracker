@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, UserSummary } from '../lib/api';
 import { tokenStore } from '../lib/tokenStore';
 import { clearAllCache } from '../lib/cache';
@@ -61,6 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     await tokenStore.clear();
     clearAllCache();
     clearSettingsCache();
+    AsyncStorage.removeItem('home_report_week').catch(() => {});
     set({ status: 'guest', user: null });
   },
 
@@ -69,6 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     await tokenStore.clear();
     clearAllCache();
     clearSettingsCache();
+    AsyncStorage.removeItem('home_report_week').catch(() => {});
     set({ status: 'guest', user: null });
   },
 }));
