@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { authApi, UserSummary } from '../lib/api';
 import { tokenStore } from '../lib/tokenStore';
+import { clearAllCache } from '../lib/cache';
+import { clearSettingsCache } from '../db/api/settings';
 
 type AuthState = {
   status: 'unknown' | 'authenticated' | 'guest';
@@ -57,12 +59,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       try { await authApi.logout(refreshToken); } catch { /* ignore */ }
     }
     await tokenStore.clear();
+    clearAllCache();
+    clearSettingsCache();
     set({ status: 'guest', user: null });
   },
 
   deleteAccount: async () => {
     await authApi.deleteAccount(); // 실패 시 throw — 화면에서 안내
     await tokenStore.clear();
+    clearAllCache();
+    clearSettingsCache();
     set({ status: 'guest', user: null });
   },
 }));

@@ -1,4 +1,5 @@
 import { apiRequest } from '../../lib/api';
+import { cached } from '../../lib/cache';
 import type {
   TrainedExercise, VolumeStats, VolumeRange, ExerciseRecord,
   MuscleFrequency, PeriodSummary, ExerciseUsage,
@@ -39,10 +40,12 @@ export async function getActualRmHistory(exercise_id: number, reps: number): Pro
 }
 
 export async function getTrainedExercises(): Promise<TrainedExercise[]> {
-  const list = await apiRequest<{ id: number; name: string; brand: string | null; note: string | null; trackingType: string | null }[]>(
-    '/api/v1/stats/trained-exercises'
-  );
-  return list.map(e => ({ id: e.id, name: e.name, brand: e.brand, note: e.note ?? null, tracking_type: e.trackingType === 'TIME' ? 'TIME' : 'REPS' }));
+  return cached('ex:trained', 45_000, async () => {
+    const list = await apiRequest<{ id: number; name: string; brand: string | null; note: string | null; trackingType: string | null }[]>(
+      '/api/v1/stats/trained-exercises'
+    );
+    return list.map(e => ({ id: e.id, name: e.name, brand: e.brand, note: e.note ?? null, tracking_type: e.trackingType === 'TIME' ? 'TIME' : 'REPS' }));
+  });
 }
 
 export async function getVolumeStats(range: VolumeRange = 'recent'): Promise<VolumeStats> {
@@ -120,7 +123,7 @@ export type ExerciseProgress = {
 
 /** 허브용: 운동한 적 있는 전 종목 요약(1RM·PR·정체·스파크)을 한 번에. */
 export async function getExerciseSummaries(): Promise<ExerciseSummary[]> {
-  return apiRequest<ExerciseSummary[]>('/api/v1/stats/exercise-summary');
+  return cached('ex:summaries', 45_000, () => apiRequest<ExerciseSummary[]>('/api/v1/stats/exercise-summary'));
 }
 
 /** 종목 진척 시계열(1RM·최대무게 일별, 볼륨·빈도 주별). */

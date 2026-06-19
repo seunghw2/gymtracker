@@ -17,6 +17,11 @@ export async function setSetting(key: string, value: string): Promise<void> {
   settingsCache = null;
 }
 
+/** 로그아웃/계정 전환 시 호출 — 이전 계정 설정이 남지 않게. */
+export function clearSettingsCache(): void {
+  settingsCache = null;
+}
+
 // 부위 태그 목록(사용자 편집 가능). 미설정 시 기본 7개.
 export const DEFAULT_BODY_TAGS = ['가슴', '등', '어깨', '하체', '팔', '코어', '유산소'];
 
