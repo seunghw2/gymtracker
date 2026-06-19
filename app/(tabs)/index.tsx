@@ -33,9 +33,10 @@ import RulerPicker from '../../components/RulerPicker';
 import BriefingLoading from '../../components/BriefingLoading';
 import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readCache, writeCache } from '../../lib/diskCache';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
-const REPORT_CACHE_KEY = 'home_report_week';
+const REPORT_CACHE_KEY = 'briefing:week';
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function getTodayStr() {
@@ -122,9 +123,7 @@ export default function BriefingHome() {
       setReportPct(r.percent ?? 0);
       setReportStep(r.step ?? null);
       // 마지막 성공 브리핑을 디스크에 저장 → 다음 실행 때 즉시 복원(아래 hydrate)
-      if (r.status === 'SUCCESS' && r.report) {
-        AsyncStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(r.report)).catch(() => {});
-      }
+      if (r.status === 'SUCCESS' && r.report) writeCache(REPORT_CACHE_KEY, r.report);
     } catch {
       setReportStatus('FAILED');
     } finally {
@@ -135,15 +134,12 @@ export default function BriefingHome() {
   // 콜드 스타트 즉시 표시: 마지막 성공 브리핑을 디스크에서 바로 띄우고(네트워크 안 기다림),
   // 위 load가 백그라운드로 갱신(stale-while-revalidate). 이미 본 화면이면 로딩 없이 바로 뜸.
   useEffect(() => {
-    AsyncStorage.getItem(REPORT_CACHE_KEY).then(raw => {
-      if (!raw) return;
-      try {
-        const cached = JSON.parse(raw) as AiReportV2;
-        setReport(prev => prev ?? cached);
-        setReportStatus(prev => prev || 'SUCCESS');
-        setReportFetched(true);
-      } catch { /* ignore */ }
-    }).catch(() => {});
+    readCache<AiReportV2>(REPORT_CACHE_KEY).then(cached => {
+      if (!cached) return;
+      setReport(prev => prev ?? cached);
+      setReportStatus(prev => prev || 'SUCCESS');
+      setReportFetched(true);
+    });
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));

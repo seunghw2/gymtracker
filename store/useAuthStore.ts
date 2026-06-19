@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, UserSummary } from '../lib/api';
 import { tokenStore } from '../lib/tokenStore';
 import { clearAllCache } from '../lib/cache';
+import { clearDiskCache } from '../lib/diskCache';
 import { clearSettingsCache } from '../db/api/settings';
 
 type AuthState = {
@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     await tokenStore.clear();
     clearAllCache();
     clearSettingsCache();
-    AsyncStorage.removeItem('home_report_week').catch(() => {});
+    clearDiskCache();
     set({ status: 'guest', user: null });
   },
 
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     await tokenStore.clear();
     clearAllCache();
     clearSettingsCache();
-    AsyncStorage.removeItem('home_report_week').catch(() => {});
+    clearDiskCache();
     set({ status: 'guest', user: null });
   },
 }));

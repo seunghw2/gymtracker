@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, RefreshControl, TextInput, Modal,
 } from 'react-native';
@@ -10,6 +10,7 @@ import { MUSCLE_KO, MUSCLE_COLOR } from '../../constants/exercises';
 import { getExerciseSummaries, ExerciseSummary } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { bucketExercises, sortExercises, SortKey, SORTS } from '../../lib/exerciseSections';
+import { readCache, writeCache } from '../../lib/diskCache';
 
 // 부위(한글 라벨) → 식별 색. 기존 MUSCLE_KO/MUSCLE_COLOR(영문키) 재사용.
 const KO_COLOR: Record<string, string> = Object.fromEntries(
@@ -35,9 +36,17 @@ export default function ExercisesTab() {
       const [list, pins] = await Promise.all([getExerciseSummaries(), loadPinned()]);
       setRows(list);
       setPinned(pins);
+      writeCache('exercise:summaries', list);   // 다음 콜드 스타트용
     } catch {
-      setRows([]);
+      /* 네트워크 실패 시 캐시된 행 유지 */
     }
+  }, []);
+
+  // 콜드 스타트 즉시 표시: 마지막 종목 목록을 디스크에서 바로 띄움(load가 백그라운드 갱신)
+  useEffect(() => {
+    readCache<ExerciseSummary[]>('exercise:summaries').then(c => {
+      if (c && c.length) setRows(prev => (prev.length ? prev : c));
+    });
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
