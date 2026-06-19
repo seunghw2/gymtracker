@@ -148,13 +148,6 @@ export default function ExercisesTab() {
         {edit && <Pressable onPress={() => setEdit(false)} hitSlop={10}><Text style={s.doneT}>완료</Text></Pressable>}
       </View>
 
-      <View style={s.searchBar}>
-        <Ionicons name="search" size={16} color={SEM.ink4} />
-        <TextInput style={s.searchInput} value={q} onChangeText={setQ} autoCapitalize="none"
-          placeholder={`종목 검색 · ${rows.length}개`} placeholderTextColor={SEM.ink4} />
-        {q.length > 0 && <Pressable onPress={() => setQ('')} hitSlop={8}><Ionicons name="close-circle" size={16} color={SEM.ink4} /></Pressable>}
-      </View>
-
       {/* 그룹 펠릿 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pelletBar} contentContainerStyle={s.pellets}>
         {pellets.filter(p => p.kind === 'system').map(p => p.kind === 'system' && (
@@ -280,7 +273,25 @@ function CustomGroupView({ group, rows, search, brandById, onReorder, onRemove, 
   onAdd: () => void; onRow: (r: ExerciseSummary) => void; refreshing: boolean; onRefresh: () => void;
 }) {
   const data = search(rows);
-  const renderItem = ({ item, getIndex, drag, isActive }: RenderItemParams<ExerciseSummary>) => (
+  const header = <View style={s.sech}><Text style={s.sechT}>{group.name} · 담은 순서</Text></View>;
+  const addBtn = (
+    <Pressable style={s.addRow} onPress={onAdd}>
+      <View style={s.addPlus}><Text style={{ color: INFO, fontSize: 18, fontWeight: '700' }}>＋</Text></View>
+      <Text style={s.addRowT}>종목 추가하기</Text>
+    </Pressable>
+  );
+  // 빈 그룹 — DraggableFlatList는 데이터 없으면 header/footer를 안 그려서, 일반 뷰로 항상 표시
+  if (data.length === 0) {
+    return (
+      <ScrollView style={s.flex1} contentContainerStyle={s.body}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={SEM.brand} />}>
+        {header}
+        <View style={s.empty}><Text style={s.emptyT}>이 그룹에 담긴 종목이 없어요</Text></View>
+        {addBtn}
+      </ScrollView>
+    );
+  }
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<ExerciseSummary>) => (
     <Pressable style={[s.row, isActive && { backgroundColor: '#111' }]} onPress={() => onRow(item)}>
       <Pressable onPressIn={drag} hitSlop={8}><Text style={s.handle}>≡</Text></Pressable>
       <View style={[s.partDot, { backgroundColor: partColor(item.bodyPart) }]} />
@@ -301,16 +312,8 @@ function CustomGroupView({ group, rows, search, brandById, onReorder, onRemove, 
       style={s.flex1}
       contentContainerStyle={s.body}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={SEM.brand} />}
-      ListHeaderComponent={<View style={s.sech}><Text style={s.sechT}>{group.name} · 담은 순서</Text></View>}
-      ListFooterComponent={(
-        <>
-          {data.length === 0 && <View style={s.empty}><Text style={s.emptyT}>이 그룹에 담긴 종목이 없어요</Text></View>}
-          <Pressable style={s.addRow} onPress={onAdd}>
-            <View style={s.addPlus}><Text style={{ color: INFO, fontSize: 18, fontWeight: '700' }}>＋</Text></View>
-            <Text style={s.addRowT}>종목 추가하기</Text>
-          </Pressable>
-        </>
-      )}
+      ListHeaderComponent={header}
+      ListFooterComponent={addBtn}
       renderItem={renderItem}
     />
   );
