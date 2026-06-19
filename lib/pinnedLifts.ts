@@ -5,7 +5,8 @@ import { getSetting, setSetting } from '../db/queries';
  * 키: ai_pinned_lifts (쉼표 구분 종목명). 비어 있으면 기본 키워드로 판정.
  */
 const PINNED_KEY = 'ai_pinned_lifts';
-const DEFAULT = ['squat', 'bench press', 'deadlift', 'overhead press', 'lat pulldown'];
+// 기본 주력(핀 안 했을 때) — 5대운동 + 풀업
+const DEFAULT = ['squat', 'deadlift', 'bench press', 'overhead press', 'barbell row', 'pull up'];
 
 export async function loadPinned(): Promise<Set<string>> {
   const v = await getSetting(PINNED_KEY, '');
