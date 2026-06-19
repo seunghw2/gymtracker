@@ -302,7 +302,7 @@ export const useWorkoutStore = create<WorkoutState>()(persist((set) => ({
   }),
 }));
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>()(persist((set) => ({
   restDurationSec: 90,
   goalWeightKg: 70,
   goalBodyFatPct: 15,
@@ -314,4 +314,16 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setGoalBodyFat: (pct) => set({ goalBodyFatPct: pct }),
   setUnitKg: (isKg) => set({ unitKg: isKg }),
   setSoundOnSilent: (on) => set({ soundOnSilent: on }),
+}), {
+  // 백엔드(getSetting)가 정본이지만, 콜드 런치 시 마지막 값을 즉시 복원해
+  // 단위·휴식·목표가 기본값(90s·kg)으로 리셋되는 문제를 막는 로컬 캐시.
+  name: 'app-settings',
+  storage: createJSONStorage(() => AsyncStorage),
+  partialize: (s) => ({
+    restDurationSec: s.restDurationSec,
+    goalWeightKg: s.goalWeightKg,
+    goalBodyFatPct: s.goalBodyFatPct,
+    unitKg: s.unitKg,
+    soundOnSilent: s.soundOnSilent,
+  }),
 }));

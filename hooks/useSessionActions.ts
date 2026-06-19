@@ -14,6 +14,7 @@ import {
 } from '../db/queries';
 import { useWorkoutStore, ExerciseEntry } from '../store/useStore';
 import { useUiStore } from '../store/useUiStore';
+import { logError } from '../lib/log';
 
 function getTodayStr() {
   // 로컬 기준 'YYYY-MM-DD' (toISOString은 UTC라 자정 전후로 하루 어긋남)
@@ -44,10 +45,18 @@ export function useSessionActions() {
 
   // 과거 세션을 오늘 새 세션으로 그대로 시작 (입력칸 미완료 상태로 프리필)
   const startAsIs = async (session: SessionSummary) => {
-    const [sets, trained] = await Promise.all([
-      getSessionSets(session.id),
-      getTrainedExercises().catch(() => [] as TrainedExercise[]),
-    ]);
+    let sets, trained;
+    try {
+      [sets, trained] = await Promise.all([
+        getSessionSets(session.id),
+        getTrainedExercises().catch(() => [] as TrainedExercise[]),
+      ]);
+    } catch (e) {
+      // 세트 조회 실패(네트워크 등) — 무반응/크래시 대신 사용자 안내
+      logError('startAsIs:getSessionSets', e);
+      Alert.alert('불러올 수 없음', '운동을 불러오지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.');
+      return;
+    }
     if (sets.length === 0) {
       Alert.alert('불러올 수 없음', '이 운동에는 기록된 세트가 없습니다.');
       return;

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, RefreshControl, TextInput, Modal, Alert,
 } from 'react-native';
@@ -58,7 +58,11 @@ export default function ExercisesTab() {
     setSetting('default_group_ids', ids.join(',')).catch(() => {});
   };
 
-  const load = useCallback(async () => {
+  const lastLoadRef = useRef(0);
+  const FOCUS_TTL_MS = 30_000;   // 탭 포커스마다 재요청 방지(이 시간 내 재진입은 캐시 유지)
+  const load = useCallback(async (force = false) => {
+    if (!force && Date.now() - lastLoadRef.current < FOCUS_TTL_MS) return;
+    lastLoadRef.current = Date.now();
     try {
       const [list, pins, gs] = await Promise.all([getExerciseSummaries(), loadPinned(), listGroups().catch(() => [] as ExerciseGroup[])]);
       setRows(list); setPinned(pins); setGroups(gs);
@@ -70,7 +74,7 @@ export default function ExercisesTab() {
       const { thisFrom, thisTo, lastFrom, lastTo } = weekRanges();
       getTrainedExerciseIds(thisFrom, thisTo).then(ids => setThisWeekIds(new Set(ids))).catch(() => {});
       getTrainedExerciseIds(lastFrom, lastTo).then(ids => setLastWeekIds(new Set(ids))).catch(() => {});
-    } catch { /* 캐시 유지 */ }
+    } catch { lastLoadRef.current = 0; /* 실패 시 throttle 해제해 다음 진입에 재시도 */ }
   }, []);
 
   useEffect(() => {
@@ -78,7 +82,7 @@ export default function ExercisesTab() {
     readCache<ExerciseGroup[]>('exercise:groups').then(c => { if (c?.length) setGroups(prev => prev.length ? prev : c); });
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(true); setRefreshing(false); }, [load]);
 
   const toggleFav = (name: string) => {
     const next = togglePin(name, pinned);

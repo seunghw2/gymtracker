@@ -68,6 +68,7 @@ import SessionCard from '../components/SessionCard';
 import RulerPicker from '../components/RulerPicker';
 import { useUiStore } from '../store/useUiStore';
 import { formatDateWithDay, todayStr } from '../lib/date';
+import { logError } from '../lib/log';
 import { toDisplay, fromInput, unitLabel } from '../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -526,7 +527,7 @@ export default function WorkoutScreen() {
     if (!s) return;
     const orm = epley(s.weight_kg, s.reps);
     updateSet(exIdx, setIdx, { estimated_1rm: orm });
-    if (s.done && s.setId) await updateWorkoutSet(s.setId, s.weight_kg, s.reps, s.setType ?? 'NORMAL').catch(() => {});
+    if (s.done && s.setId) await updateWorkoutSet(s.setId, s.weight_kg, s.reps, s.setType ?? 'NORMAL').catch(e => logError('handleEditDoneSet:updateWorkoutSet', e));
   };
 
   // 세트 번호 탭 → 타입 순환(일반→W→D→F). 이미 저장된 세트면 백엔드도 갱신.
@@ -794,7 +795,7 @@ export default function WorkoutScreen() {
     const w = last?.weight_kg ?? 60;
     const r = last?.reps ?? 10;
     const nextOrder = (last?.set_order ?? 0) + 1;
-    await addWorkoutSet(detailSession.id, exerciseId, nextOrder, w, r, epley(w, r), last?.set_type ?? 'NORMAL').catch(() => {});
+    await addWorkoutSet(detailSession.id, exerciseId, nextOrder, w, r, epley(w, r), last?.set_type ?? 'NORMAL').catch(e => logError('addSetToDetail:addWorkoutSet', e));
     const sets = await getSessionSets(detailSession.id);
     setDetailSets(sets);
     getSessionHistory().then(setHistory);
@@ -805,7 +806,7 @@ export default function WorkoutScreen() {
     if (!detailSession || detailSaving) return;
     setDetailSaving(true);
     try {
-      await Promise.all(detailSets.map(s => updateWorkoutSet(s.id, s.weight_kg, s.reps, s.set_type).catch(() => {})));
+      await Promise.all(detailSets.map(s => updateWorkoutSet(s.id, s.weight_kg, s.reps, s.set_type).catch(e => logError('handleSaveDetail:updateWorkoutSet', e))));
       await updateSession(detailSession.id, { title: detailTitle, note: detailNote }).catch(() => {});
       setDetailSession({ ...detailSession, title: detailTitle, note: detailNote });
       getSessionHistory().then(setHistory);
@@ -820,7 +821,7 @@ export default function WorkoutScreen() {
   const handleUncompleteSet = async (exIdx: number, setIdx: number) => {
     const s = exercises[exIdx]?.sets[setIdx];
     if (!s?.done) return;
-    if (s.setId) await deleteWorkoutSet(s.setId).catch(() => {});
+    if (s.setId) await deleteWorkoutSet(s.setId).catch(e => logError('handleUncompleteSet:deleteWorkoutSet', e));
     unmarkSetDone(exIdx, setIdx);
     stopRestTimer(); // 완료로 시작된 휴식 타이머 취소
     Haptics.selectionAsync();
@@ -839,7 +840,15 @@ export default function WorkoutScreen() {
     }
     const repsVal = timed ? 0 : s.reps;
     const orm = timed ? 0 : epley(s.weight_kg, s.reps);
-    const setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, repsVal, orm, s.setType ?? 'NORMAL', null, timed ? (s.durationSec ?? 0) : null);
+    let setId: number;
+    try {
+      setId = await addWorkoutSet(activeSessionId, ex.exerciseId, s.setOrder, s.weight_kg, repsVal, orm, s.setType ?? 'NORMAL', null, timed ? (s.durationSec ?? 0) : null);
+    } catch (e) {
+      // 서버 저장 실패 시 완료 처리하지 않고 사용자에게 알림(서버-로컬 desync 방지)
+      logError('handleCompleteSet:addWorkoutSet', e);
+      Alert.alert('저장 실패', '세트를 저장하지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.');
+      return;
+    }
     // PR: 시간기반/워밍업 제외, 종목 역대 최고 1RM을 넘으면
     const isPR = !timed
       && (s.setType ?? 'NORMAL') !== 'WARMUP'
