@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SEM, COLORS } from '../../constants/colors';
 import { MUSCLE_KO, MUSCLE_COLOR } from '../../constants/exercises';
 import {
-  getExerciseSummaries, getExercises, ExerciseSummary, Exercise,
+  getExerciseSummaries, getExercises, getSetting, setSetting, ExerciseSummary, Exercise,
   listGroups, createGroup, updateGroup, deleteGroup, reorderGroups, getTrainedExerciseIds, ExerciseGroup,
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
@@ -50,6 +50,12 @@ export default function ExercisesTab() {
   const [selKey, setSelKey] = useState<string>('sys:all');   // 'sys:all'|'sys:thisWeek'|'sys:lastWeek'|'custom:<id>'
   const [edit, setEdit] = useState(false);
   const [menuGroup, setMenuGroup] = useState<ExerciseGroup | null>(null);
+  const [defaultIds, setDefaultIds] = useState<number[]>([]);   // '기본' 그룹 멤버(설정 저장)
+
+  const saveDefaultIds = (ids: number[]) => {
+    setDefaultIds(ids);
+    setSetting('default_group_ids', ids.join(',')).catch(() => {});
+  };
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +64,8 @@ export default function ExercisesTab() {
       writeCache('exercise:summaries', list);
       writeCache('exercise:groups', gs);
       getExercises().then(ex => setBrandById(new Map(ex.map(e => [e.id, e.brand])))).catch(() => {});
+      getSetting('default_group_ids', '').then(csv =>
+        setDefaultIds(csv ? csv.split(',').map(Number).filter(n => Number.isFinite(n)) : [])).catch(() => {});
       const { thisFrom, thisTo, lastFrom, lastTo } = weekRanges();
       getTrainedExerciseIds(thisFrom, thisTo).then(ids => setThisWeekIds(new Set(ids))).catch(() => {});
       getTrainedExerciseIds(lastFrom, lastTo).then(ids => setLastWeekIds(new Set(ids))).catch(() => {});
@@ -172,6 +180,15 @@ export default function ExercisesTab() {
             onAdd={() => router.push({ pathname: '/exercise-add', params: { target: 'group', groupId: String(sel.id) } })}
             onRow={goReport}
             refreshing={refreshing} onRefresh={onRefresh} />
+        : (sel as { key: SystemKind }).key === 'all'
+        ? <CustomGroupView
+            group={{ id: -1, name: '기본', exerciseIds: defaultIds, sortIndex: -1 } as ExerciseGroup}
+            rows={groupRows(defaultIds, byId)}
+            search={filterSearch} brandById={brandById}
+            onReorder={(from, to) => saveDefaultIds(moveMember(defaultIds, from, to))}
+            onRemove={(exId) => saveDefaultIds(defaultIds.filter(id => id !== exId))}
+            onAdd={() => router.push({ pathname: '/exercise-add', params: { target: 'default' } })}
+            onRow={goReport} refreshing={refreshing} onRefresh={onRefresh} />
         : <SystemGroupView
             kind={(sel as { key: SystemKind }).key}
             rows={filterSearch(systemRows((sel as { key: SystemKind }).key, rows, (sel as { key: SystemKind }).key === 'thisWeek' ? thisWeekIds : lastWeekIds))}

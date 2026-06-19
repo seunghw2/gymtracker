@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView,
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, listGroups, updateGroup, Exercise } from '../db/queries';
+import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, listGroups, updateGroup, getSetting, setSetting, Exercise } from '../db/queries';
 import { addMembers } from '../lib/exerciseGroups';
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES, MUSCLE_KO, EQUIP_KO, MUSCLE_COLOR, PART_ORDER } from '../constants/exercises';
 import { GREEN, COLORS } from '../constants/colors';
@@ -181,6 +181,17 @@ export default function ExerciseAddScreen() {
 
   const handleDone = async () => {
     if (pickedList.length === 0) return;
+    // 기본 그룹 담기 — 설정(default_group_ids)에 append
+    if (params.target === 'default') {
+      try {
+        const csv = await getSetting('default_group_ids', '');
+        const cur = csv ? csv.split(',').map(Number).filter(n => Number.isFinite(n)) : [];
+        await setSetting('default_group_ids', addMembers(cur, pickedList.map(e => e.id)).join(','));
+      } catch { /* 무시 */ }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+      return;
+    }
     // 그룹 담기 모드: 세션에 추가하지 않고 해당 그룹 멤버에 append(담은 순서 보존)
     if (params.target === 'group' && params.groupId) {
       const gid = Number(params.groupId);
