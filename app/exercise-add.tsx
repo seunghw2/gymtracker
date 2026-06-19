@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView, Alert, Modal, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, Exercise } from '../db/queries';
+import { getExercises, getExerciseUsage, addCustomExercise, updateExercise, deleteCustomExercise, listGroups, updateGroup, Exercise } from '../db/queries';
+import { addMembers } from '../lib/exerciseGroups';
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES, MUSCLE_KO, EQUIP_KO, MUSCLE_COLOR, PART_ORDER } from '../constants/exercises';
 import { GREEN, COLORS } from '../constants/colors';
 import { useWorkoutStore } from '../store/useStore';
@@ -17,6 +18,7 @@ function Dot({ group }: { group: string }) {
 
 export default function ExerciseAddScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ target?: string; groupId?: string }>();
   const addExercises = useWorkoutStore(s => s.addExercises);
 
   const [all, setAll] = useState<Exercise[]>([]);
@@ -179,6 +181,18 @@ export default function ExerciseAddScreen() {
 
   const handleDone = async () => {
     if (pickedList.length === 0) return;
+    // 그룹 담기 모드: 세션에 추가하지 않고 해당 그룹 멤버에 append(담은 순서 보존)
+    if (params.target === 'group' && params.groupId) {
+      const gid = Number(params.groupId);
+      try {
+        const gs = await listGroups();
+        const cur = gs.find(g => g.id === gid)?.exerciseIds ?? [];
+        await updateGroup(gid, { exerciseIds: addMembers(cur, pickedList.map(e => e.id)) });
+      } catch { /* 실패해도 화면은 닫음 */ }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+      return;
+    }
     // 담은 순서대로 (처음 담은 종목이 세션 맨 위)
     const entries = await Promise.all(pickedList.map(buildExerciseEntry));
     addExercises(entries);
