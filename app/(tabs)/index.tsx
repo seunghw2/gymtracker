@@ -80,6 +80,7 @@ export default function BriefingHome() {
   const [waistInput, setWaistInput] = useState('');
   const [todayWaist, setTodayWaist] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [reportFetched, setReportFetched] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -121,6 +122,8 @@ export default function BriefingHome() {
       setReportStep(r.step ?? null);
     } catch {
       setReportStatus('FAILED');
+    } finally {
+      setReportFetched(true);   // 리포트 응답 전엔 폴백 헤드라인 대신 스켈레톤(깜빡임 방지)
     }
   }, []);
 
@@ -205,6 +208,11 @@ export default function BriefingHome() {
         {reportStatus === 'GENERATING' ? (
           <View style={{ height: 300 }}>
             <BriefingLoading percent={reportPct} step={reportStep} />
+          </View>
+        ) : !reportFetched ? (
+          <View style={styles.headlineSkeleton}>
+            <View style={[styles.skelBar, { width: '72%' }]} />
+            <View style={[styles.skelBar, { width: '48%', marginTop: 12 }]} />
           </View>
         ) : (<>
         {/* 큰 헤드라인 */}
@@ -327,6 +335,8 @@ const styles = StyleSheet.create({
   dateChip: { color: AI.textSub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
 
   headline: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', lineHeight: 38, letterSpacing: -0.5, marginTop: 18 },
+  headlineSkeleton: { marginTop: 22, marginBottom: 6 },
+  skelBar: { height: 26, borderRadius: 8, backgroundColor: '#1c1c1e' },
 
   rxCard: { backgroundColor: '#161618', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 12, padding: 15, marginTop: 18 },
   rxCap: { color: ACCENT, fontSize: 11, fontWeight: '800' },
