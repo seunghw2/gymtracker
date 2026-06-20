@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { View, Text, Pressable, StyleSheet, FlatList, ScrollView, RefreshControl } from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { SEM, ACCENT, ACCENT_TINT } from '../../constants/colors';
 import ExerciseCard from './ExerciseCard';
@@ -41,19 +41,13 @@ export default function ExerciseGrid({
 
   if (items.length === 0) {
     return (
-      <FlatList
-        data={[]}
-        renderItem={null}
-        style={s.flex1}
-        refreshControl={refresh}
-        ListEmptyComponent={
-          <View style={s.empty}>
-            <Text style={s.emptyIcon}>🗂️</Text>
-            <Text style={s.emptyT}>{emptyLabel}</Text>
-            {canAdd && <Pressable style={s.emptyAdd} onPress={onAdd}><Text style={s.emptyAddT}>＋ 종목 추가하기</Text></Pressable>}
-          </View>
-        }
-      />
+      <ScrollView style={s.flex1} contentContainerStyle={s.flex1} refreshControl={refresh}>
+        <View style={s.empty}>
+          <Text style={s.emptyIcon}>🗂️</Text>
+          <Text style={s.emptyT}>{emptyLabel}</Text>
+          {canAdd && <Pressable style={s.emptyAdd} onPress={onAdd}><Text style={s.emptyAddT}>＋ 종목 추가하기</Text></Pressable>}
+        </View>
+      </ScrollView>
     );
   }
 
@@ -85,17 +79,18 @@ export default function ExerciseGrid({
     );
   }
 
-  // 보기 모드: 2열 그리드
+  // 보기 모드: 2열 그리드 (홀수 마지막은 스페이서로 반폭 유지)
+  const gridData: GridItem[] = items.length % 2 === 1 ? [...items, { ...items[0], exerciseId: -1 }] : items;
   return (
     <FlatList
-      data={items}
-      keyExtractor={(it) => String(it.exerciseId)}
+      data={gridData}
+      keyExtractor={(it, i) => (it.exerciseId === -1 ? `spacer-${i}` : String(it.exerciseId))}
       numColumns={2}
       columnWrapperStyle={s.colWrap}
       style={s.flex1}
       contentContainerStyle={s.body}
       refreshControl={refresh}
-      renderItem={({ item }) => (
+      renderItem={({ item }) => item.exerciseId === -1 ? <View style={s.flex1} /> : (
         <ExerciseCard
           data={item.data} name={item.name} partLabel={item.partLabel} equipLabel={item.equipLabel}
           dotColor={item.dotColor} onPress={() => onPressItem(item.exerciseId)}
