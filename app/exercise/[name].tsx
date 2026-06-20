@@ -290,7 +290,10 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
 function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; unit: string; prDate: string | null; plateauWeeks: number }) {
   const [act, setAct] = useState<number | null>(null);
   if (pts.length < 2) return <Empty />;
-  const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
+  // x축은 '점 순서'가 아니라 '실제 날짜'에 비례 — 16일치 데이터가 3개월처럼 늘어나 보이는 착시 방지
+  const times = pts.map(p => parseLocal(p.date).getTime());
+  const tMin = times[0], tMax = times[times.length - 1], tSpan = tMax - tMin || 1;
+  const xs = times.map(t => ((t - tMin) / tSpan) * W);
   const vals = pts.map(p => p.value);
   const rawMax = Math.max(...vals), rawMin = Math.min(...vals);
   // 값 범위에 위아래 여백을 둬서 작은 차이가 화면 전체 높이로 과장되지 않게 한다.
@@ -302,8 +305,12 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
   const prIdx = prDate ? pts.findIndex(p => p.date === prDate) : -1;
   // 정체 음영: PR 이후 구간
   const showPlateau = plateauWeeks >= 4 && prIdx >= 0 && prIdx < pts.length - 1;
-  // 누르고 있는 지점 → 가장 가까운 데이터 인덱스(토스식 스크럽)
-  const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.round((x / W) * (pts.length - 1)))));
+  // 누르고 있는 지점 → x가 가장 가까운 데이터 인덱스(시간 비례 좌표라 거리로 찾는다)
+  const pick = (x: number) => {
+    let best = 0;
+    for (let i = 1; i < xs.length; i++) if (Math.abs(xs[i] - x) < Math.abs(xs[best] - x)) best = i;
+    setAct(best);
+  };
   // 지표·기간 변경으로 점 개수가 줄어도 안전하도록 범위 가드
   const a = act != null && act < pts.length ? act : null;
 
@@ -333,6 +340,9 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
           {showPlateau && <Line x1={xs[prIdx]} y1={0} x2={xs[prIdx]} y2={CH - 6} stroke="rgba(255,138,0,0.4)" strokeWidth={1} strokeDasharray="3 3" />}
           <Polygon points={area} fill="rgba(43,217,106,0.10)" />
           <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          {/* x축 날짜: 실제 기간이 며칠인지 양 끝에 표시 */}
+          <SvgText x={1} y={CH - 3} fill="#6a6a6e" fontSize={9} textAnchor="start">{fmtDate(pts[0].date)}</SvgText>
+          {tMax !== tMin && <SvgText x={W - 1} y={CH - 3} fill="#6a6a6e" fontSize={9} textAnchor="end">{fmtDate(pts[pts.length - 1].date)}</SvgText>}
           {prIdx >= 0 && <Circle cx={xs[prIdx]} cy={y(pts[prIdx].value)} r={4.5} fill="#FFC53D" stroke="#000" strokeWidth={1.5} />}
           <Circle cx={xs[xs.length - 1]} cy={y(pts[pts.length - 1].value)} r={3.5} fill={SEM.good} stroke="#000" strokeWidth={1.5} />
           {a != null && <Line x1={xs[a]} y1={0} x2={xs[a]} y2={CH - 6} stroke="#fff" strokeWidth={1} opacity={0.55} />}
