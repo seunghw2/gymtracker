@@ -14,6 +14,8 @@ function row(p: Partial<ExerciseSummary> & { name: string }): ExerciseSummary {
     delta: p.delta ?? 0,
     spark: p.spark ?? [1, 2, 3],
     lastDate: p.lastDate ?? '2026-06-10',
+    recentTopWeightKg: null, recentTopReps: null,
+    bestTopWeightKg: null, bestTopReps: null, prevTopWeightKg: null,
   };
 }
 

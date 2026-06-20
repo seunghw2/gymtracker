@@ -102,6 +102,12 @@ export type ExerciseSummary = {
   delta: number | null;
   spark: number[];
   lastDate: string | null;
+  // 카드 그리드용 작업세트(워밍업 제외 최고무게 세트 W×R). 맨몸은 weight=0.
+  recentTopWeightKg: number | null;
+  recentTopReps: number | null;
+  bestTopWeightKg: number | null;
+  bestTopReps: number | null;
+  prevTopWeightKg: number | null;
 };
 
 export type SeriesPoint = { date: string; value: number };

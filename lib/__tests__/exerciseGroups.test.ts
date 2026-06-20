@@ -8,6 +8,8 @@ const grp = (id: number, name: string, sortIndex: number, exerciseIds: number[] 
 const sum = (id: number, name: string): ExerciseSummary => ({
   exerciseId: id, name, bodyPart: '등', currentE1rm: 100, prE1rm: 100, prDate: null,
   plateauWeeks: 0, trend: 'up', delta: 0, spark: [1, 2], lastDate: null,
+  recentTopWeightKg: null, recentTopReps: null,
+  bestTopWeightKg: null, bestTopReps: null, prevTopWeightKg: null,
 });
 
 describe('buildPellets', () => {
