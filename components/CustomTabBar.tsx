@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useSegments } from 'expo-router';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ACCENT } from '../constants/colors';
 import { useUiStore } from '../store/useUiStore';
@@ -12,46 +11,29 @@ const INACTIVE = '#7E7E83';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-// CARBON 탭: 브리핑(홈)·기록·통계 + 리포트(별도 스택). 운동은 탭에서 제거(브리핑에서 시작),
-// 설정은 브리핑 헤더 ⚙️로 진입. META에 없는 라우트(workout/settings)는 탭바에 렌더되지 않는다.
+// CARBON 탭: 브리핑(홈)·기록·종목·리포트·Chat. 운동은 탭에서 제거(브리핑에서 시작),
+// 설정은 브리핑 헤더 ⚙️로 진입. META에 없는 라우트(settings)는 탭바에 렌더되지 않는다.
 const META: Record<string, { active: IoniconName; inactive: IoniconName; label: string }> = {
   index: { active: 'sparkles', inactive: 'sparkles-outline', label: '브리핑' },
   calendar: { active: 'list', inactive: 'list-outline', label: '기록' },
   exercises: { active: 'barbell', inactive: 'barbell-outline', label: '종목' },
+  reports: { active: 'document-text', inactive: 'document-text-outline', label: '리포트' },
   chat: { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline', label: 'Chat' },
 };
 
 /**
- * CARBON 하단 탭바 — 레드 활성 스타일. 리포트 탭은 (tabs) 밖 app/ai 스택이라 router.push로 진입.
+ * CARBON 하단 탭바 — 레드 활성 스타일. 모든 탭(리포트 포함)은 정식 탭 라우트라 navigate로 즉시 전환.
  */
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const segments = useSegments();
-  const reportActive = (segments as string[]).includes('ai');
   const unread = useUiStore(s => s.unread);
-
-  const reportTab = (
-    <Pressable
-      key="__report"
-      style={styles.tab}
-      onPress={() => router.push('/ai/reports')}
-      accessibilityRole="button"
-      accessibilityState={{ selected: reportActive }}
-      accessibilityLabel="리포트"
-    >
-      <View style={[styles.indicator, reportActive && styles.indicatorOn]} />
-      <Ionicons name={reportActive ? 'document-text' : 'document-text-outline'} size={26} color={reportActive ? ACTIVE : INACTIVE} />
-      <Text style={[styles.label, { color: reportActive ? ACTIVE : INACTIVE }, reportActive && styles.labelOn]}>리포트</Text>
-    </Pressable>
-  );
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {state.routes.map((route, idx) => {
         const meta = META[route.name];
         if (!meta) return null;
-        const focused = state.index === idx && !reportActive;
+        const focused = state.index === idx;
         const color = focused ? ACTIVE : INACTIVE;
 
         const onPress = () => {
@@ -83,10 +65,6 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           </Pressable>
         );
 
-        // 종목 뒤에 리포트 탭을 끼워 넣는다(브리핑·기록·종목·리포트·Chat).
-        if (route.name === 'exercises') {
-          return <React.Fragment key={route.key}>{tab}{reportTab}</React.Fragment>;
-        }
         return tab;
       })}
     </View>
