@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import Svg, { Polyline, Polygon, Circle, Rect, Line } from 'react-native-svg';
+import Svg, { Polyline, Polygon, Circle, Rect, Line, Text as SvgText } from 'react-native-svg';
 import { SEM } from '../../constants/colors';
 import {
   getExerciseProgress, getTrainedExercises, updateExerciseNote, getExerciseCoachLine, ExerciseProgress, SeriesPoint,
@@ -21,9 +21,9 @@ import { useChatStore } from '../../store/useChatStore';
 
 type Metric = '1rm' | 'maxw' | 'vol' | 'freq';
 const METRICS: [Metric, string][] = [['1rm', '1RM'], ['maxw', '최대무게'], ['vol', '볼륨'], ['freq', '빈도']];
-type Period = '3m' | '6m' | '1y' | 'all';
-const PERIODS: [Period, string][] = [['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', '전체']];
-const PERIOD_DAYS: Record<Period, number> = { '3m': 90, '6m': 182, '1y': 365, all: 1e9 };
+type Period = '1w' | '1m' | '3m' | '6m' | '1y' | 'all';
+const PERIODS: [Period, string][] = [['1w', '1주'], ['1m', '한달'], ['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', '전체']];
+const PERIOD_DAYS: Record<Period, number> = { '1w': 7, '1m': 30, '3m': 90, '6m': 182, '1y': 365, all: 1e9 };
 
 const W = Dimensions.get('window').width - 28 - 24; // 카드 안쪽 폭
 
@@ -326,6 +326,11 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
         onResponderTerminate={() => setAct(null)}
       >
         <Svg width={W} height={CH}>
+          {/* y축 눈금: 최대·최소값 라벨로 그래프 높이가 몇 kg인지 한눈에 */}
+          <Line x1={0} y1={y(rawMax)} x2={W} y2={y(rawMax)} stroke="#3a3a42" strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />
+          <Line x1={0} y1={y(rawMin)} x2={W} y2={y(rawMin)} stroke="#3a3a42" strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />
+          <SvgText x={W - 3} y={y(rawMax) - 4} fill="#8a8a90" fontSize={9.5} textAnchor="end">{trim(rawMax)}kg</SvgText>
+          {rawMax !== rawMin && <SvgText x={W - 3} y={y(rawMin) + 12} fill="#6a6a6e" fontSize={9.5} textAnchor="end">{trim(rawMin)}kg</SvgText>}
           {showPlateau && <Rect x={xs[prIdx]} y={0} width={W - xs[prIdx]} height={CH - 6} fill="rgba(255,138,0,0.12)" />}
           {showPlateau && <Line x1={xs[prIdx]} y1={0} x2={xs[prIdx]} y2={CH - 6} stroke="rgba(255,138,0,0.4)" strokeWidth={1} strokeDasharray="3 3" />}
           <Polygon points={area} fill="rgba(43,217,106,0.10)" />
@@ -365,7 +370,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
     <>
       <View style={s.clabel}>
         {a == null ? (
-          <><Text style={s.clT}>{isVol ? 't' : '회'}</Text><Text style={s.clT}>{unit} · {pts.length}주</Text></>
+          <><Text style={s.clT}>최대 {fmtVal(max)}</Text><Text style={s.clT}>{unit} · {pts.length}주</Text></>
         ) : (
           <><Text style={s.clT}>{fmtDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[a].value)}</Text></>
         )}
@@ -379,6 +384,9 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
         onResponderRelease={() => setAct(null)}
         onResponderTerminate={() => setAct(null)}
       >
+        {/* 천장(=최대) 기준선 + 절반선: 막대 높이가 어느 정도인지 눈금 */}
+        <View pointerEvents="none" style={[s.barGrid, { top: 4 }]} />
+        <View pointerEvents="none" style={[s.barGrid, { top: 50 }]} />
         {pts.map((p, i) => {
           // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
           if (p.value <= 0) return <View key={i} style={s.ghostBar} />;
@@ -575,7 +583,8 @@ const s = StyleSheet.create({
   clabel: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
   clT: { color: '#6a6a6e', fontSize: 9.5 },
   clActive: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  barrow: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 92, paddingTop: 4 },
+  barrow: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 92, paddingTop: 4, position: 'relative' },
+  barGrid: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#2a2a30', opacity: 0.6 },
   ghostBar: { flex: 1, height: 14, borderRadius: 3, borderWidth: 1, borderColor: '#2a2a30', borderStyle: 'dashed', opacity: 0.7 },
   legend: { flexDirection: 'row', gap: 12, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' },
   lg: { flexDirection: 'row', alignItems: 'center', gap: 4 },
