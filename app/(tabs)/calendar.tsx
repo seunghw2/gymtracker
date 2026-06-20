@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   Pressable,
   ScrollView,
   RefreshControl,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, SessionSummary } from '../../db/queries';
+import { readCache, writeCache } from '../../lib/diskCache';
 import { formatShortWithDay, formatShortWithWeekday, todayStr, toDateStr, addDaysStr } from '../../lib/date';
 import { formatDuration } from '../../lib/format';
 import SessionCard from '../../components/SessionCard';
@@ -72,7 +74,17 @@ export default function HistoryScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'timeline' | 'month'>('timeline');
   const [preview, setPreview] = useState<SessionSummary | null>(null);
+  const [firstLoading, setFirstLoading] = useState(true);   // 최초 로드 중 여부(스켈레톤 표시용)
   const today = todayStr();
+
+  // 타임라인·연속일은 월과 무관 → 마지막 값을 디스크 캐시로 즉시 복원(SWR). 재진입 시 팝인 제거.
+  useEffect(() => {
+    readCache<{ sessions: SessionSummary[]; streak: number }>('cal:overview').then(c => {
+      if (!c) return;
+      setSessions(prev => prev.length ? prev : c.sessions);
+      setStreak(prev => prev || c.streak);
+    });
+  }, []);
 
   const load = useCallback(async () => {
     const [dates, allDates, monthStats, hist] = await Promise.all([
@@ -81,13 +93,21 @@ export default function HistoryScreen() {
       getMonthStats(year, month),
       getSessionHistory(90).catch(() => [] as SessionSummary[]),
     ]);
+    const st = calcStreak(allDates);
     setWorkoutDates(dates);
-    setStreak(calcStreak(allDates));
+    setStreak(st);
     setStats(monthStats);
     setSessions(hist);
+    writeCache('cal:overview', { sessions: hist, streak: st });
   }, [year, month]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    // 화면 전환 후 로드 → 진입이 매끄럽고, 그동안 캐시/스켈레톤이 먼저 자리잡는다.
+    const task = InteractionManager.runAfterInteractions(() => {
+      load().finally(() => setFirstLoading(false));
+    });
+    return () => task.cancel();
+  }, [load]));
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -140,7 +160,7 @@ export default function HistoryScreen() {
         {/* ── 타임라인 ── */}
         {viewMode === 'timeline' && (
           sorted.length === 0 ? (
-            <Text style={styles.emptyText}>아직 운동 기록이 없어요.</Text>
+            firstLoading ? <TimelineSkeleton /> : <Text style={styles.emptyText}>아직 운동 기록이 없어요.</Text>
           ) : (
             <View>
               {sorted.map((s, i) => {
@@ -236,8 +256,27 @@ export default function HistoryScreen() {
 }
 
 
+/** 타임라인 자리표시(스켈레톤) — 실제 행과 같은 레일+카드 골격을 잡아 레이아웃 점프를 막는다. */
+function TimelineSkeleton() {
+  return (
+    <View>
+      {[0, 1, 2].map(i => (
+        <View key={i} style={styles.tlRow}>
+          <View style={styles.rail}><View style={styles.dotEmpty} /><View style={styles.railLine} /></View>
+          <View style={styles.tlBody}>
+            <View style={[styles.skel, { width: 90, height: 13 }]} />
+            <View style={[styles.skel, { width: '70%', height: 14, marginTop: 6 }]} />
+            <View style={[styles.skel, { width: '45%', height: 11, marginTop: 6 }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000000' },
+  skel: { backgroundColor: '#1a1a1f', borderRadius: 6 },
   content: { padding: 20, paddingBottom: 40 },
   bannerPad: { paddingBottom: 100 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
