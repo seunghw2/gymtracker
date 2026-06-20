@@ -19,6 +19,7 @@ type Props = {
   editing: boolean;
   draggable: boolean;          // 담은순 + 편집모드일 때만 드래그
   emptyLabel: string;          // 빈 상태 문구(그룹별로 다름)
+  canAdd?: boolean;            // 시스템(자동) 그룹은 추가 불가
   onPressItem: (id: number) => void;
   onRemoveItem: (id: number) => void;
   onReorder: (from: number, to: number) => void;
@@ -28,7 +29,7 @@ type Props = {
 };
 
 export default function ExerciseGrid({
-  items, editing, draggable, emptyLabel, onPressItem, onRemoveItem, onReorder, onAdd, refreshing, onRefresh,
+  items, editing, draggable, emptyLabel, canAdd = true, onPressItem, onRemoveItem, onReorder, onAdd, refreshing, onRefresh,
 }: Props) {
   const addCard = (
     <Pressable style={s.addCard} onPress={onAdd}>
@@ -49,7 +50,7 @@ export default function ExerciseGrid({
           <View style={s.empty}>
             <Text style={s.emptyIcon}>🗂️</Text>
             <Text style={s.emptyT}>{emptyLabel}</Text>
-            <Pressable style={s.emptyAdd} onPress={onAdd}><Text style={s.emptyAddT}>＋ 종목 추가하기</Text></Pressable>
+            {canAdd && <Pressable style={s.emptyAdd} onPress={onAdd}><Text style={s.emptyAddT}>＋ 종목 추가하기</Text></Pressable>}
           </View>
         }
       />
@@ -79,7 +80,7 @@ export default function ExerciseGrid({
         contentContainerStyle={s.body}
         refreshControl={refresh}
         renderItem={renderItem}
-        ListFooterComponent={addCard}
+        ListFooterComponent={canAdd ? addCard : null}
       />
     );
   }
@@ -100,7 +101,7 @@ export default function ExerciseGrid({
           dotColor={item.dotColor} onPress={() => onPressItem(item.exerciseId)}
         />
       )}
-      ListFooterComponent={<View style={s.footer}>{addCard}</View>}
+      ListFooterComponent={canAdd ? <View style={s.footer}>{addCard}</View> : null}
     />
   );
 }
