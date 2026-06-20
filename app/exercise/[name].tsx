@@ -340,6 +340,8 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
           {showPlateau && <Line x1={xs[prIdx]} y1={0} x2={xs[prIdx]} y2={CH - 6} stroke="rgba(255,138,0,0.4)" strokeWidth={1} strokeDasharray="3 3" />}
           <Polygon points={area} fill="rgba(43,217,106,0.10)" />
           <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          {/* 운동한 날 = 작은 흰 점 (특수 마커는 아래에서 덮어써 강조) */}
+          {pts.map((p, i) => <Circle key={`d${i}`} cx={xs[i]} cy={y(p.value)} r={2} fill="#fff" opacity={0.85} />)}
           {/* x축 날짜: 실제 기간이 며칠인지 양 끝에 표시 */}
           <SvgText x={1} y={CH - 3} fill="#6a6a6e" fontSize={9} textAnchor="start">{fmtDate(pts[0].date)}</SvgText>
           {tMax !== tMin && <SvgText x={W - 1} y={CH - 3} fill="#6a6a6e" fontSize={9} textAnchor="end">{fmtDate(pts[pts.length - 1].date)}</SvgText>}
