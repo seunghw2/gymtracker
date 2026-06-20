@@ -18,12 +18,15 @@ import {
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { useChatStore } from '../../store/useChatStore';
+import RangePickerSheet from '../../components/RangePickerSheet';
+
+type DateRange = { start: string; end: string };
 
 type Metric = '1rm' | 'maxw' | 'vol' | 'freq';
 const METRICS: [Metric, string][] = [['1rm', '1RM'], ['maxw', '최대무게'], ['vol', '볼륨'], ['freq', '빈도']];
-type Period = '1w' | '1m' | '3m' | '6m' | '1y' | 'all';
-const PERIODS: [Period, string][] = [['1w', '1주'], ['1m', '한달'], ['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', '전체']];
-const PERIOD_DAYS: Record<Period, number> = { '1w': 7, '1m': 30, '3m': 90, '6m': 182, '1y': 365, all: 1e9 };
+type Period = '1m' | '3m' | '6m' | '1y' | 'all' | 'custom';
+const PERIODS: [Period, string][] = [['1m', '1M'], ['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', '전체'], ['custom', '기간 지정']];
+const PERIOD_DAYS: Record<Period, number> = { '1m': 30, '3m': 90, '6m': 182, '1y': 365, all: 1e9, custom: 1e9 };
 
 const W = Dimensions.get('window').width - 28 - 24; // 카드 안쪽 폭
 
@@ -38,6 +41,8 @@ export default function ExerciseReport() {
   const [pinned, setPinned] = useState<Set<string>>(new Set());
   const [metric, setMetric] = useState<Metric>('1rm');
   const [period, setPeriod] = useState<Period>('1y');
+  const [range, setRange] = useState<DateRange | null>(null); // '기간 지정' 직접 선택 범위
+  const [rangeOpen, setRangeOpen] = useState(false);
   const [exId, setExId] = useState<number | null>(null);
   const [items, setItems] = useState<{ text: string; done: boolean }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -146,15 +151,17 @@ export default function ExerciseReport() {
           </View>
           <View style={s.periodRow}>
             {PERIODS.map(([k, lbl]) => (
-              <Pressable key={k} onPress={() => setPeriod(k)} style={[s.pc, period === k && s.pcOn]}>
-                <Text style={[s.pcT, period === k && s.pcTOn]}>{lbl}</Text>
+              <Pressable key={k} onPress={() => (k === 'custom' ? setRangeOpen(true) : setPeriod(k))} style={[s.pc, period === k && s.pcOn]}>
+                <Text style={[s.pcT, period === k && s.pcTOn]}>
+                  {k === 'custom' && period === 'custom' && range ? `${fmtDate(range.start)}~${fmtDate(range.end)}` : lbl}
+                </Text>
               </Pressable>
             ))}
           </View>
 
           {/* 차트 카드 */}
           <View style={s.card}>
-            <ChartArea data={data} metric={metric} period={period} />
+            <ChartArea data={data} metric={metric} period={period} range={range} />
           </View>
 
           {/* 진단 + 핵심 지표 */}
@@ -207,6 +214,13 @@ export default function ExerciseReport() {
           </View>
         </ScrollView>
       )}
+      <RangePickerSheet
+        visible={rangeOpen}
+        start={range?.start ?? ymd(new Date(Date.now() - 30 * 86400000))}
+        end={range?.end ?? ymd(new Date())}
+        onClose={() => setRangeOpen(false)}
+        onConfirm={(s2, e2) => { setRange({ start: s2, end: e2 }); setPeriod('custom'); setRangeOpen(false); }}
+      />
     </SafeAreaView>
   );
 }
@@ -267,11 +281,18 @@ function buildChecklist(d: ExerciseProgress): { text: string; done: boolean }[] 
 // ── 차트 ─────────────────────────────────────────────────
 const CH = 150;
 
-function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: Metric; period: Period }) {
+function ChartArea({ data, metric, period, range }: { data: ExerciseProgress; metric: Metric; period: Period; range: DateRange | null }) {
   // 선택한 기간만 — 기록이 없으면 전체로 폴백하지 않고 "기간 내 기록 없음"을 보여준다.
+  const custom = period === 'custom' && range ? range : null;
   const cut = Date.now() - PERIOD_DAYS[period] * 86400000;
-  const inRange = (p: SeriesPoint) => period === 'all' || new Date(p.date).getTime() >= cut;
-  const periodLabel = PERIODS.find(([k]) => k === period)?.[1] ?? '';
+  const rs = custom ? parseLocal(custom.start).getTime() : 0;
+  const re = custom ? parseLocal(custom.end).getTime() + 86400000 - 1 : 0; // 끝날 하루 전체 포함
+  const inRange = (p: SeriesPoint) => {
+    if (period === 'all') return true;
+    const t = parseLocal(p.date).getTime();
+    return custom ? (t >= rs && t <= re) : t >= cut;
+  };
+  const periodLabel = period === 'custom' ? '선택 기간' : (PERIODS.find(([k]) => k === period)?.[1] ?? '');
 
   if (metric === '1rm' || metric === 'maxw') {
     const pts = (metric === '1rm' ? data.e1rm : data.maxWeight).filter(inRange);
@@ -296,7 +317,7 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
   if (src.filter(inRange).length < 1) return <Empty
     label={`${periodLabel} 동안 기록이 없어요`} sub="그래프는 기록 1개부터 그려져요" />;
   // 쉰 주를 0으로 메우고(고스트 막대), 너무 많으면 최근 ~1년치(52주)까지만(주로 '전체' 보호).
-  const pts = fillWeeks(src, period).slice(-52);
+  const pts = fillWeeks(src, period, custom).slice(-52);
   return <BarChart pts={pts} unit="주 운동 횟수" isVol={false} />;
 }
 
@@ -483,13 +504,17 @@ const ymd = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padSt
  * 주간 시계열의 빈 주(쉰 주)를 0으로 메운다 — 백엔드는 활동한 주만 주므로
  * 프론트에서 기간 시작(또는 첫 기록)부터 이번 주까지 연속 주를 채워 고스트 막대가 뜨게 한다.
  */
-function fillWeeks(all: SeriesPoint[], period: Period): SeriesPoint[] {
+function fillWeeks(all: SeriesPoint[], period: Period, range?: DateRange | null): SeriesPoint[] {
   if (all.length === 0) return [];
   const map = new Map(all.map(p => [p.date.slice(0, 10), p.value]));
   const firstData = mondayOf(parseLocal(all[0].date));
-  const end = mondayOf(new Date());
+  let end = mondayOf(new Date());
   let start = firstData;
-  if (period !== 'all') {
+  if (period === 'custom' && range) {
+    const rs = mondayOf(parseLocal(range.start));
+    start = rs > firstData ? rs : firstData;
+    end = mondayOf(parseLocal(range.end));
+  } else if (period !== 'all') {
     const cut = mondayOf(new Date(Date.now() - PERIOD_DAYS[period] * 86400000));
     start = cut > firstData ? cut : firstData;
   }
@@ -616,7 +641,7 @@ const s = StyleSheet.create({
   segOn: { backgroundColor: SEM.brand, borderColor: SEM.brand },
   segT: { color: '#cfcfd6', fontSize: 11.5, fontWeight: '800' },
   segTOn: { color: SEM.onBrand },
-  periodRow: { flexDirection: 'row', gap: 6, marginHorizontal: 16, marginTop: 8, marginBottom: 2 },
+  periodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, rowGap: 6, marginHorizontal: 16, marginTop: 8, marginBottom: 2 },
   pc: { borderWidth: 1, borderColor: '#2a2a30', borderRadius: 11, paddingVertical: 4, paddingHorizontal: 11 },
   pcOn: { backgroundColor: '#1c1c22', borderColor: '#3a3a42' },
   pcT: { color: '#7a7a7e', fontSize: 10.5, fontWeight: '700' },
