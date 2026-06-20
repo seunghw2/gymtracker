@@ -14,6 +14,8 @@
 
 ## 기간별 콘텐츠 (✅재사용 / 🆕신규계산 / 🤖AI)
 
+> **원칙: 기존 항목 최대 반영.** 19개 데이터 블록(consistency·sessionStats·volumeBars·muscleVolumeShare·prTimeline·muscleBalance·bodyComposition·lbm·trends·growth·stagnation·milestones·highlights…)은 버리지 말고 **기간별로 재배치·재프레이밍**해 채운다. 🆕신규는 기존으로 못 만드는 것(전기 대비 성장률·위험알림·MVP·정체원인·예측)에 한정.
+
 ### 주간 — 전술
 - ✅ 핵심 지표: 운동 횟수·시간·총 볼륨·부위별 볼륨·PR (consistency/sessionStats/volumeBars/muscleVolumeShare/prTimeline)
 - 🤖 간단 분석 한 줄 + 처방 (전술 프롬프트로 재프레이밍)

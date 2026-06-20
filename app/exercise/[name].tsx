@@ -322,8 +322,6 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
         onMoveShouldSetResponder={() => true}
         onResponderGrant={e => pick(e.nativeEvent.locationX)}
         onResponderMove={e => pick(e.nativeEvent.locationX)}
-        onResponderRelease={() => setAct(null)}
-        onResponderTerminate={() => setAct(null)}
       >
         <Svg width={W} height={CH}>
           {/* y축 눈금: 최대·최소값 라벨로 그래프 높이가 몇 kg인지 한눈에 */}
@@ -381,8 +379,6 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
         onMoveShouldSetResponder={() => true}
         onResponderGrant={e => pick(e.nativeEvent.locationX)}
         onResponderMove={e => pick(e.nativeEvent.locationX)}
-        onResponderRelease={() => setAct(null)}
-        onResponderTerminate={() => setAct(null)}
       >
         {/* 천장(=최대) 기준선 + 절반선: 막대 높이가 어느 정도인지 눈금 */}
         <View pointerEvents="none" style={[s.barGrid, { top: 4 }]} />
