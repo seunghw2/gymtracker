@@ -15,6 +15,7 @@ import Svg, { Polyline, Polygon, Circle, Rect, Line, Text as SvgText } from 'rea
 import { SEM } from '../../constants/colors';
 import {
   getExerciseProgress, getTrainedExercises, updateExerciseNote, getExerciseCoachLine, ExerciseProgress, SeriesPoint,
+  getRepMaxes, RepMax,
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { useChatStore } from '../../store/useChatStore';
@@ -22,8 +23,8 @@ import RangePickerSheet from '../../components/RangePickerSheet';
 
 type DateRange = { start: string; end: string };
 
-type Metric = '1rm' | 'maxw' | 'vol' | 'freq';
-const METRICS: [Metric, string][] = [['1rm', '1RM'], ['maxw', '최대무게'], ['vol', '볼륨'], ['freq', '빈도']];
+type Metric = '1rm' | 'maxw' | 'vol' | 'freq' | 'reps';
+const METRICS: [Metric, string][] = [['1rm', '1RM'], ['maxw', '최대무게'], ['vol', '볼륨'], ['freq', '빈도'], ['reps', '렙기록']];
 type Period = '1m' | '3m' | '6m' | '1y' | 'all' | 'custom';
 const PERIODS: [Period, string][] = [['1m', '1M'], ['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', '전체'], ['custom', '기간 지정']];
 const PERIOD_DAYS: Record<Period, number> = { '1m': 30, '3m': 90, '6m': 182, '1y': 365, all: 1e9, custom: 1e9 };
@@ -43,6 +44,7 @@ export default function ExerciseReport() {
   const [period, setPeriod] = useState<Period>('1y');
   const [range, setRange] = useState<DateRange | null>(null); // '기간 지정' 직접 선택 범위
   const [rangeOpen, setRangeOpen] = useState(false);
+  const [repMaxes, setRepMaxes] = useState<RepMax[] | null>(null); // 렙기록 탭 데이터(지연 로드)
   const [exId, setExId] = useState<number | null>(null);
   const [items, setItems] = useState<{ text: string; done: boolean }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -84,6 +86,14 @@ export default function ExerciseReport() {
 
   // 체크리스트는 코드 계산값으로 프리필(사용자 편집 가능)
   useEffect(() => { if (data) setItems(buildChecklist(data)); }, [data]);
+
+  // 렙기록 탭 진입 시 1회 로드(반복수 1~12 역대 최고)
+  useEffect(() => {
+    if (metric !== 'reps' || !exId || repMaxes) return;
+    let on = true;
+    getRepMaxes(exId).then(r => { if (on) setRepMaxes(r); }).catch(() => {});
+    return () => { on = false; };
+  }, [metric, exId, repMaxes]);
 
   // 코치 한 줄 = LLM 해석(비동기·실패 시 코드 템플릿 폴백)
   useEffect(() => {
@@ -149,19 +159,23 @@ export default function ExerciseReport() {
               </Pressable>
             ))}
           </View>
-          <View style={s.periodRow}>
-            {PERIODS.map(([k, lbl]) => (
-              <Pressable key={k} onPress={() => (k === 'custom' ? setRangeOpen(true) : setPeriod(k))} style={[s.pc, period === k && s.pcOn]}>
-                <Text style={[s.pcT, period === k && s.pcTOn]}>
-                  {k === 'custom' && period === 'custom' && range ? `${fmtDate(range.start)}~${fmtDate(range.end)}` : lbl}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          {metric !== 'reps' && (
+            <View style={s.periodRow}>
+              {PERIODS.map(([k, lbl]) => (
+                <Pressable key={k} onPress={() => (k === 'custom' ? setRangeOpen(true) : setPeriod(k))} style={[s.pc, period === k && s.pcOn]}>
+                  <Text style={[s.pcT, period === k && s.pcTOn]}>
+                    {k === 'custom' && period === 'custom' && range ? `${fmtDate(range.start)}~${fmtDate(range.end)}` : lbl}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
-          {/* 차트 카드 */}
+          {/* 차트 카드 (렙기록은 표) */}
           <View style={s.card}>
-            <ChartArea data={data} metric={metric} period={period} range={range} />
+            {metric === 'reps'
+              ? <RepTable rows={repMaxes} />
+              : <ChartArea data={data} metric={metric} period={period} range={range} />}
           </View>
 
           {/* 진단 + 핵심 지표 */}
@@ -312,13 +326,19 @@ function ChartArea({ data, metric, period, range }: { data: ExerciseProgress; me
     return <LineChart pts={vpts} unit="t · 주간 볼륨" prDate={null} plateauWeeks={0}
       fmtY={v => `${(v / 1000).toFixed(1)}t`} unitShort="t" />;
   }
-  // 빈도 → 막대 그래프(주별 운동 횟수)
+  // 빈도 → 막대 그래프
   const src = data.weeklyFreq;
   if (src.filter(inRange).length < 1) return <Empty
     label={`${periodLabel} 동안 기록이 없어요`} sub="그래프는 기록 1개부터 그려져요" />;
+  // 1년 이상(1Y·전체·범위≥365일)이면 주별 52칸이 빽빽 → 월별 빈도로 집계
+  const longSpan = period === '1y' || period === 'all' || (!!custom && re - rs >= 365 * 86400000);
+  if (longSpan) {
+    const mpts = fillMonths(src, period, custom).slice(-36); // 최근 3년치까지
+    return <BarChart pts={mpts} unit="월 운동 횟수" isVol={false} bucket="month" />;
+  }
   // 쉰 주를 0으로 메우고(고스트 막대), 너무 많으면 최근 ~1년치(52주)까지만(주로 '전체' 보호).
   const pts = fillWeeks(src, period, custom).slice(-52);
-  return <BarChart pts={pts} unit="주 운동 횟수" isVol={false} />;
+  return <BarChart pts={pts} unit="주 운동 횟수" isVol={false} bucket="week" />;
 }
 
 function LineChart({ pts, unit, prDate, plateauWeeks, fmtY = (v: number) => `${trim(v)}kg`, unitShort = 'kg' }:
@@ -401,20 +421,22 @@ function LineChart({ pts, unit, prDate, plateauWeeks, fmtY = (v: number) => `${t
   );
 }
 
-function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVol: boolean }) {
+function BarChart({ pts, unit, isVol, bucket = 'week' }: { pts: SeriesPoint[]; unit: string; isVol: boolean; bucket?: 'week' | 'month' }) {
   const [act, setAct] = useState<number | null>(null);
   const [bw, setBw] = useState(W); // 막대줄 실제 너비(onLayout으로 측정)
   if (pts.length < 1) return <Empty />;
+  const unitName = bucket === 'month' ? '개월' : '주';
   const max = Math.max(...pts.map(p => p.value)) || 1;
-  // 가장 최근 "활동한" 주(0인 주는 건너뜀) 기준으로 요약·강조
+  // 가장 최근 "활동한" 칸(0은 건너뜀) 기준으로 요약·강조
   const active = pts.filter(p => p.value > 0);
   const lastActive = active.length ? active[active.length - 1] : pts[pts.length - 1];
   let lastActiveIdx = -1;
   for (let i = pts.length - 1; i >= 0; i--) { if (pts[i].value > 0) { lastActiveIdx = i; break; } }
   const drop = active.length >= 2 && active[active.length - 1].value < active[active.length - 2].value;
-  // 주당 빈도수 = 운동한 주들의 평균 세션 수
-  const weeklyAvg = active.length ? active.reduce((sum, p) => sum + p.value, 0) / active.length : 0;
+  // 주/월당 빈도수 = 운동한 칸들의 평균 세션 수
+  const periodAvg = active.length ? active.reduce((sum, p) => sum + p.value, 0) / active.length : 0;
   const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
+  const fmtBarDate = (d: string) => (bucket === 'month' ? `${d.slice(2, 4)}.${Number(d.slice(5, 7))}` : fmtDate(d));
   // 누른 x에 '가장 가까운 막대 중심'을 선택 — gap·flex 레이아웃에서도 정확(모든 막대 터치 가능)
   const GAP = 5;
   const barW = (bw - GAP * (pts.length - 1)) / pts.length;
@@ -431,9 +453,9 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
     <>
       <View style={s.clabel}>
         {a == null ? (
-          <><Text style={s.clT}>최대 {fmtVal(max)}</Text><Text style={s.clT}>{unit} · {pts.length}주</Text></>
+          <><Text style={s.clT}>최대 {fmtVal(max)}</Text><Text style={s.clT}>{unit} · {pts.length}{unitName}</Text></>
         ) : (
-          <><Text style={s.clT}>{fmtDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[a].value)}</Text></>
+          <><Text style={s.clT}>{fmtBarDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[a].value)}</Text></>
         )}
       </View>
       <View
@@ -456,7 +478,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
       </View>
       <View style={s.legend}>
         <Text style={[s.legT, drop && { color: SEM.bad }]}>
-          {!isVol && active.length ? `주 평균 ${weeklyAvg.toFixed(1)}회 · ` : ''}최근 {fmtVal(lastActive.value)}{drop ? ' · 직전보다 감소' : ''}
+          {!isVol && active.length ? `${unitName === '개월' ? '월' : '주'} 평균 ${periodAvg.toFixed(1)}회 · ` : ''}최근 {fmtVal(lastActive.value)}{drop ? ' · 직전보다 감소' : ''}
         </Text>
       </View>
     </>
@@ -472,6 +494,34 @@ const Empty = ({ label, sub }: { label?: string; sub?: string }) => (
 const Legend = ({ color, label }: { color: string; label: string }) => (
   <View style={s.lg}><View style={[s.lgDot, { backgroundColor: color }]} /><Text style={s.legT}>{label}</Text></View>
 );
+
+// 렙기록 표 — 반복수 1~12별 역대 최고 실측(무게×횟수)과 Epley 추정 1RM. 최고 추정 1RM 행 강조(🔥).
+function RepTable({ rows }: { rows: RepMax[] | null }) {
+  if (!rows) return <Empty label="불러오는 중…" />;
+  const withData = rows.filter(r => r.weight > 0);
+  if (withData.length === 0) return <Empty label="아직 렙별 기록이 없어요" sub="세트를 완료하면 반복수별 최고기록이 쌓여요" />;
+  const bestE1rm = Math.max(...withData.map(r => r.e1rm));
+  return (
+    <View>
+      <View style={s.rtHead}>
+        <Text style={[s.rtH, s.rtRep]}>반복</Text>
+        <Text style={[s.rtH, s.rtRec]}>실측 기록</Text>
+        <Text style={[s.rtH, s.rtRm]}>추정 1RM</Text>
+      </View>
+      {rows.map(r => {
+        const has = r.weight > 0;
+        const best = has && r.e1rm === bestE1rm;
+        return (
+          <View key={r.reps} style={[s.rtRow, best && s.rtRowBest]}>
+            <Text style={[s.rtRep, s.rtRepT]}>{r.reps}RM</Text>
+            <Text style={[s.rtRec, s.rtCell, !has && s.rtMuted]}>{has ? `${trim(r.weight)} × ${r.reps}` : '—'}</Text>
+            <Text style={[s.rtRm, s.rtCell, best && s.rtBestT, !has && s.rtMuted]}>{has ? `${trim(r.e1rm)}kg${best ? '  🔥' : ''}` : '—'}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 // ── 진단 카드 + 핵심 지표 ─────────────────────────────────
 type Dir = 'up' | 'down' | 'flat';
@@ -524,6 +574,31 @@ function fillWeeks(all: SeriesPoint[], period: Period, range?: DateRange | null)
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
     const key = ymd(d);
     out.push({ date: key, value: map.get(key) ?? 0 });
+  }
+  return out;
+}
+
+const firstOfMonth = (dt: Date) => new Date(dt.getFullYear(), dt.getMonth(), 1);
+/** 주간 빈도를 '월'로 합산(빈 달은 0). 1년 이상 기간에서 막대가 빽빽해지는 걸 방지. */
+function fillMonths(all: SeriesPoint[], period: Period, range?: DateRange | null): SeriesPoint[] {
+  if (all.length === 0) return [];
+  const sum = new Map<string, number>(); // 'YYYY-MM' → 세션 수 합
+  for (const p of all) { const k = p.date.slice(0, 7); sum.set(k, (sum.get(k) ?? 0) + p.value); }
+  const firstData = firstOfMonth(parseLocal(all[0].date));
+  let end = firstOfMonth(new Date());
+  let start = firstData;
+  if (period === 'custom' && range) {
+    const rs = firstOfMonth(parseLocal(range.start));
+    start = rs > firstData ? rs : firstData;
+    end = firstOfMonth(parseLocal(range.end));
+  } else if (period !== 'all') {
+    const cut = firstOfMonth(new Date(Date.now() - PERIOD_DAYS[period] * 86400000));
+    start = cut > firstData ? cut : firstData;
+  }
+  const out: SeriesPoint[] = [];
+  for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    out.push({ date: `${k}-01`, value: sum.get(k) ?? 0 });
   }
   return out;
 }
@@ -659,6 +734,18 @@ const s = StyleSheet.create({
   lg: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lgDot: { width: 8, height: 8, borderRadius: 4 },
   legT: { color: '#9a9aa2', fontSize: 9.5 },
+  // 렙기록 표
+  rtHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#2a2a30' },
+  rtH: { color: '#7a7a7e', fontSize: 11, fontWeight: '700' },
+  rtRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#242427', borderRadius: 8 },
+  rtRowBest: { backgroundColor: 'rgba(43,217,106,0.12)' },
+  rtRep: { width: 56 },
+  rtRec: { flex: 1, textAlign: 'right', paddingRight: 14 },
+  rtRm: { width: 96, textAlign: 'right' },
+  rtRepT: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  rtCell: { color: '#EDEDF0', fontSize: 14, fontWeight: '600' },
+  rtBestT: { color: SEM.good, fontWeight: '800' },
+  rtMuted: { color: '#48484A' },
 
   dcard: { marginHorizontal: 14, marginTop: 12, borderWidth: 1, borderRadius: 13, padding: 12 },
   dcardBad: { borderColor: 'rgba(255,138,0,0.45)', backgroundColor: 'rgba(255,138,0,0.07)' },

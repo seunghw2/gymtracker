@@ -39,6 +39,19 @@ export async function getActualRmHistory(exercise_id: number, reps: number): Pro
   return list.map(r => ({ date: String(r.date), estimated_1rm: r.oneRm }));
 }
 
+// 렙별 기록: 반복수 1~12 각각의 역대 최고 실측 무게 + Epley 추정 1RM(weight*(1+reps/30))
+export type RepMax = { reps: number; weight: number; e1rm: number };
+export async function getRepMaxes(exercise_id: number): Promise<RepMax[]> {
+  const repsList = Array.from({ length: 12 }, (_, i) => i + 1);
+  const series = await Promise.all(repsList.map(r => getActualRmHistory(exercise_id, r)));
+  return repsList.map((reps, i) => {
+    const vals = series[i].map(p => p.estimated_1rm).filter(v => v > 0);
+    if (vals.length === 0) return { reps, weight: 0, e1rm: 0 };
+    const weight = Math.max(...vals);
+    return { reps, weight, e1rm: Math.round(weight * (1 + reps / 30) * 10) / 10 };
+  });
+}
+
 export async function getTrainedExercises(): Promise<TrainedExercise[]> {
   return cached('ex:trained', 45_000, async () => {
     const list = await apiRequest<{ id: number; name: string; brand: string | null; note: string | null; trackingType: string | null }[]>(
