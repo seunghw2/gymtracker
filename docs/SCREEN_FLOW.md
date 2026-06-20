@@ -81,4 +81,4 @@ flowchart TD
 - **초록** = 양호(↑ 증가·PR), **주황** = 주의(정체·부족)
 - 파랑(info)은 미사용
 
-> 참고: 정식 스크린샷은 `docs/screenshots/`(작업 중). 인터랙티브 클릭 프로토타입이 필요하면 이 흐름도를 기반으로 `prototype.html`을 생성할 수 있다.
+> 화면 캡처: [screenshots/README.md](screenshots/README.md) (시뮬레이터 실제 앱). 인터랙티브 클릭 프로토타입이 필요하면 이 흐름도를 기반으로 `prototype.html`을 생성할 수 있다.
