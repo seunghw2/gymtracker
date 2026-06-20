@@ -66,7 +66,7 @@ export async function refreshWorkoutReminder(): Promise<void> {
     fire,
     '운동할 시간이야 💪',
     `${s.days}일째 쉬고 있어. 가볍게라도 다녀오면 흐름이 안 끊겨.`,
-    '/(tabs)/workout',
+    '/workout',   // 워크아웃은 독립 라우트(app/workout.tsx). (tabs)/workout 은 라우트 개편으로 삭제됨.
   );
   if (id) await AsyncStorage.setItem(K_SCHED_ID, id);
 }
