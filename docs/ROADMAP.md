@@ -181,6 +181,7 @@
 
 ### 우선순위 C — 보완
 
+- [ ] **C0. AI 범위 좁히기** — 감사 결과 앱은 이미 ~90% 맞음("계산=코드, 해석=LLM"). 남은 일: 레거시 LLM 필드 `summaryMetrics`/`strengths`/`watchouts` 제거 + 코치 탭 숫자 재진술 솎기 → AI를 **헤드라인·처방·채팅** 3개로. 상세·표: [AI_SCOPE.md](AI_SCOPE.md).
 - [ ] **C1. 세션 메모(note)** 프론트 입력 UI (백엔드 지원됨)
 - [ ] **C2. 스트릭 로직 통일** — 클라 계산 제거하고 백엔드 `/stats/streak` 사용
 - [x] **C3. 자동화 테스트** — ✅ (2026-06-18) 백엔드 43 + 프론트 35 = 78 테스트. 백엔드: 단위(ExerciseStats·detectStagnation·Epley/SetType·AiReportValidator) + 통합(h2 MockMvc: 인증 로테이션·운동 CRUD·종목 stats·채팅 멱등). 프론트: jest-expo + 순수 로직(units·format·date·periods·groupNotifications·pinnedLifts·exerciseEntry) + useChatStore 리듀서. 실행: 백 `./mvnw test`, 프론트 `npm test`
