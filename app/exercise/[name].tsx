@@ -275,19 +275,33 @@ function ChartArea({ data, metric, period }: { data: ExerciseProgress; metric: M
 
   if (metric === '1rm' || metric === 'maxw') {
     const pts = (metric === '1rm' ? data.e1rm : data.maxWeight).filter(inRange);
-    if (pts.length < 2) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
+    if (pts.length < 2) return <Empty
+      label={pts.length === 0 ? `${periodLabel} 동안 기록이 없어요` : `기록이 ${pts.length}개뿐이에요`}
+      sub="추세 그래프는 최소 2개부터 그려져요" />;
     const unit = metric === '1rm' ? '추정 1RM' : '최대 수행 무게';
     return <LineChart pts={pts} unit={`kg · ${unit}`}
       prDate={metric === '1rm' ? data.prDate : null} plateauWeeks={metric === '1rm' ? data.plateauWeeks : 0} />;
   }
-  const src = metric === 'vol' ? data.weeklyVolume : data.weeklyFreq;
-  if (src.filter(inRange).length < 1) return <Empty label={`최근 ${periodLabel} 기록이 부족해요`} />;
+  if (metric === 'vol') {
+    // 볼륨도 1RM·최대무게와 같은 선 그래프 방식으로(주간 볼륨 추세)
+    const vpts = data.weeklyVolume.filter(inRange);
+    if (vpts.length < 2) return <Empty
+      label={vpts.length === 0 ? `${periodLabel} 동안 기록이 없어요` : `기록이 ${vpts.length}개뿐이에요`}
+      sub="추세 그래프는 최소 2개부터 그려져요" />;
+    return <LineChart pts={vpts} unit="t · 주간 볼륨" prDate={null} plateauWeeks={0}
+      fmtY={v => `${(v / 1000).toFixed(1)}t`} unitShort="t" />;
+  }
+  // 빈도 → 막대 그래프(주별 운동 횟수)
+  const src = data.weeklyFreq;
+  if (src.filter(inRange).length < 1) return <Empty
+    label={`${periodLabel} 동안 기록이 없어요`} sub="그래프는 기록 1개부터 그려져요" />;
   // 쉰 주를 0으로 메우고(고스트 막대), 너무 많으면 최근 ~1년치(52주)까지만(주로 '전체' 보호).
   const pts = fillWeeks(src, period).slice(-52);
-  return <BarChart pts={pts} unit={metric === 'vol' ? '주간 볼륨' : '주 운동 횟수'} isVol={metric === 'vol'} />;
+  return <BarChart pts={pts} unit="주 운동 횟수" isVol={false} />;
 }
 
-function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; unit: string; prDate: string | null; plateauWeeks: number }) {
+function LineChart({ pts, unit, prDate, plateauWeeks, fmtY = (v: number) => `${trim(v)}kg`, unitShort = 'kg' }:
+  { pts: SeriesPoint[]; unit: string; prDate: string | null; plateauWeeks: number; fmtY?: (v: number) => string; unitShort?: string }) {
   const [act, setAct] = useState<number | null>(null);
   if (pts.length < 2) return <Empty />;
   // x축은 '점 순서'가 아니라 '실제 날짜'에 비례 — 16일치 데이터가 3개월처럼 늘어나 보이는 착시 방지
@@ -313,14 +327,20 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
   };
   // 지표·기간 변경으로 점 개수가 줄어도 안전하도록 범위 가드
   const a = act != null && act < pts.length ? act : null;
+  // 점이 빽빽하지 않게: 직전 표시점과 최소 간격(px) 이상일 때만 점 표시(첫·끝은 항상)
+  const dotSet = new Set<number>();
+  let prevDotX = -Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    if (i === pts.length - 1 || xs[i] - prevDotX >= 9) { dotSet.add(i); prevDotX = xs[i]; }
+  }
 
   return (
     <>
       <View style={s.clabel}>
         {a == null ? (
-          <><Text style={s.clT}>kg</Text><Text style={s.clT}>{unit}</Text></>
+          <><Text style={s.clT}>{unitShort}</Text><Text style={s.clT}>{unit}</Text></>
         ) : (
-          <><Text style={s.clT}>{fmtDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{trim(pts[a].value)}kg</Text></>
+          <><Text style={s.clT}>{fmtDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtY(pts[a].value)}</Text></>
         )}
       </View>
       <View
@@ -334,14 +354,14 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
           {/* y축 눈금: 최대·최소값 라벨로 그래프 높이가 몇 kg인지 한눈에 */}
           <Line x1={0} y1={y(rawMax)} x2={W} y2={y(rawMax)} stroke="#3a3a42" strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />
           <Line x1={0} y1={y(rawMin)} x2={W} y2={y(rawMin)} stroke="#3a3a42" strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />
-          <SvgText x={W - 3} y={y(rawMax) - 4} fill="#8a8a90" fontSize={9.5} textAnchor="end">{trim(rawMax)}kg</SvgText>
-          {rawMax !== rawMin && <SvgText x={W - 3} y={y(rawMin) + 12} fill="#6a6a6e" fontSize={9.5} textAnchor="end">{trim(rawMin)}kg</SvgText>}
+          <SvgText x={W - 3} y={y(rawMax) - 4} fill="#8a8a90" fontSize={9.5} textAnchor="end">{fmtY(rawMax)}</SvgText>
+          {rawMax !== rawMin && <SvgText x={W - 3} y={y(rawMin) + 12} fill="#6a6a6e" fontSize={9.5} textAnchor="end">{fmtY(rawMin)}</SvgText>}
           {showPlateau && <Rect x={xs[prIdx]} y={0} width={W - xs[prIdx]} height={CH - 6} fill="rgba(255,138,0,0.12)" />}
           {showPlateau && <Line x1={xs[prIdx]} y1={0} x2={xs[prIdx]} y2={CH - 6} stroke="rgba(255,138,0,0.4)" strokeWidth={1} strokeDasharray="3 3" />}
           <Polygon points={area} fill="rgba(43,217,106,0.10)" />
           <Polyline points={poly} fill="none" stroke={SEM.good} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
           {/* 운동한 날 = 작은 흰 점 (특수 마커는 아래에서 덮어써 강조) */}
-          {pts.map((p, i) => <Circle key={`d${i}`} cx={xs[i]} cy={y(p.value)} r={2} fill="#fff" opacity={0.85} />)}
+          {pts.map((p, i) => dotSet.has(i) ? <Circle key={`d${i}`} cx={xs[i]} cy={y(p.value)} r={2} fill="#fff" opacity={0.85} /> : null)}
           {/* x축 날짜: 실제 기간이 며칠인지 양 끝에 표시 */}
           <SvgText x={1} y={CH - 3} fill="#6a6a6e" fontSize={9} textAnchor="start">{fmtDate(pts[0].date)}</SvgText>
           {tMax !== tMin && <SvgText x={W - 1} y={CH - 3} fill="#6a6a6e" fontSize={9} textAnchor="end">{fmtDate(pts[pts.length - 1].date)}</SvgText>}
@@ -362,6 +382,7 @@ function LineChart({ pts, unit, prDate, plateauWeeks }: { pts: SeriesPoint[]; un
 
 function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVol: boolean }) {
   const [act, setAct] = useState<number | null>(null);
+  const [bw, setBw] = useState(W); // 막대줄 실제 너비(onLayout으로 측정)
   if (pts.length < 1) return <Empty />;
   const max = Math.max(...pts.map(p => p.value)) || 1;
   // 가장 최근 "활동한" 주(0인 주는 건너뜀) 기준으로 요약·강조
@@ -371,8 +392,15 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
   for (let i = pts.length - 1; i >= 0; i--) { if (pts[i].value > 0) { lastActiveIdx = i; break; } }
   const drop = active.length >= 2 && active[active.length - 1].value < active[active.length - 2].value;
   const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
-  // 막대 사이 간격(gap 5)을 보정한 인덱스 매핑 — 누른 위치의 막대를 정확히 잡는다.
-  const pick = (x: number) => setAct(Math.max(0, Math.min(pts.length - 1, Math.floor((x * pts.length) / (W + 5)))));
+  // 누른 x에 '가장 가까운 막대 중심'을 선택 — gap·flex 레이아웃에서도 정확(모든 막대 터치 가능)
+  const GAP = 5;
+  const barW = (bw - GAP * (pts.length - 1)) / pts.length;
+  const centerX = (i: number) => i * (barW + GAP) + barW / 2;
+  const pick = (x: number) => {
+    let best = 0;
+    for (let i = 1; i < pts.length; i++) if (Math.abs(centerX(i) - x) < Math.abs(centerX(best) - x)) best = i;
+    setAct(best);
+  };
   // 기간 변경으로 주 개수가 줄어도 안전하도록 범위 가드
   const a = act != null && act < pts.length ? act : null;
 
@@ -387,6 +415,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
       </View>
       <View
         style={s.barrow}
+        onLayout={e => setBw(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={e => pick(e.nativeEvent.locationX)}
@@ -397,7 +426,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
         <View pointerEvents="none" style={[s.barGrid, { top: 50 }]} />
         {pts.map((p, i) => {
           // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
-          if (p.value <= 0) return <View key={i} style={s.ghostBar} />;
+          if (p.value <= 0) return <View key={i} style={[s.ghostBar, i === a && { borderColor: '#fff', opacity: 1 }]} />;
           const color = i === a ? '#fff' : i === lastActiveIdx ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
           return <View key={i} style={{ flex: 1, height: Math.max(4, (p.value / max) * 92), borderRadius: 3, backgroundColor: color }} />;
         })}
@@ -411,7 +440,12 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
   );
 }
 
-const Empty = ({ label }: { label?: string }) => <View style={[s.barrow, { alignItems: 'center', justifyContent: 'center', height: CH }]}><Text style={s.clT}>{label ?? '데이터가 부족해요'}</Text></View>;
+const Empty = ({ label, sub }: { label?: string; sub?: string }) => (
+  <View style={[s.barrow, { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: CH, gap: 5 }]}>
+    <Text style={[s.clT, { fontSize: 12.5, color: '#c7c7cc' }]}>{label ?? '데이터가 부족해요'}</Text>
+    {sub ? <Text style={s.clT}>{sub}</Text> : null}
+  </View>
+);
 const Legend = ({ color, label }: { color: string; label: string }) => (
   <View style={s.lg}><View style={[s.lgDot, { backgroundColor: color }]} /><Text style={s.legT}>{label}</Text></View>
 );
