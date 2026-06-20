@@ -1,8 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Animated,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { getAiProfile, putAiProfile } from '../../db/queries';

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ChatConversation, ChatMsg, CreateConvInput, SendResult,
   listConversations, getConversationMessages, createConversation, sendChatMessage, deleteConversation,
@@ -21,7 +23,7 @@ type ChatState = {
 
 let tempId = -1;
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>()(persist((set, get) => ({
   conversations: [],
   messagesByConv: {},
 
@@ -77,4 +79,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
     try { await deleteConversation(convId); } catch (e) { console.warn('대화 삭제 실패', e); }
   },
+}), {
+  // 대화 목록을 로컬 캐시로 영속 → 재진입/콜드 스타트 시 네트워크 대기 없이 즉시 표시(SWR).
+  // 메시지(messagesByConv)는 대화별로 다시 불러오므로 목록만 저장한다.
+  name: 'chat-conversations',
+  storage: createJSONStorage(() => AsyncStorage),
+  partialize: (s) => ({ conversations: s.conversations }),
 }));

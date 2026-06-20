@@ -6,13 +6,13 @@ import {
   ScrollView,
   Pressable,
   Modal,
-  SafeAreaView,
   TextInput,
   RefreshControl,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';

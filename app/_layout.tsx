@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
 import { configureNotifications, ensurePermission } from '../lib/notifications';
 import { refreshWorkoutReminder, refreshWeeklyCoachNotification } from '../lib/reminders';
@@ -54,15 +55,19 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      {status === 'authenticated' && <NotificationBridge />}
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="workout" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="exercise-add" options={{ presentation: 'modal' }} />
-      </Stack>
-    </GestureHandlerRootView>
+    // initialWindowMetrics: 앱 시작 시점에 캡처된 안전영역 값을 첫 프레임부터 제공해
+    // 화면 진입 시 인셋이 뒤늦게 적용되며 콘텐츠가 "툭" 내려오는 점프를 제거한다.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="light" />
+        {status === 'authenticated' && <NotificationBridge />}
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="workout" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="exercise-add" options={{ presentation: 'modal' }} />
+        </Stack>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

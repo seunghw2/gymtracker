@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { getLatestAiReport, AiReportResult } from '../../db/queries';

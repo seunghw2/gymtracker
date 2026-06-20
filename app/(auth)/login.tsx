@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, SafeAreaView, ActivityIndicator, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import { useAuthStore } from '../../store/useAuthStore';

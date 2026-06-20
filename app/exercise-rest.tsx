@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, SafeAreaView, ScrollView, TextInput, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  TextInput,
+  Modal,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { SEM } from '../constants/colors';
 import { getExercises, getSetting, setSetting, setExerciseRest, Exercise } from '../db/queries';

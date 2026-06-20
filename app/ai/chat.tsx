@@ -1,8 +1,16 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, TextInput, SafeAreaView,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { askReportChat, ChatTurn, ReportPeriodType } from '../../db/queries';

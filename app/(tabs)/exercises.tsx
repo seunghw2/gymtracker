@@ -1,7 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, RefreshControl, TextInput, Modal, Alert,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  TextInput,
+  Modal,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';

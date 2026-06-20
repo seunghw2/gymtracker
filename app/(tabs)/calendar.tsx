@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   ScrollView,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { getWorkoutDates, getMonthStats, getAllWorkoutDates, getSessionHistory, SessionSummary } from '../../db/queries';
 import { formatShortWithDay, formatShortWithWeekday, todayStr, toDateStr, addDaysStr } from '../../lib/date';

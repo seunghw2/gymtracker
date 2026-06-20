@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import {
+  useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -7,7 +8,6 @@ import {
   Pressable,
   TextInput,
   Alert,
-  SafeAreaView,
   Modal,
   ScrollView,
   Platform,
@@ -18,6 +18,7 @@ import {
   findNodeHandle,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import * as Haptics from 'expo-haptics';

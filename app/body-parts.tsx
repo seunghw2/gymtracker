@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, SafeAreaView, TextInput, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { useRouter } from 'expo-router';
 import { SEM } from '../constants/colors';

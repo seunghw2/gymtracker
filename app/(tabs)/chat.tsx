@@ -1,7 +1,14 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, RefreshControl,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  InteractionManager,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Swipeable } from 'react-native-gesture-handler';
 import { AI } from '../../constants/colors';
@@ -21,17 +28,26 @@ export default function ChatTab() {
   const removeConv = useChatStore(s => s.remove);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [firstLoading, setFirstLoading] = useState(true);   // 최초 로드 중 여부(스켈레톤 표시용)
   const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
 
   const load = useCallback(async () => {
-    // 이번 주 코치 대화 보장(크론이 못 돌았어도 보완) 후 목록 갱신
-    ensureWeeklyConversation().finally(() => loadConversations());
     // 코치 허브 진입 → 알림 배지 비움(알림은 이제 주간 채팅 메시지로 들어옴)
-    markAllNotificationsRead().catch(() => {});
     setUnread(0);
+    markAllNotificationsRead().catch(() => {});
+    // 이번 주 코치 대화 보장(크론이 못 돌았어도 보완) 후 목록 갱신
+    try { await ensureWeeklyConversation(); } catch { /* ignore */ }
+    await loadConversations();
   }, [loadConversations, setUnread]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    // 화면 전환 애니메이션이 끝난 뒤 네트워크 로드 → 진입이 매끄럽고,
+    // 그동안 캐시(persist)된 목록이나 스켈레톤이 먼저 자리잡는다.
+    const task = InteractionManager.runAfterInteractions(() => {
+      load().finally(() => setFirstLoading(false));
+    });
+    return () => task.cancel();
+  }, [load]));
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   const starters = ['이번 주 어땠어', '정체 풀기', '루틴 짜줘'];
@@ -88,7 +104,9 @@ export default function ChatTab() {
             );
           })}
 
-          {conversations.length === 0 && (
+          {/* 첫 로딩 중엔 스켈레톤으로 골격을 먼저 고정(빈→채움 팝인 방지) */}
+          {conversations.length === 0 && firstLoading && <ChatSkeleton />}
+          {conversations.length === 0 && !firstLoading && (
             <View style={s.empty}><Text style={{ fontSize: 36, marginBottom: 10 }}>🤖</Text><Text style={s.emptyT}>운동에 대해 뭐든 물어보세요.</Text></View>
           )}
         </ScrollView>
@@ -98,6 +116,22 @@ export default function ChatTab() {
           <Text style={s.fabIcon}>✎</Text>
         </Pressable>
     </SafeAreaView>
+  );
+}
+
+/** 최근 대화 자리표시(스켈레톤) — 실제 카드(s.ses)와 같은 크기로 골격을 잡아 레이아웃 점프를 막는다. */
+function ChatSkeleton() {
+  return (
+    <View>
+      <Text style={s.lbl}>최근 대화</Text>
+      {[0, 1].map(i => (
+        <View key={i} style={s.ses}>
+          <View style={[s.skel, { width: '55%', height: 13 }]} />
+          <View style={[s.skel, { width: '80%', height: 11, marginTop: 8 }]} />
+          <View style={[s.skel, { width: 48, height: 10, marginTop: 9 }]} />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -137,6 +171,7 @@ const s = StyleSheet.create({
 
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyT: { color: AI.textSub, fontSize: 13 },
+  skel: { backgroundColor: '#1a1a1f', borderRadius: 6 },
 
   swipeDel: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 76, marginBottom: 8, borderRadius: 12 },
   swipeDelT: { color: '#fff', fontSize: 13, fontWeight: '800' },

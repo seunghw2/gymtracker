@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, Dimensions, ActivityIndicator, TextInput,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Dimensions,
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Polyline, Polygon, Circle, Rect, Line } from 'react-native-svg';
 import { SEM } from '../../constants/colors';
