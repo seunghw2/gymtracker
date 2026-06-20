@@ -641,7 +641,8 @@ function KV({ k, v, bad }: { k: string; v: string; bad?: boolean }) {
 
 /** 핵심 지표 2×2 — 최대무게·주간볼륨·주빈도·마지막 수행. 모두 코드 계산값. */
 function KeyStats({ data }: { data: ExerciseProgress }) {
-  const maxW = data.maxWeight.length ? data.maxWeight[data.maxWeight.length - 1].value : null;
+  // 역대 최고 무게(전체 최댓값) — 차트의 피크와 일치. 마지막 세션 값이 아님.
+  const maxW = data.maxWeight.length ? Math.max(...data.maxWeight.map(p => p.value)) : null;
   const vol = data.weeklyVolume.length ? data.weeklyVolume[data.weeklyVolume.length - 1].value : 0;
   const volDown = seriesDir(data.weeklyVolume) === 'down';
   const freq = data.weeklyFreq.length ? data.weeklyFreq[data.weeklyFreq.length - 1].value : 0;
