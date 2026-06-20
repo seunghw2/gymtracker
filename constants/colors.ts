@@ -36,8 +36,8 @@ export const SEM = {
   ink4: '#48484A',       // 가장 약함(placeholder·disabled)
 } as const;
 
-/** 모서리 반경 스케일(5단). sm=칩 내부, md=작은 카드, lg=카드, xl=큰 카드·버튼, full=알약·원형. */
-export const RADIUS = { sm: 4, md: 8, lg: 12, xl: 16, full: 999 } as const;
+/** 모서리 반경 스케일. sm=칩 내부, md=작은 카드/시트행, lg=칩/버튼, card=카드(가장 많이 씀), xl=큰 카드·시트, full=알약·원형. */
+export const RADIUS = { sm: 4, md: 8, lg: 12, card: 14, xl: 16, full: 999 } as const;
 
 /** 4pt 간격 그리드. padding·gap·margin 공통. */
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;

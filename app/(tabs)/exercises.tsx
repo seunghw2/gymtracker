@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BottomSheet from '../../components/ui/BottomSheet';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SEM, ACCENT } from '../../constants/colors';
 import { MUSCLE_KO, MUSCLE_COLOR, PART_ORDER } from '../../constants/exercises';
@@ -224,22 +225,17 @@ export default function ExercisesTab() {
       <SortSheet visible={sortOpen} current={sortKey} onSelect={setSortKey} onClose={() => setSortOpen(false)} />
 
       {/* 그룹 관리 시트(롱프레스) */}
-      <Modal visible={!!menuGroup} transparent animationType="slide" onRequestClose={() => setMenuGroup(null)}>
-        <Pressable style={s.scrim} onPress={() => setMenuGroup(null)}>
-          <Pressable style={s.sheet} onPress={() => {}}>
-            <Text style={s.sheetTitle}>{menuGroup?.name}</Text>
-            <Pressable style={s.sopt} onPress={() => { const g = menuGroup!; setMenuGroup(null); renameGroup(g); }}>
-              <Text style={s.soptT}>✏️ 이름 변경</Text>
-            </Pressable>
-            <Pressable style={s.sopt} onPress={() => { setMenuGroup(null); setEdit(true); }}>
-              <Text style={s.soptT}>↕️ 순서 변경</Text>
-            </Pressable>
-            <Pressable style={s.sopt} onPress={() => { const g = menuGroup!; setMenuGroup(null); removeGroup(g); }}>
-              <Text style={[s.soptT, { color: SEM.danger }]}>🗑️ 삭제</Text>
-            </Pressable>
-          </Pressable>
+      <BottomSheet visible={!!menuGroup} onClose={() => setMenuGroup(null)} title={menuGroup?.name}>
+        <Pressable style={s.sopt} onPress={() => { const g = menuGroup!; setMenuGroup(null); renameGroup(g); }}>
+          <Text style={s.soptT}>✏️ 이름 변경</Text>
         </Pressable>
-      </Modal>
+        <Pressable style={s.sopt} onPress={() => { setMenuGroup(null); setEdit(true); }}>
+          <Text style={s.soptT}>↕️ 순서 변경</Text>
+        </Pressable>
+        <Pressable style={s.sopt} onPress={() => { const g = menuGroup!; setMenuGroup(null); removeGroup(g); }}>
+          <Text style={[s.soptT, { color: SEM.danger }]}>🗑️ 삭제</Text>
+        </Pressable>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -280,9 +276,6 @@ const s = StyleSheet.create({
   sortBtnT: { color: '#ddd', fontSize: 13, fontWeight: '700' },
   editBtn: { color: ACCENT, fontSize: 13, fontWeight: '800', paddingHorizontal: 2, paddingVertical: 6 },
 
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: SEM.surface3, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingBottom: 30 },
-  sheetTitle: { color: SEM.ink3, fontSize: 14, fontWeight: '700', margin: 16, marginBottom: 4 },
   sopt: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingVertical: 15, borderTopWidth: 1, borderTopColor: SEM.line2 },
   soptT: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
