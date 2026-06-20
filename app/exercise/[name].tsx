@@ -412,6 +412,8 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
   let lastActiveIdx = -1;
   for (let i = pts.length - 1; i >= 0; i--) { if (pts[i].value > 0) { lastActiveIdx = i; break; } }
   const drop = active.length >= 2 && active[active.length - 1].value < active[active.length - 2].value;
+  // 주당 빈도수 = 운동한 주들의 평균 세션 수
+  const weeklyAvg = active.length ? active.reduce((sum, p) => sum + p.value, 0) / active.length : 0;
   const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
   // 누른 x에 '가장 가까운 막대 중심'을 선택 — gap·flex 레이아웃에서도 정확(모든 막대 터치 가능)
   const GAP = 5;
@@ -454,7 +456,7 @@ function BarChart({ pts, unit, isVol }: { pts: SeriesPoint[]; unit: string; isVo
       </View>
       <View style={s.legend}>
         <Text style={[s.legT, drop && { color: SEM.bad }]}>
-          최근 {fmtVal(lastActive.value)}{drop ? ' · 직전보다 감소' : ''}
+          {!isVol && active.length ? `주 평균 ${weeklyAvg.toFixed(1)}회 · ` : ''}최근 {fmtVal(lastActive.value)}{drop ? ' · 직전보다 감소' : ''}
         </Text>
       </View>
     </>
