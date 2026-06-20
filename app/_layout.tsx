@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
 import { configureNotifications, ensurePermission } from '../lib/notifications';
 import { refreshWorkoutReminder, refreshWeeklyCoachNotification } from '../lib/reminders';
@@ -55,9 +55,11 @@ export default function RootLayout() {
   }
 
   return (
-    // initialWindowMetrics: 앱 시작 시점에 캡처된 안전영역 값을 첫 프레임부터 제공해
-    // 화면 진입 시 인셋이 뒤늦게 적용되며 콘텐츠가 "툭" 내려오는 점프를 제거한다.
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+    // initialMetrics를 일부러 넘기지 않는다. Expo Go에선 initialWindowMetrics가
+    // null/0으로 와서 잘못된 인셋(top:0)으로 먼저 그린 뒤 "툭" 내려오는 점프가 생긴다.
+    // 미지정 시 Provider가 실제 측정(onLayout) 후에 children을 렌더하므로(검은 1프레임=비가시)
+    // 모든 화면이 처음부터 올바른 위치로 뜬다.
+    <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
         {status === 'authenticated' && <NotificationBridge />}

@@ -325,6 +325,7 @@ function CustomGroupView({ group, rows, search, brandById, onReorder, onRemove, 
       keyExtractor={r => String(r.exerciseId)}
       onDragEnd={({ from, to }) => onReorder(from, to)}
       activationDistance={12}
+      containerStyle={s.flex1}
       style={s.flex1}
       contentContainerStyle={s.body}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={SEM.brand} />}
