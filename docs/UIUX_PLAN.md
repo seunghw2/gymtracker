@@ -16,7 +16,7 @@
 ## 10단계 (체크리스트)
 
 ### 기반
-- [ ] **1. 디자인 시스템 감사 + 컴포넌트 인벤토리** — 토큰 단일화(색·타입·8pt 간격), 인라인 스타일 → 공용 `Card/Sheet/Row/Pill`. ref: Linear, Things.
+- [x] **1. 디자인 시스템 감사 + 컴포넌트 인벤토리** — `components/ui/BottomSheet` 신설(SortSheet·그룹시트 치환), `RADIUS.card` 토큰, `docs/DESIGN.md`(토큰 단일소스 + hex→토큰 규칙). 감사: TYPE/SPACE/RADIUS 사용 0회·fontSize 615/여백 981 하드코딩 확인. ⚠ 대량 hex 스윕은 blind 치환이 JSX 깨뜨려 보류 → 화면별 점진(2~10단계). ref: Linear, Things.
 - [ ] **2. 정보 위계·타이포·글랜서빌리티** — 화면별 1차/2차/3차 재배치, "한눈에 핵심 1개". ref: Whoop, Oura.
 
 ### 핵심 플로우
