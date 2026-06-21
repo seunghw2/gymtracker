@@ -102,6 +102,23 @@ export async function getExerciseCoachLine(exerciseId: number): Promise<string |
   }
 }
 
+/** 종목 구조화 리포트(C) — 목표·스타일 기준 위치→원인→액션. 실패/미생성이면 null. */
+export type ExerciseReport = {
+  status: string | null;
+  goalBasis: string | null;
+  currentSituation: string | null;
+  causes: string[];
+  nextActions: string[];
+};
+export async function getExerciseReport(exerciseId: number): Promise<ExerciseReport | null> {
+  try {
+    const r = await apiRequest<ExerciseReport | null>(`/api/v1/ai/exercise-report?exerciseId=${exerciseId}`);
+    return r && r.currentSituation ? r : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── 통합 리포트(명세 §7) — 6종 기간을 한 스키마로 ─────────────────────────
 
 export type ReportPeriodType = 'session' | 'week' | 'month' | 'quarter' | 'half' | 'year';

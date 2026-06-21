@@ -15,7 +15,7 @@ import Svg, { Polyline, Polygon, Circle, Rect, Line, Text as SvgText } from 'rea
 import { SEM } from '../../constants/colors';
 import {
   getExerciseProgress, getTrainedExercises, updateExerciseNote, getExerciseCoachLine, ExerciseProgress, SeriesPoint,
-  getRepMaxes, RepMax,
+  getRepMaxes, RepMax, getExerciseReport, ExerciseReport,
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { useChatStore } from '../../store/useChatStore';
@@ -53,6 +53,7 @@ export default function ExerciseReport() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [llmLine, setLlmLine] = useState<string | null>(null);
+  const [exReport, setExReport] = useState<ExerciseReport | null>(null); // 구조화 리포트(C)
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export default function ExerciseReport() {
     if (!exId) return;
     let on = true;
     getExerciseCoachLine(exId).then(l => { if (on && l) setLlmLine(l); }).catch(() => {});
+    getExerciseReport(exId).then(r => { if (on && r) setExReport(r); }).catch(() => {});
     return () => { on = false; };
   }, [exId]);
 
@@ -114,7 +116,7 @@ export default function ExerciseReport() {
   const goalMethod = isFlat
     ? `${trim(pr)}kg 회복 · ${trim(reset)} 리셋, 주당 +2.5kg`
     : `다음 목표 ${trim(cur + 2.5)}kg · 점진적 과부하`;
-  const whyLine = llmLine ?? coach?.headline ?? '';
+  const whyLine = exReport?.currentSituation ?? llmLine ?? coach?.headline ?? '';
 
   const saveMemo = async () => {
     if (!exId) return;
@@ -193,6 +195,26 @@ export default function ExerciseReport() {
               <Text style={s.rxB}>{goalMethod}</Text>
             </View>
             {whyLine ? <Text style={s.rxWhy}>{whyLine}</Text> : null}
+
+            {exReport && (
+              <View style={s.exr}>
+                {!!exReport.goalBasis && (
+                  <Text style={s.exrBasis}>{exReport.status ? `${exReport.status} · ` : ''}{exReport.goalBasis}</Text>
+                )}
+                {exReport.causes.length > 0 && (
+                  <View style={s.exrSec}>
+                    <Text style={s.exrK}>원인</Text>
+                    {exReport.causes.map((c, i) => <Text key={i} style={s.exrLi}>· {c}</Text>)}
+                  </View>
+                )}
+                {exReport.nextActions.length > 0 && (
+                  <View style={s.exrSec}>
+                    <Text style={s.exrK}>다음 액션</Text>
+                    {exReport.nextActions.map((c, i) => <Text key={i} style={s.exrLi}>· {c}</Text>)}
+                  </View>
+                )}
+              </View>
+            )}
 
             <View style={s.memo}>
               <View style={s.memoH}>
@@ -796,6 +818,12 @@ const s = StyleSheet.create({
   rxK: { color: SEM.good, fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   rxB: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
   rxWhy: { color: '#9a9aa2', fontSize: 12, lineHeight: 17, marginTop: 7, marginBottom: 4 },
+  // 구조화 리포트(C) — 원인·다음 액션
+  exr: { marginTop: 8, gap: 8 },
+  exrBasis: { color: SEM.good, fontSize: 11.5, fontWeight: '700' },
+  exrSec: { gap: 3 },
+  exrK: { color: '#7a7a7e', fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  exrLi: { color: '#EDEDF0', fontSize: 13, lineHeight: 18 },
   memo: { backgroundColor: '#14130d', borderWidth: 1, borderColor: '#3a3320', borderRadius: 11, padding: 11, marginTop: 11 },
   memoH: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   memoHT: { color: '#caa94a', fontSize: 10.5, fontWeight: '800', flex: 1, marginRight: 8 },
