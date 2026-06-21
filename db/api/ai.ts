@@ -49,6 +49,7 @@ export type AiReportResult = {
 export type AiProfile = {
   goalPhysique: string;
   weightGoal: string | null;
+  successGoal: string | null;
   priorityMuscles: string[];
   weeklyFrequencyTarget: number | null;
   constraints: string[];
@@ -62,6 +63,7 @@ export type AiProfile = {
 export type AiProfileInput = {
   goalPhysique: string;
   weightGoal?: string | null;
+  successGoal?: string | null;
   priorityMuscles: string[];
   weeklyFrequencyTarget?: number | null;
   constraints?: string[];
