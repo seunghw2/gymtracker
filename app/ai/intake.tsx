@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { getAiProfile, putAiProfile } from '../../db/queries';
+import { toggleMulti, answersToProfile } from '../../lib/onboarding';
 
 // ── 선택지 ────────────────────────────────────────────────────────────────
 type Opt = { v: string | number; label: string };
@@ -106,6 +107,7 @@ export default function AiIntake() {
   const [typing, setTyping] = useState(false);
   const [progress, setProgress] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState(''); // 하단 입력바 자유 입력
 
   const setAnswer = (patch: Partial<Answers>) => {
     answersRef.current = { ...answersRef.current, ...patch };
@@ -194,20 +196,24 @@ export default function AiIntake() {
     if (skip || !text) {
       setAnswer({ note: '' });
       push('user', '건너뛸게요');
-    } else {
-      push('user', text);
     }
+    // 메모가 있으면 이미 입력바에서 보낸 말풍선이 있으므로 추가 push 안 함
     setActiveIndex(-1);
     advance(i);
   };
 
-  const toggleMuscle = (v: string) => {
-    const cur = answersRef.current.muscles ?? [];
-    setAnswer({ muscles: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] });
-  };
-  const togglePain = (v: string) => {
-    const cur = answersRef.current.constraintChips ?? [];
-    setAnswer({ constraintChips: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] });
+  const toggleMuscle = (v: string) => setAnswer({ muscles: toggleMulti(answersRef.current.muscles ?? [], v) });
+  const togglePain = (v: string) => setAnswer({ constraintChips: toggleMulti(answersRef.current.constraintChips ?? [], v) });
+
+  // 하단 입력바: 자유 입력을 현재 스텝 텍스트 필드로(메모/제약), 칩 스텝에선 freeNote로 모음. 진행은 칩/버튼이 담당.
+  const sendDraft = () => {
+    const t = draft.trim();
+    if (!t) return;
+    push('user', t);
+    if (q?.type === 'note') setAnswer({ note: t });
+    else if (q?.type === 'constraints') setAnswer({ constraintText: [answersRef.current.constraintText, t].filter(Boolean).join(', ') });
+    else setAnswer({ note: [answersRef.current.note, t].filter(Boolean).join(' / ') });
+    setDraft('');
   };
 
   // ── 저장 ──────────────────────────────────────────────────────────────
@@ -215,24 +221,8 @@ export default function AiIntake() {
     setActiveIndex(-1);
     setTyping(true);
     setSaving(true);
-    const a = answersRef.current;
-    const constraints = [
-      ...(a.constraintChips ?? []),
-      ...((a.constraintText ?? '').split(',').map(s => s.trim()).filter(Boolean)),
-    ];
     try {
-      await putAiProfile({
-        goalPhysique: a.goal!,
-        weightGoal: a.weightGoal ?? null,
-        priorityMuscles: a.muscles ?? [],
-        weeklyFrequencyTarget: a.frequency ?? null,
-        constraints,
-        experienceLevel: a.experience ?? null,
-        trainingMonths: a.trainingMonths ?? null,
-        splitStyle: null,
-        sessionMinutes: a.sessionMinutes ?? null,
-        freeNote: (a.note ?? '').trim() || null,
-      });
+      await putAiProfile(answersToProfile(answersRef.current));
       if (mounted.current) router.replace('/ai');
     } catch {
       if (!mounted.current) return;
@@ -316,14 +306,7 @@ export default function AiIntake() {
                     );
                   })}
                 </View>
-                <TextInput
-                  style={styles.input}
-                  placeholder="직접 입력 (예: 왼 어깨가 시큰함)"
-                  placeholderTextColor={AI.faint}
-                  defaultValue={answers.constraintText}
-                  onChangeText={t => setAnswer({ constraintText: t })}
-                  multiline
-                />
+                <Text style={styles.hint}>그 외엔 아래 입력창에 적어 주세요</Text>
                 <View style={styles.row}>
                   <Pressable style={[styles.cta, styles.ghost]} onPress={() => onConstraints(activeIndex)}>
                     <Text style={styles.ghostText}>없어요</Text>
@@ -337,14 +320,7 @@ export default function AiIntake() {
 
             {q.type === 'note' && (
               <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="자유롭게 적어 주세요"
-                  placeholderTextColor={AI.faint}
-                  defaultValue={answers.note}
-                  onChangeText={t => setAnswer({ note: t })}
-                  multiline
-                />
+                <Text style={styles.hint}>아래 입력창에 자유롭게 적어 주세요</Text>
                 <View style={styles.row}>
                   <Pressable style={[styles.cta, styles.ghost]} onPress={() => onNote(activeIndex, true)}>
                     <Text style={styles.ghostText}>건너뛰기</Text>
@@ -359,10 +335,25 @@ export default function AiIntake() {
           )}
         </ScrollView>
 
-        {saving && (
+        {saving ? (
           <View style={styles.savingBar}>
             <ActivityIndicator color={AI.accent} />
             <Text style={styles.savingText}>분석을 준비하고 있어요…</Text>
+          </View>
+        ) : (
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.barInput}
+              placeholder="메시지 입력…"
+              placeholderTextColor={AI.faint}
+              value={draft}
+              onChangeText={setDraft}
+              onSubmitEditing={sendDraft}
+              returnKeyType="send"
+            />
+            <Pressable style={[styles.sendBtn, !draft.trim() && { opacity: 0.4 }]} disabled={!draft.trim()} onPress={sendDraft} hitSlop={6}>
+              <Text style={styles.sendIcon}>↑</Text>
+            </Pressable>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -437,13 +428,13 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: AI.textSub },
 
   controls: { gap: 10, marginTop: 6, marginBottom: 4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderColor: AI.accent, borderWidth: 1, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 15 },
-  chipOn: { backgroundColor: AI.tint },
-  chipText: { color: AI.accent, fontSize: 13.5, fontWeight: '700' },
-  chipTextOn: { color: '#FF9F97' },
-
-  input: { backgroundColor: AI.bubble, borderRadius: 12, padding: 13, color: '#fff', fontSize: 14, minHeight: 48 },
+  // 답변 칩 — 우측 균일폭 세로 스택, 중립 다크(빨강은 보낸 말풍선에만)
+  chips: { gap: 8, alignSelf: 'stretch' },
+  chip: { alignSelf: 'flex-end', width: '74%', alignItems: 'center', backgroundColor: AI.chipBg, borderColor: AI.chipBorder, borderWidth: 1, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 16 },
+  chipOn: { borderColor: AI.accent },          // 복수 대기상태: 빨강 테두리(배경 중립 유지)
+  chipText: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
+  chipTextOn: { color: '#fff' },
+  hint: { color: AI.textSub, fontSize: 12.5, alignSelf: 'flex-end' },
 
   row: { flexDirection: 'row', gap: 8 },
   cta: { backgroundColor: AI.accent, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 18, alignItems: 'center' },
@@ -453,4 +444,10 @@ const styles = StyleSheet.create({
 
   savingBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },
   savingText: { color: AI.textSub, fontSize: 13 },
+
+  // 하단 입력바
+  inputBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: AI.line },
+  barInput: { flex: 1, backgroundColor: AI.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, color: '#fff', fontSize: 14, maxHeight: 100 },
+  sendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center' },
+  sendIcon: { color: AI.ink, fontSize: 19, fontWeight: '800', marginTop: -1 },
 });
