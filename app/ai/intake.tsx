@@ -21,10 +21,18 @@ import { getAiProfile, putAiProfile } from '../../db/queries';
 type Opt = { v: string | number; label: string };
 
 const GOALS: Opt[] = [
-  { v: 'lean_muscle', label: '린매스' },
-  { v: 'strength', label: '근력' },
-  { v: 'fat_loss', label: '체지방 감소' },
-  { v: 'maintain', label: '체형 유지' },
+  { v: 'lean_muscle', label: '💪 근육을 키우고 싶어요' },
+  { v: 'strength', label: '🏋️ 더 강해지고 싶어요' },
+  { v: 'fat_loss', label: '🔥 체지방을 줄이고 싶어요' },
+  { v: 'habit', label: '📅 운동 습관을 만들고 싶어요' },
+  { v: 'health', label: '❤️ 건강하게 유지하고 싶어요' },
+  { v: 'unsure', label: '🤔 잘 모르겠어요' },
+];
+const WEIGHT_GOAL: Opt[] = [
+  { v: 'gain', label: '증량' },
+  { v: 'maintain', label: '유지' },
+  { v: 'loss', label: '감량' },
+  { v: 'unknown', label: '모름' },
 ];
 const EXPERIENCE: Opt[] = [
   { v: 'beginner', label: '막 시작했어요' },
@@ -40,13 +48,6 @@ const DURATION: Opt[] = [
 const FREQ: Opt[] = [
   { v: 2, label: '주 2회' }, { v: 3, label: '주 3회' }, { v: 4, label: '주 4회' },
   { v: 5, label: '주 5회' }, { v: 6, label: '주 6회+' },
-];
-const SPLIT: Opt[] = [
-  { v: 'full_body', label: '무분할 (전신)' },
-  { v: 'split_2_3', label: '2~3분할' },
-  { v: 'split_4_5', label: '4~5분할' },
-  { v: 'ppl', label: 'PPL (밀기·당기기·다리)' },
-  { v: 'unsure', label: '아직 잘 몰라요' },
 ];
 const SESSION_MIN: Opt[] = [
   { v: 30, label: '30분' }, { v: 45, label: '45분' }, { v: 60, label: '60분' }, { v: 90, label: '90분+' },
@@ -66,11 +67,11 @@ type QType = 'single' | 'multi' | 'constraints' | 'note';
 type Question = { id: string; type: QType; prompt: React.ReactNode; options?: Opt[] };
 
 const QUESTIONS: Question[] = [
-  { id: 'goal', type: 'single', options: GOALS, prompt: <>반가워요! 더 정확히 분석하려고 몇 가지만 물어볼게요. 먼저, 요즘 <B>어떤 몸</B>을 만들고 싶어요?</> },
+  { id: 'goal', type: 'single', options: GOALS, prompt: <>반가워요! 몇 가지만 빠르게 물어볼게요. <B>운동 목표</B>가 뭐예요?</> },
+  { id: 'weightGoal', type: 'single', options: WEIGHT_GOAL, prompt: <><B>목표 체중</B>이 있나요?</> },
   { id: 'experience', type: 'single', options: EXPERIENCE, prompt: <>지금 <B>운동 실력</B>은 어느 쪽에 가까워요?</> },
   { id: 'trainingMonths', type: 'single', options: DURATION, prompt: <>운동을 <B>꾸준히 한 지</B>는 얼마나 됐어요?</> },
   { id: 'frequency', type: 'single', options: FREQ, prompt: <>일주일에 보통 <B>며칠</B> 운동해요?</> },
-  { id: 'split', type: 'single', options: SPLIT, prompt: <>운동을 <B>어떻게 나눠서</B> 해요?</> },
   { id: 'sessionMinutes', type: 'single', options: SESSION_MIN, prompt: <>한 번 운동하면 보통 <B>얼마나</B> 걸려요?</> },
   { id: 'muscles', type: 'multi', options: MUSCLES, prompt: <>특히 <B>키우고 싶은 부위</B>가 있어요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(여러 개 골라도 돼요)</Text></> },
   { id: 'constraints', type: 'constraints', options: PAIN_CHIPS, prompt: <>혹시 <B>아프거나 조심해야</B> 할 곳이 있어요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 넘어가도 돼요)</Text></> },
@@ -80,10 +81,10 @@ const QUESTIONS: Question[] = [
 type Msg = { id: string; role: 'ai' | 'user'; content: React.ReactNode };
 type Answers = {
   goal?: string;
+  weightGoal?: string;
   experience?: string;
   trainingMonths?: number;
   frequency?: number;
-  split?: string;
   sessionMinutes?: number;
   muscles?: string[];
   constraintChips?: string[];
@@ -133,10 +134,10 @@ export default function AiIntake() {
       if (p) {
         const a: Answers = {};
         if (p.goalPhysique) a.goal = p.goalPhysique;
+        if (p.weightGoal) a.weightGoal = p.weightGoal;
         if (p.experienceLevel) a.experience = p.experienceLevel;
         if (p.trainingMonths != null) a.trainingMonths = p.trainingMonths;
         if (p.weeklyFrequencyTarget != null) a.frequency = p.weeklyFrequencyTarget;
-        if (p.splitStyle) a.split = p.splitStyle;
         if (p.sessionMinutes != null) a.sessionMinutes = p.sessionMinutes;
         if (p.priorityMuscles?.length) a.muscles = p.priorityMuscles;
         const known = new Set(PAIN_CHIPS.map(c => c.v));
@@ -222,12 +223,13 @@ export default function AiIntake() {
     try {
       await putAiProfile({
         goalPhysique: a.goal!,
+        weightGoal: a.weightGoal ?? null,
         priorityMuscles: a.muscles ?? [],
         weeklyFrequencyTarget: a.frequency ?? null,
         constraints,
         experienceLevel: a.experience ?? null,
         trainingMonths: a.trainingMonths ?? null,
-        splitStyle: a.split ?? null,
+        splitStyle: null,
         sessionMinutes: a.sessionMinutes ?? null,
         freeNote: (a.note ?? '').trim() || null,
       });
