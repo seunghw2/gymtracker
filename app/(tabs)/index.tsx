@@ -34,6 +34,7 @@ import BriefingLoading from '../../components/BriefingLoading';
 import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { readCache, writeCache } from '../../lib/diskCache';
+import { shouldRefreshBriefing, BRIEFING_DAY_KEY, BRIEFING_DIRTY_KEY } from '../../lib/briefingRefresh';
 
 const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
 const REPORT_CACHE_KEY = 'briefing:week';
@@ -85,6 +86,15 @@ export default function BriefingHome() {
   const [reportFetched, setReportFetched] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // SUCCESS면 디스크 캐시 저장 + '오늘' 날짜도장 + dirty 해제(다음 트리거까지 재생성 안 함)
+  const persistFresh = useCallback((r: { status: string; report: AiReportV2 | null }) => {
+    if (r.status === 'SUCCESS' && r.report) {
+      writeCache(REPORT_CACHE_KEY, r.report);
+      AsyncStorage.setItem(BRIEFING_DAY_KEY, getTodayStr()).catch(() => {});
+      AsyncStorage.setItem(BRIEFING_DIRTY_KEY, '0').catch(() => {});
+    }
+  }, []);
+
   const load = useCallback(async () => {
     const today = getTodayStr();
     const { start, end } = getWeekRange();
@@ -115,21 +125,26 @@ export default function BriefingHome() {
     }
     setLoaded(true);
 
-    // v2 주간 브리핑(비동기 — 생성 중이면 GENERATING, 폴링으로 완성 감지)
+    // v2 주간 브리핑 — 라이브 재계산이 아니라 정해진 시점에만 재생성:
+    // 날짜 변경(자정 경과·'매일 0시') 또는 세션 완료(dirty)일 때만 force.
     try {
-      const r = await getReportV2('week');
+      const [lastDay, dirty] = await Promise.all([
+        AsyncStorage.getItem(BRIEFING_DAY_KEY).catch(() => null),
+        AsyncStorage.getItem(BRIEFING_DIRTY_KEY).catch(() => null),
+      ]);
+      const force = shouldRefreshBriefing(lastDay, today, dirty === '1');
+      const r = await getReportV2('week', 0, force);
       setReportStatus(r.status);
       setReport(r.report);
       setReportPct(r.percent ?? 0);
       setReportStep(r.step ?? null);
-      // 마지막 성공 브리핑을 디스크에 저장 → 다음 실행 때 즉시 복원(아래 hydrate)
-      if (r.status === 'SUCCESS' && r.report) writeCache(REPORT_CACHE_KEY, r.report);
+      persistFresh(r);   // SUCCESS면 캐시+날짜도장+dirty 해제
     } catch {
       setReportStatus('FAILED');
     } finally {
       setReportFetched(true);   // 리포트 응답 전엔 폴백 헤드라인 대신 스켈레톤(깜빡임 방지)
     }
-  }, []);
+  }, [persistFresh]);
 
   // 콜드 스타트 즉시 표시: 마지막 성공 브리핑을 디스크에서 바로 띄우고(네트워크 안 기다림),
   // 위 load가 백그라운드로 갱신(stale-while-revalidate). 이미 본 화면이면 로딩 없이 바로 뜸.
@@ -151,10 +166,11 @@ export default function BriefingHome() {
       getReportV2('week').then(r => {
         setReportStatus(r.status); setReport(r.report);
         setReportPct(r.percent ?? 0); setReportStep(r.step ?? null);
+        persistFresh(r);   // 폴링으로 완성된 SUCCESS도 날짜도장(중복 재생성 방지)
       }).catch(() => {});
     }, 2000);
     return () => clearTimeout(id);
-  }, [reportStatus, reportPct]);
+  }, [reportStatus, reportPct, persistFresh]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

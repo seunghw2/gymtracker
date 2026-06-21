@@ -73,6 +73,7 @@ import { logError } from '../lib/log';
 import { toDisplay, fromInput, unitLabel } from '../lib/units';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BRIEFING_DIRTY_KEY } from '../lib/briefingRefresh';
 
 
 // 운동 추가 모달에서 선택 가능한 종목(목록·최근 종목 공통)
@@ -480,6 +481,7 @@ export default function WorkoutScreen() {
           if (activeSessionId) {
             await completeSession(activeSessionId, durationSec).catch(() => {});
           }
+          AsyncStorage.setItem(BRIEFING_DIRTY_KEY, '1').catch(() => {});  // 다음 브리핑 진입에서 재생성
           refreshWorkoutReminder().catch(() => {});  // 운동했으니 다음 리마인더를 뒤로 미룸
           // 종료 전 요약 계산
           const doneSets = exercises.flatMap(e => e.sets.filter(s => s.done));
