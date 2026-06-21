@@ -98,7 +98,9 @@ export const AI = {
   accent: ACCENT,           // 레드 액센트
   ink: ACCENT_INK,          // 액센트 위 텍스트(흰색)
   tint: '#241011',          // 강조 버블/카드 배경(레드 틴트)
-  bubble: '#1C1C1E',        // AI 말풍선
+  bubble: '#1C1C1E',        // AI(봇) 말풍선
+  chipBg: '#1A1A1D',        // 답변 칩 배경(중립 — 빨강은 보낸 말풍선에만)
+  chipBorder: '#2C2C30',    // 답변 칩 테두리
   card: '#161618',
   line: '#2C2C2E',
   text: '#FFFFFF',
