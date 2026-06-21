@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AI } from '../../constants/colors';
 import { getAiProfile, putAiProfile } from '../../db/queries';
-import { toggleMulti, answersToProfile } from '../../lib/onboarding';
+import { toggleMulti, answersToProfile, successOptions } from '../../lib/onboarding';
 
 // ── 선택지 ────────────────────────────────────────────────────────────────
 type Opt = { v: string | number; label: string };
@@ -30,15 +30,10 @@ const GOALS: Opt[] = [
   { v: 'unsure', label: '🤔 잘 모르겠어요' },
 ];
 const WEIGHT_GOAL: Opt[] = [
-  { v: 'gain', label: '증량' },
-  { v: 'maintain', label: '유지' },
-  { v: 'loss', label: '감량' },
-  { v: 'unknown', label: '모름' },
-];
-const EXPERIENCE: Opt[] = [
-  { v: 'beginner', label: '막 시작했어요' },
-  { v: 'intermediate', label: '기본기는 있어요' },
-  { v: 'advanced', label: '베테랑이에요' },
+  { v: 'gain', label: '증량 중' },
+  { v: 'maintain', label: '유지 중' },
+  { v: 'loss', label: '감량 중' },
+  { v: 'unknown', label: '잘 모르겠음' },
 ];
 const DURATION: Opt[] = [
   { v: 3, label: '6개월 미만' },
@@ -63,27 +58,34 @@ const PAIN_CHIPS: Opt[] = [
 ];
 
 const B = ({ children }: { children: React.ReactNode }) => <Text style={styles.b}>{children}</Text>;
+const SumRow = ({ k, v, accent }: { k: string; v: string; accent?: boolean }) => (
+  <View style={styles.sumRow}>
+    <Text style={styles.sumK}>{k}</Text>
+    <Text style={[styles.sumV, accent && styles.sumVAccent]} numberOfLines={2}>{v}</Text>
+  </View>
+);
 
 type QType = 'single' | 'multi' | 'constraints' | 'note';
 type Question = { id: string; type: QType; prompt: React.ReactNode; options?: Opt[] };
 
+// 성공 기준(successGoal)은 목표(goal)에 따라 옵션·질문이 분기 — 런타임에 successOptions로 채운다.
 const QUESTIONS: Question[] = [
-  { id: 'goal', type: 'single', options: GOALS, prompt: <>반가워요! 몇 가지만 빠르게 물어볼게요. <B>운동 목표</B>가 뭐예요?</> },
-  { id: 'weightGoal', type: 'single', options: WEIGHT_GOAL, prompt: <><B>목표 체중</B>이 있나요?</> },
-  { id: 'experience', type: 'single', options: EXPERIENCE, prompt: <>지금 <B>운동 실력</B>은 어느 쪽에 가까워요?</> },
-  { id: 'trainingMonths', type: 'single', options: DURATION, prompt: <>운동을 <B>꾸준히 한 지</B>는 얼마나 됐어요?</> },
-  { id: 'frequency', type: 'single', options: FREQ, prompt: <>일주일에 보통 <B>며칠</B> 운동해요?</> },
-  { id: 'sessionMinutes', type: 'single', options: SESSION_MIN, prompt: <>한 번 운동하면 보통 <B>얼마나</B> 걸려요?</> },
-  { id: 'muscles', type: 'multi', options: MUSCLES, prompt: <>특히 <B>키우고 싶은 부위</B>가 있어요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(여러 개 골라도 돼요)</Text></> },
-  { id: 'constraints', type: 'constraints', options: PAIN_CHIPS, prompt: <>혹시 <B>아프거나 조심해야</B> 할 곳이 있어요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 넘어가도 돼요)</Text></> },
-  { id: 'note', type: 'note', prompt: <>마지막! 분석할 때 <B>참고하면 좋을</B> 내용이 더 있을까요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 건너뛰어도 돼요)</Text></> },
+  { id: 'goal', type: 'single', options: GOALS, prompt: <>반가워요! 먼저, <B>운동하는 가장 큰 이유</B>는 무엇인가요?</> },
+  { id: 'successGoal', type: 'single', prompt: <></> }, // 동적(분기)
+  { id: 'muscles', type: 'multi', options: MUSCLES, prompt: <>특히 <B>집중하고 싶은 부위</B>가 있나요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(여러 개 골라도 돼요)</Text></> },
+  { id: 'frequency', type: 'single', options: FREQ, prompt: <>일주일에 <B>몇 번</B> 운동 가능하신가요?</> },
+  { id: 'sessionMinutes', type: 'single', options: SESSION_MIN, prompt: <>한 번 운동 시 <B>얼마나</B> 가능하신가요?</> },
+  { id: 'weightGoal', type: 'single', options: WEIGHT_GOAL, prompt: <>현재 <B>체중</B>은 어느 쪽인가요?</> },
+  { id: 'trainingMonths', type: 'single', options: DURATION, prompt: <><B>운동 경력</B>이 얼마나 되었나요?</> },
+  { id: 'constraints', type: 'constraints', options: PAIN_CHIPS, prompt: <>현재 <B>운동에 영향을 주는 통증</B>이 있나요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 넘어가도 돼요)</Text></> },
+  { id: 'note', type: 'note', prompt: <>마지막! <B>AI에게 알려주고 싶은 점</B>이 있을까요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 건너뛰어도 돼요)</Text></> },
 ];
 
 type Msg = { id: string; role: 'ai' | 'user'; content: React.ReactNode };
 type Answers = {
   goal?: string;
+  successGoal?: string;
   weightGoal?: string;
-  experience?: string;
   trainingMonths?: number;
   frequency?: number;
   sessionMinutes?: number;
@@ -108,6 +110,7 @@ export default function AiIntake() {
   const [progress, setProgress] = useState(1);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState(''); // 하단 입력바 자유 입력
+  const [reviewing, setReviewing] = useState(false); // 'AI가 이해한 목표' 요약 화면
 
   const setAnswer = (patch: Partial<Answers>) => {
     answersRef.current = { ...answersRef.current, ...patch };
@@ -124,7 +127,11 @@ export default function AiIntake() {
     timerRef.current = setTimeout(() => {
       if (!mounted.current) return;
       setTyping(false);
-      push('ai', QUESTIONS[i].prompt);
+      // 성공 기준은 목표에 따라 질문이 분기
+      const prompt = QUESTIONS[i].id === 'successGoal'
+        ? successOptions(answersRef.current.goal).prompt
+        : QUESTIONS[i].prompt;
+      push('ai', prompt);
       setActiveIndex(i);
     }, i === 0 ? 450 : 700);
   };
@@ -136,8 +143,8 @@ export default function AiIntake() {
       if (p) {
         const a: Answers = {};
         if (p.goalPhysique) a.goal = p.goalPhysique;
+        if (p.successGoal) a.successGoal = p.successGoal;
         if (p.weightGoal) a.weightGoal = p.weightGoal;
-        if (p.experienceLevel) a.experience = p.experienceLevel;
         if (p.trainingMonths != null) a.trainingMonths = p.trainingMonths;
         if (p.weeklyFrequencyTarget != null) a.frequency = p.weeklyFrequencyTarget;
         if (p.sessionMinutes != null) a.sessionMinutes = p.sessionMinutes;
@@ -161,8 +168,18 @@ export default function AiIntake() {
   }, []);
 
   const advance = (i: number) => {
-    if (i >= QUESTIONS.length - 1) save();
-    else askQuestion(i + 1);
+    if (i >= QUESTIONS.length - 1) {
+      // 마지막 → 저장 대신 'AI가 이해한 목표' 요약 화면
+      setActiveIndex(-1);
+      setTyping(true);
+      timerRef.current = setTimeout(() => {
+        if (!mounted.current) return;
+        setTyping(false);
+        setReviewing(true);
+      }, 700);
+    } else {
+      askQuestion(i + 1);
+    }
   };
 
   // ── 입력 핸들러 ───────────────────────────────────────────────────────
@@ -235,6 +252,19 @@ export default function AiIntake() {
 
   const q = activeIndex >= 0 ? QUESTIONS[activeIndex] : null;
 
+  // '수정할게요' — 답변 유지한 채 처음부터 다시(칩에 프리필 표시)
+  const editAgain = () => { setReviewing(false); setMessages([]); idRef.current = 0; askQuestion(0); };
+
+  // 요약 라벨
+  const labelOf = (opts: { v: string | number; label: string }[], v?: string | number) => opts.find(o => o.v === v)?.label;
+  const goalLabel = labelOf(GOALS, answers.goal)?.replace(/^\S+\s/, '') ?? '—'; // 이모지 제거
+  const successLabel = labelOf(successOptions(answers.goal).options, answers.successGoal) ?? '—';
+  const muscleLabel = (answers.muscles ?? []).map(v => labelOf(MUSCLES, v)).filter(Boolean).join(', ') || '—';
+  const careerLabel = labelOf(DURATION, answers.trainingMonths) ?? '—';
+  const weightLabel = labelOf(WEIGHT_GOAL, answers.weightGoal) ?? '—';
+  const availLabel = `${answers.frequency ? `주 ${answers.frequency}회` : '—'} / ${answers.sessionMinutes ? `${answers.sessionMinutes}분` : '—'}`;
+  const cautionLabel = [...(answers.constraintChips ?? []), (answers.constraintText ?? '').trim()].filter(Boolean).join(', ') || '없음';
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -261,7 +291,7 @@ export default function AiIntake() {
           <View style={styles.controls}>
             {q.type === 'single' && (
               <View style={styles.chips}>
-                {q.options!.map(o => {
+                {(q.id === 'successGoal' ? successOptions(answers.goal).options : q.options!).map(o => {
                   const on = (answers as any)[q.id] === o.v;
                   return (
                     <Pressable key={String(o.v)} style={[styles.chip, on && styles.chipOn]} onPress={() => onSingle(activeIndex, o)}>
@@ -326,12 +356,30 @@ export default function AiIntake() {
                     <Text style={styles.ghostText}>건너뛰기</Text>
                   </Pressable>
                   <Pressable style={[styles.cta, { flex: 1 }]} onPress={() => onNote(activeIndex, false)}>
-                    <Text style={styles.ctaText}>저장하고 분석 시작</Text>
+                    <Text style={styles.ctaText}>다음</Text>
                   </Pressable>
                 </View>
               </>
             )}
           </View>
+          )}
+
+          {reviewing && (
+            <View style={styles.summary}>
+              <Text style={styles.sumTitle}>🎯 AI가 이해한 목표</Text>
+              <SumRow k="주 목표" v={goalLabel} />
+              <SumRow k="세부 목표" v={successLabel} accent />
+              <SumRow k="집중 부위" v={muscleLabel} />
+              <SumRow k="운동 가능" v={availLabel} />
+              <SumRow k="체중" v={weightLabel} />
+              <SumRow k="경력" v={careerLabel} />
+              <SumRow k="주의" v={cautionLabel} />
+              <Text style={styles.sumNote}>앞으로 모든 브리핑과 리포트는 이 목표를 기준으로 분석할게요.</Text>
+              <View style={styles.row}>
+                <Pressable style={[styles.cta, styles.ghost]} onPress={editAgain}><Text style={styles.ghostText}>수정할게요</Text></Pressable>
+                <Pressable style={[styles.cta, { flex: 1 }]} onPress={save}><Text style={styles.ctaText}>좋아요</Text></Pressable>
+              </View>
+            </View>
           )}
         </ScrollView>
 
@@ -340,7 +388,7 @@ export default function AiIntake() {
             <ActivityIndicator color={AI.accent} />
             <Text style={styles.savingText}>분석을 준비하고 있어요…</Text>
           </View>
-        ) : (
+        ) : reviewing ? null : (
           <View style={styles.inputBar}>
             <TextInput
               style={styles.barInput}
@@ -444,6 +492,15 @@ const styles = StyleSheet.create({
 
   savingBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },
   savingText: { color: AI.textSub, fontSize: 13 },
+
+  // 'AI가 이해한 목표' 요약 카드
+  summary: { backgroundColor: AI.card, borderWidth: 1, borderColor: AI.line, borderRadius: 16, padding: 16, marginTop: 6, gap: 9 },
+  sumTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 4 },
+  sumRow: { flexDirection: 'row', gap: 12 },
+  sumK: { color: AI.textSub, fontSize: 13, width: 64 },
+  sumV: { color: '#fff', fontSize: 14, fontWeight: '700', flex: 1 },
+  sumVAccent: { color: AI.accent, fontWeight: '800' },
+  sumNote: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 4, marginBottom: 4 },
 
   // 하단 입력바
   inputBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: AI.line },
