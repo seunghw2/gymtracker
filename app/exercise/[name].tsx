@@ -411,70 +411,6 @@ function LineChart({ pts, unit, prDate, plateauWeeks, fmtY = (v: number) => `${t
   );
 }
 
-function BarChart({ pts, unit, isVol, bucket = 'week' }: { pts: SeriesPoint[]; unit: string; isVol: boolean; bucket?: 'week' | 'month' }) {
-  const [act, setAct] = useState<number | null>(null);
-  const [bw, setBw] = useState(W); // 막대줄 실제 너비(onLayout으로 측정)
-  if (pts.length < 1) return <Empty />;
-  const unitName = bucket === 'month' ? '개월' : '주';
-  const max = Math.max(...pts.map(p => p.value)) || 1;
-  // 가장 최근 "활동한" 칸(0은 건너뜀) 기준으로 요약·강조
-  const active = pts.filter(p => p.value > 0);
-  const lastActive = active.length ? active[active.length - 1] : pts[pts.length - 1];
-  let lastActiveIdx = -1;
-  for (let i = pts.length - 1; i >= 0; i--) { if (pts[i].value > 0) { lastActiveIdx = i; break; } }
-  const drop = active.length >= 2 && active[active.length - 1].value < active[active.length - 2].value;
-  // 주/월당 빈도수 = 운동한 칸들의 평균 세션 수
-  const periodAvg = active.length ? active.reduce((sum, p) => sum + p.value, 0) / active.length : 0;
-  const fmtVal = (v: number) => (isVol ? `${(v / 1000).toFixed(1)}t` : `${v}회`);
-  const fmtBarDate = (d: string) => (bucket === 'month' ? `${d.slice(2, 4)}.${Number(d.slice(5, 7))}` : fmtDate(d));
-  // 누른 x에 '가장 가까운 막대 중심'을 선택 — gap·flex 레이아웃에서도 정확(모든 막대 터치 가능)
-  const GAP = 5;
-  const barW = (bw - GAP * (pts.length - 1)) / pts.length;
-  const centerX = (i: number) => i * (barW + GAP) + barW / 2;
-  const pick = (x: number) => {
-    let best = 0;
-    for (let i = 1; i < pts.length; i++) if (Math.abs(centerX(i) - x) < Math.abs(centerX(best) - x)) best = i;
-    setAct(best);
-  };
-  // 기간 변경으로 주 개수가 줄어도 안전하도록 범위 가드
-  const a = act != null && act < pts.length ? act : null;
-
-  return (
-    <>
-      <View style={s.clabel}>
-        {a == null ? (
-          <><Text style={s.clT}>최대 {fmtVal(max)}</Text><Text style={s.clT}>{unit} · {pts.length}{unitName}</Text></>
-        ) : (
-          <><Text style={s.clT}>{fmtBarDate(pts[a].date)}</Text><Text style={[s.clT, s.clActive]}>{fmtVal(pts[a].value)}</Text></>
-        )}
-      </View>
-      <View
-        style={s.barrow}
-        onLayout={e => setBw(e.nativeEvent.layout.width)}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onResponderGrant={e => pick(e.nativeEvent.locationX)}
-        onResponderMove={e => pick(e.nativeEvent.locationX)}
-      >
-        {/* 천장(=최대) 기준선 + 절반선: 막대 높이가 어느 정도인지 눈금 */}
-        <View pointerEvents="none" style={[s.barGrid, { top: 4 }]} />
-        <View pointerEvents="none" style={[s.barGrid, { top: 50 }]} />
-        {pts.map((p, i) => {
-          // 쉰 주(값 0) = 점선 고스트 막대로 — "텅 빈 화면" 방지
-          if (p.value <= 0) return <View key={i} style={[s.ghostBar, i === a && { borderColor: '#fff', opacity: 1 }]} />;
-          const color = i === a ? '#fff' : i === lastActiveIdx ? (drop ? SEM.bad : SEM.brand) : '#3a3a42';
-          return <View key={i} style={{ flex: 1, height: Math.max(4, (p.value / max) * 92), borderRadius: 3, backgroundColor: color }} />;
-        })}
-      </View>
-      <View style={s.legend}>
-        <Text style={[s.legT, drop && { color: SEM.bad }]}>
-          {!isVol && active.length ? `${unitName === '개월' ? '월' : '주'} 평균 ${periodAvg.toFixed(1)}회 · ` : ''}최근 {fmtVal(lastActive.value)}{drop ? ' · 직전보다 감소' : ''}
-        </Text>
-      </View>
-    </>
-  );
-}
-
 const Empty = ({ label, sub }: { label?: string; sub?: string }) => (
   <View style={[s.barrow, { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: CH, gap: 5 }]}>
     <Text style={[s.clT, { fontSize: 12.5, color: '#c7c7cc' }]}>{label ?? '데이터가 부족해요'}</Text>
@@ -782,8 +718,6 @@ const s = StyleSheet.create({
   clT: { color: '#6a6a6e', fontSize: 9.5 },
   clActive: { color: '#fff', fontSize: 12, fontWeight: '800' },
   barrow: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 92, paddingTop: 4, position: 'relative' },
-  barGrid: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#2a2a30', opacity: 0.6 },
-  ghostBar: { flex: 1, height: 14, borderRadius: 3, borderWidth: 1, borderColor: '#2a2a30', borderStyle: 'dashed', opacity: 0.7 },
   legend: { flexDirection: 'row', gap: 12, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' },
   lg: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lgDot: { width: 8, height: 8, borderRadius: 4 },
