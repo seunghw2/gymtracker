@@ -317,19 +317,18 @@ function ChartArea({ data, metric, period, range }: { data: ExerciseProgress; me
     return <LineChart pts={vpts} unit="t · 주간 볼륨" prDate={null} plateauWeeks={0}
       fmtY={v => `${(v / 1000).toFixed(1)}t`} unitShort="t" />;
   }
-  // 빈도 → 막대 그래프
+  // 빈도 → 히트맵(주별/월별)
   const src = data.weeklyFreq;
   if (src.filter(inRange).length < 1) return <Empty
-    label={`${periodLabel} 동안 기록이 없어요`} sub="그래프는 기록 1개부터 그려져요" />;
-  // 1년 이상(1Y·전체·범위≥365일)이면 주별 52칸이 빽빽 → 월별 빈도로 집계
+    label={`${periodLabel} 동안 기록이 없어요`} sub="운동을 기록하면 빈도가 쌓여요" />;
+  // 1년 이상(1Y·전체·범위≥365일)은 월별 칸, 그 외는 주별 칸
   const longSpan = period === '1y' || period === 'all' || (!!custom && re - rs >= 365 * 86400000);
   if (longSpan) {
     const mpts = fillMonths(src, period, custom).slice(-36); // 최근 3년치까지
-    return <BarChart pts={mpts} unit="월 운동 횟수" isVol={false} bucket="month" />;
+    return <HeatmapChart pts={mpts} bucket="month" />;
   }
-  // 쉰 주를 0으로 메우고(고스트 막대), 너무 많으면 최근 ~1년치(52주)까지만(주로 '전체' 보호).
-  const pts = fillWeeks(src, period, custom).slice(-52);
-  return <BarChart pts={pts} unit="주 운동 횟수" isVol={false} bucket="week" />;
+  const wpts = fillWeeks(src, period, custom).slice(-52);
+  return <HeatmapChart pts={wpts} bucket="week" />;
 }
 
 function LineChart({ pts, unit, prDate, plateauWeeks, fmtY = (v: number) => `${trim(v)}kg`, unitShort = 'kg' }:
@@ -485,6 +484,68 @@ const Empty = ({ label, sub }: { label?: string; sub?: string }) => (
 const Legend = ({ color, label }: { color: string; label: string }) => (
   <View style={s.lg}><View style={[s.lgDot, { backgroundColor: color }]} /><Text style={s.legT}>{label}</Text></View>
 );
+
+// 빈도 히트맵 셀 색 — 0=빈칸, 단계별 초록 농도
+const HEAT_EMPTY = '#1b1b1d';
+const wColor = (c: number) => (c <= 0 ? HEAT_EMPTY : c === 1 ? 'rgba(48,209,88,0.36)' : c === 2 ? 'rgba(48,209,88,0.62)' : '#30D158');
+const mColor = (c: number) => (c <= 0 ? HEAT_EMPTY : c <= 2 ? 'rgba(48,209,88,0.36)' : c <= 4 ? 'rgba(48,209,88,0.62)' : '#30D158');
+
+// 빈도 = GitHub식 히트맵. 주별/월별 칸, 셀 탭 시 횟수. 평균·최장연속·현재공백 요약.
+function HeatmapChart({ pts, bucket }: { pts: SeriesPoint[]; bucket: 'week' | 'month' }) {
+  const [sel, setSel] = useState<number | null>(null);
+  if (pts.length < 1) return <Empty />;
+  const unit = bucket === 'month' ? '월' : '주';
+  const cols = bucket === 'month' ? 12 : 13;
+  const color = bucket === 'month' ? mColor : wColor;
+  const vals = pts.map(p => p.value);
+  const total = vals.reduce((a, b) => a + b, 0);
+  const avg = (total / pts.length).toFixed(1);
+  // 끝쪽 연속 0 = 현재 공백
+  let gap = 0;
+  for (let i = pts.length - 1; i >= 0; i--) { if (pts[i].value === 0) gap++; else break; }
+  const nowIdx = pts.length - 1 - gap;
+  // 최장 연속(활동한 칸)
+  let streak = 0, cs = 0;
+  for (const v of vals) { if (v > 0) { cs++; if (cs > streak) streak = cs; } else cs = 0; }
+  const rows: { v: number; idx: number }[][] = [];
+  for (let i = 0; i < pts.length; i += cols) rows.push(pts.slice(i, i + cols).map((p, j) => ({ v: p.value, idx: i + j })));
+  const a = sel != null && sel < pts.length ? sel : null;
+  const ago = (idx: number) => pts.length - 1 - idx;
+
+  return (
+    <>
+      <View style={s.clabel}>
+        <Text style={s.clT}>{bucket === 'month' ? '월별' : '주별'} 운동 횟수</Text>
+        {a == null
+          ? <Text style={s.clT}>{unit} 평균 {avg}회</Text>
+          : <Text style={[s.clT, s.clActive]}>{ago(a) === 0 ? `이번 ${unit}` : `${ago(a)}${unit} 전`} · {pts[a].value}회</Text>}
+      </View>
+      <View style={{ gap: 5 }}>
+        {rows.map((r, ri) => (
+          <View key={ri} style={{ flexDirection: 'row', gap: 5 }}>
+            {r.map(o => (
+              <Pressable key={o.idx} onPress={() => setSel(o.idx)}
+                style={[s.hcell, { backgroundColor: color(o.v) }, o.idx === nowIdx && s.hcellNow, o.idx === a && s.hcellSel]} />
+            ))}
+            {Array.from({ length: cols - r.length }).map((_, k) => <View key={`p${k}`} style={{ flex: 1 }} />)}
+          </View>
+        ))}
+      </View>
+      <View style={s.hlegend}>
+        <Text style={s.legT}>적음</Text>
+        {[0, 1, bucket === 'month' ? 3 : 2, bucket === 'month' ? 5 : 3].map((c, i) => (
+          <View key={i} style={[s.lcell, { backgroundColor: color(c) }]} />
+        ))}
+        <Text style={s.legT}>많음</Text>
+      </View>
+      <View style={s.hsum}>
+        <View style={s.hsm}><Text style={s.hsmK}>{unit} 평균</Text><Text style={s.hsmV}>{avg}회</Text></View>
+        <View style={s.hsm}><Text style={s.hsmK}>최장 연속</Text><Text style={s.hsmV}>{streak}{unit}</Text></View>
+        <View style={s.hsm}><Text style={s.hsmK}>현재 공백</Text><Text style={[s.hsmV, gap > 0 && { color: '#FF9F0A' }]}>{gap}{unit}{gap > 0 ? ' ▼' : ''}</Text></View>
+      </View>
+    </>
+  );
+}
 
 // 렙기록 표 — 반복수 1~12별 역대 최고 실측(무게×횟수)과 Epley 추정 1RM. 최고 추정 1RM 행 강조(🔥).
 function RepTable({ rows }: { rows: RepMax[] | null }) {
@@ -727,6 +788,16 @@ const s = StyleSheet.create({
   lg: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lgDot: { width: 8, height: 8, borderRadius: 4 },
   legT: { color: '#9a9aa2', fontSize: 9.5 },
+  // 빈도 히트맵
+  hcell: { flex: 1, aspectRatio: 1, borderRadius: 3 },
+  hcellNow: { borderWidth: 1.5, borderColor: '#FF9F0A' },
+  hcellSel: { borderWidth: 1.5, borderColor: '#fff' },
+  hlegend: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 13 },
+  lcell: { width: 11, height: 11, borderRadius: 3 },
+  hsum: { flexDirection: 'row', gap: 22, marginTop: 14, paddingTop: 13, borderTopWidth: 1, borderTopColor: '#1f1f22' },
+  hsm: { gap: 3 },
+  hsmK: { color: '#8e8e93', fontSize: 11, fontWeight: '700' },
+  hsmV: { color: '#fff', fontSize: 15, fontWeight: '800' },
   // 렙기록 표
   rtHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#2a2a30' },
   rtH: { color: '#7a7a7e', fontSize: 11, fontWeight: '700' },
