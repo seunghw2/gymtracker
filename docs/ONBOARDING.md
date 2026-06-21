@@ -32,17 +32,18 @@ Q1에 따라 질문과 선택지가 달라진다.
 - **그 외(habit·health·unsure) 공통** — “6개월 뒤 가장 이루고 싶은 것은?”
   꾸준함 유지 `consistency` / 컨디션 개선 `condition` / 체형 관리 `shape` / 전반적 건강 `health` / 아직 모름 `unsure`
 
-## Q3. 우선 부위 (다중) → `priorityMuscles[]`
+## Q3. 현재 체중 방향 → `weightGoal`
+**“현재 체중은 어느 쪽인가요?”** — 증량 중 `gain` / 유지 중 `maintain` / 감량 중 `loss` / 잘 모르겠음 `unknown`
+> 목표(성공 기준)와 직결되는 정보라 성공 기준 바로 다음으로 배치.
+
+## Q4. 우선 부위 (다중) → `priorityMuscles[]`
 **“특히 집중하고 싶은 부위가 있나요?”** — 가슴 `chest` · 등 `back` · 어깨 `shoulders` · 하체 `legs` · 팔 `arms` · 코어 `core`
 
-## Q4. 운동 빈도 → `weeklyFrequencyTarget`
+## Q5. 운동 빈도 → `weeklyFrequencyTarget`
 **“일주일에 몇 번 운동 가능하신가요?”** — 2 / 3 / 4 / 5 / 6(=6회 이상)
 
-## Q5. 세션 길이 → `sessionMinutes`
+## Q6. 세션 길이 → `sessionMinutes`
 **“한 번 운동 시 얼마나 가능하신가요?”** — 30 / 45 / 60 / 90
-
-## Q6. 현재 체중 방향 → `weightGoal`
-**“현재 체중은 어느 쪽인가요?”** — 증량 중 `gain` / 유지 중 `maintain` / 감량 중 `loss` / 잘 모르겠음 `unknown`
 
 ## Q7. 운동 경력 → `trainingMonths`(개월)
 **“운동 경력이 얼마나 되었나요?”** — 6개월 미만 `3` / 6개월~1년 `9` / 1~3년 `24` / 3년 이상 `48`

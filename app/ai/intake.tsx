@@ -72,10 +72,10 @@ type Question = { id: string; type: QType; prompt: React.ReactNode; options?: Op
 const QUESTIONS: Question[] = [
   { id: 'goal', type: 'single', options: GOALS, prompt: <>반가워요! 먼저, <B>운동하는 가장 큰 이유</B>는 무엇인가요?</> },
   { id: 'successGoal', type: 'single', prompt: <></> }, // 동적(분기)
+  { id: 'weightGoal', type: 'single', options: WEIGHT_GOAL, prompt: <>현재 <B>체중</B>은 어느 쪽인가요?</> },
   { id: 'muscles', type: 'multi', options: MUSCLES, prompt: <>특히 <B>집중하고 싶은 부위</B>가 있나요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(여러 개 골라도 돼요)</Text></> },
   { id: 'frequency', type: 'single', options: FREQ, prompt: <>일주일에 <B>몇 번</B> 운동 가능하신가요?</> },
   { id: 'sessionMinutes', type: 'single', options: SESSION_MIN, prompt: <>한 번 운동 시 <B>얼마나</B> 가능하신가요?</> },
-  { id: 'weightGoal', type: 'single', options: WEIGHT_GOAL, prompt: <>현재 <B>체중</B>은 어느 쪽인가요?</> },
   { id: 'trainingMonths', type: 'single', options: DURATION, prompt: <><B>운동 경력</B>이 얼마나 되었나요?</> },
   { id: 'constraints', type: 'constraints', options: PAIN_CHIPS, prompt: <>현재 <B>운동에 영향을 주는 통증</B>이 있나요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 넘어가도 돼요)</Text></> },
   { id: 'note', type: 'note', prompt: <>마지막! <B>AI에게 알려주고 싶은 점</B>이 있을까요? <Text style={{ color: AI.textSub, fontWeight: '400' }}>(없으면 건너뛰어도 돼요)</Text></> },
