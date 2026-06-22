@@ -210,6 +210,9 @@ export default function BriefingHome() {
   const headline = report?.headline
     ?? (profileNeeded ? 'AI 분석을 켜볼까요?' : weekCount > 0 ? '이번 주, 잘 쌓고 있어요.' : '오늘부터 다시 시작.');
   const rx = report?.prescription;
+  // 오늘 추천(DAILY·코드 계산): 가장 오래 쉰 부위 = 회복돼서 오늘 하기 좋음
+  const recovery = report?.cards?.recovery ?? [];
+  const todayRec = recovery.length ? [...recovery].sort((a, b) => b.days - a.days)[0] : null;
 
   if (!loaded) {
     return (
@@ -265,6 +268,15 @@ export default function BriefingHome() {
             {!!rx.todo && <Text style={styles.rxTodo}>{rx.todo}</Text>}
           </Pressable>
         ) : null}
+
+        {/* 오늘 추천(DAILY) — 가장 오래 쉰 부위 */}
+        {todayRec && !profileNeeded && (
+          <View style={styles.todayCard}>
+            <Text style={styles.todayCap}>🎯 오늘 추천</Text>
+            <Text style={styles.todayAction}>{todayRec.part} 어때요?</Text>
+            <Text style={styles.todaySub}>{todayRec.days}일 쉬어서 회복됐어요</Text>
+          </View>
+        )}
 
         {/* 부위별 하드세트 · 빈도(주간) */}
         {(report?.detail?.balance?.length ?? 0) > 0 && (
@@ -373,6 +385,10 @@ const styles = StyleSheet.create({
   rxCap: { color: ACCENT, fontSize: 11, fontWeight: '800' },
   rxAction: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
   rxTodo: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
+  todayCard: { backgroundColor: '#161618', borderLeftWidth: 3, borderLeftColor: SEM.good, borderRadius: 12, padding: 15, marginTop: 10 },
+  todayCap: { color: SEM.good, fontSize: 11, fontWeight: '800' },
+  todayAction: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
+  todaySub: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 6 },
 
   msCard: { backgroundColor: '#161618', borderRadius: 12, padding: 15, marginTop: 11 },
   msTitle: { color: '#fff', fontSize: 14, fontWeight: '800', marginBottom: 10 },
