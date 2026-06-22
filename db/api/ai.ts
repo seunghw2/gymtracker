@@ -227,6 +227,7 @@ export type AiReportV2 = {
   cards: RCards | null;
   tone: string | null;
   monthGrowth: { volumeGrowthPct: number; prevLabel: string } | null; // 월간 '성장' 섹션
+  monthScore: { total: number; consistency: number; growth: number; balance: number } | null;
 };
 
 export type AiReportV2Response = {

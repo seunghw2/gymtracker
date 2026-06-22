@@ -95,15 +95,23 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
     <View>
       <Text style={s.hero}>{r.headline}</Text>
 
-      {r.period.type === 'month' && r.monthGrowth && (
+      {r.period.type === 'month' && (r.monthScore || r.monthGrowth) && (
         <View style={s.mg}>
           <Text style={s.mgCap}>📈 이번 달 성장</Text>
+          {r.monthScore && (
+            <View style={s.mgScoreRow}>
+              <Text style={s.mgScore}>{r.monthScore.total}<Text style={s.mgScoreUnit}>점</Text></Text>
+              <Text style={s.mgAxes}>꾸준 {r.monthScore.consistency} · 성장 {r.monthScore.growth} · 밸런스 {r.monthScore.balance}</Text>
+            </View>
+          )}
+          {r.monthGrowth && (
           <View style={s.mgRow}>
             <Text style={[s.mgPct, { color: up ? RT.good : RT.bad }]}>
               {up ? '▲' : '▼'} {Math.abs(r.monthGrowth.volumeGrowthPct)}%
             </Text>
             <Text style={s.mgSub}>{r.monthGrowth.prevLabel} 대비 총 볼륨</Text>
           </View>
+          )}
           {(r.detail.growth?.length ?? 0) > 0 && (
             <View style={s.mgGrow}>
               {r.detail.growth!.slice(0, 3).map((g, i) => (
@@ -547,6 +555,10 @@ const s = StyleSheet.create({
   // 월간 '성장' 히어로
   mg: { backgroundColor: RT.goodBg, borderRadius: 14, padding: 14, marginBottom: 11, gap: 8 },
   mgCap: { color: RT.good, fontSize: 12, fontWeight: '800' },
+  mgScoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  mgScore: { color: RT.ink, fontSize: 30, fontWeight: '900', letterSpacing: -1 },
+  mgScoreUnit: { color: RT.ink3, fontSize: 14, fontWeight: '700' },
+  mgAxes: { color: RT.ink3, fontSize: 12, fontWeight: '600', flex: 1 },
   mgRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   mgPct: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
   mgSub: { color: RT.ink3, fontSize: 12.5, fontWeight: '600' },
