@@ -228,6 +228,7 @@ export type AiReportV2 = {
   tone: string | null;
   monthGrowth: { volumeGrowthPct: number; prevLabel: string } | null; // 월간 '성장' 섹션
   monthScore: { total: number; consistency: number; growth: number; balance: number } | null;
+  yearWrapped: { totalSessions: number; totalVolumeTons: number; topGrowth: string | null } | null;
 };
 
 export type AiReportV2Response = {

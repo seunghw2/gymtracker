@@ -150,6 +150,22 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
         </View>
       )}
 
+      {r.period.type === 'year' && r.yearWrapped && (
+        <View style={s.mg}>
+          <Text style={s.mgCap}>🎁 올해의 기록</Text>
+          <View style={s.mgWrap}>
+            <View style={s.mgWi}><Text style={s.mgWv}>{r.yearWrapped.totalSessions}</Text><Text style={s.mgWl}>운동</Text></View>
+            <View style={s.mgWi}><Text style={s.mgWv}>{r.yearWrapped.totalVolumeTons}t</Text><Text style={s.mgWl}>총 볼륨</Text></View>
+          </View>
+          {!!r.yearWrapped.topGrowth && (
+            <View style={s.mgSec}><Text style={s.mgSecK}>최고 성장</Text><Text style={s.mgSecV}>{r.yearWrapped.topGrowth}</Text></View>
+          )}
+          {(r.detail.milestones?.length ?? 0) > 0 && (
+            <View style={s.mgSec}><Text style={s.mgSecK}>마일스톤</Text><Text style={s.mgSecV} numberOfLines={2}>{r.detail.milestones!.slice(0, 3).map(m => m.text).join(' · ')}</Text></View>
+          )}
+        </View>
+      )}
+
       <View style={s.kpiGrid}>
         {show('kpi_attendance') && <View style={[s.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'good'} />{editDot('kpi_attendance')}</View>}
         {show('kpi_weight') && <View style={[s.kpiWrap, editing && hidden.has('kpi_weight') && { opacity: 0.4 }]}><Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} tone={w?.delta?.startsWith('-') ? 'good' : undefined} />{editDot('kpi_weight')}</View>}
@@ -594,6 +610,10 @@ const s = StyleSheet.create({
   mgSec: { flexDirection: 'row', gap: 10 },
   mgSecK: { color: RT.ink3, fontSize: 12, fontWeight: '700', width: 44 },
   mgSecV: { color: RT.ink, fontSize: 13, fontWeight: '600', flex: 1 },
+  mgWrap: { flexDirection: 'row', gap: 24 },
+  mgWi: { alignItems: 'flex-start' },
+  mgWv: { color: RT.ink, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  mgWl: { color: RT.ink3, fontSize: 12, fontWeight: '600' },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 11 },
   kpiWrap: { width: '48%', position: 'relative' },
   kpiEdit: { position: 'absolute', top: 6, right: 8 },
