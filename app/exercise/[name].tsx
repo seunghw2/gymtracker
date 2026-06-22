@@ -15,7 +15,7 @@ import Svg, { Polyline, Polygon, Circle, Rect, Line, Text as SvgText } from 'rea
 import { SEM } from '../../constants/colors';
 import {
   getExerciseProgress, getTrainedExercises, updateExerciseNote, getExerciseCoachLine, ExerciseProgress, SeriesPoint,
-  getRepMaxes, RepMax, getExerciseReport, ExerciseReport,
+  getRepMaxes, RepMax, getExerciseReport, ExerciseReport as ExerciseReportData,
 } from '../../db/queries';
 import { loadPinned, savePinned, togglePin, isPin } from '../../lib/pinnedLifts';
 import { useChatStore } from '../../store/useChatStore';
@@ -53,7 +53,7 @@ export default function ExerciseReport() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [llmLine, setLlmLine] = useState<string | null>(null);
-  const [exReport, setExReport] = useState<ExerciseReport | null>(null); // 구조화 리포트(C)
+  const [exReport, setExReport] = useState<ExerciseReportData | null>(null); // 구조화 리포트(C)
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
   useEffect(() => {
