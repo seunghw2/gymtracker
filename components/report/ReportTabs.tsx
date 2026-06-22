@@ -138,7 +138,7 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
           {(r.detail.stagnation?.length ?? 0) > 0 && (
             <View style={s.mgSec}>
               <Text style={s.mgSecK}>정체</Text>
-              <Text style={s.mgSecV} numberOfLines={2}>{r.detail.stagnation!.slice(0, 3).map(st => `${st.name} ${st.weeksFlat}주`).join(' · ')}</Text>
+              <Text style={s.mgSecV} numberOfLines={3}>{r.detail.stagnation!.slice(0, 3).map(st => `${st.name} ${st.weeksFlat}주${st.cause ? `(${st.cause})` : ''}`).join(' · ')}</Text>
             </View>
           )}
           {balanceLow.length > 0 && (

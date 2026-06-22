@@ -132,7 +132,7 @@ export type RTimelineItem = { kind: string; title: string; body: string | null; 
 export type RExerciseLine = { name: string; sets: string; prevDelta: string | null; isPR: boolean };
 export type RBalanceItem = { part: string; sets: number; target: number; status: string };
 export type RGrowthItem = { name: string; change: string; direction: AiMetricDirection };
-export type RStagnationItem = { name: string; weeksFlat: number };
+export type RStagnationItem = { name: string; weeksFlat: number; cause: string | null };
 export type RMilestone = { icon: string; text: string };
 export type RTrendSeries = { metric: string; points: RPoint[] };
 
