@@ -109,10 +109,11 @@ export type ExerciseReport = {
   currentSituation: string | null;
   causes: string[];
   nextActions: string[];
+  generatedAt: string | null; // 마지막 AI 업데이트(ISO)
 };
-export async function getExerciseReport(exerciseId: number): Promise<ExerciseReport | null> {
+export async function getExerciseReport(exerciseId: number, force = false): Promise<ExerciseReport | null> {
   try {
-    const r = await apiRequest<ExerciseReport | null>(`/api/v1/ai/exercise-report?exerciseId=${exerciseId}`);
+    const r = await apiRequest<ExerciseReport | null>(`/api/v1/ai/exercise-report?exerciseId=${exerciseId}${force ? '&force=true' : ''}`);
     return r && r.currentSituation ? r : null;
   } catch {
     return null;

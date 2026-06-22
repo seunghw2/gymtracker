@@ -54,6 +54,7 @@ export default function ExerciseReport() {
   const [saved, setSaved] = useState(false);
   const [llmLine, setLlmLine] = useState<string | null>(null);
   const [exReport, setExReport] = useState<ExerciseReportData | null>(null); // 구조화 리포트(C)
+  const [updating, setUpdating] = useState(false); // 'AI 업데이트' 진행 중
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
 
   useEffect(() => {
@@ -107,6 +108,17 @@ export default function ExerciseReport() {
     getExerciseReport(exId).then(r => { if (on && r) setExReport(r); }).catch(() => {});
     return () => { on = false; };
   }, [exId]);
+
+  // 수동 'AI 업데이트' — 강제 재생성 후 마지막 업데이트 시각 갱신
+  const updateAi = async () => {
+    if (!exId || updating) return;
+    setUpdating(true);
+    try {
+      const r = await getExerciseReport(exId, true);
+      if (r) { setExReport(r); setLlmLine(null); }
+    } catch { /* 무시 — 기존 표시 유지 */ }
+    finally { setUpdating(false); }
+  };
 
   // 목표·방법 = 코드값. 코치 한 줄(whyLine)은 지금은 코드 템플릿(추후 LLM로 교체).
   const cur = data?.currentE1rm ?? 0;
@@ -188,7 +200,14 @@ export default function ExerciseReport() {
           <KeyStats data={data} />
 
           {/* 코치 — 목표·방법(코드) + 해석 한 줄 + 편집 가능 체크리스트 메모 */}
-          <Text style={s.secttl}>🤖 AI 코치</Text>
+          <View style={s.coachHd}>
+            <Text style={s.secttl}>🤖 AI 코치</Text>
+            <Pressable onPress={updateAi} disabled={updating} hitSlop={6} style={s.aiUpd}>
+              <Text style={s.aiUpdT}>
+                {updating ? '업데이트 중…' : exReport?.generatedAt ? `${fmtAgo(exReport.generatedAt.slice(0, 10))} · ↻ 업데이트` : '↻ AI 업데이트'}
+              </Text>
+            </Pressable>
+          </View>
           <View style={s.cbox}>
             <View style={s.rx}>
               <Text style={s.rxK}>목표·방법</Text>
@@ -806,6 +825,9 @@ const s = StyleSheet.create({
   kvV: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   secttl: { color: '#8a8a8e', fontSize: 9.5, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginHorizontal: 16, marginTop: 16, marginBottom: 7 },
+  coachHd: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 16 },
+  aiUpd: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: '#2a2a30', marginTop: 9 },
+  aiUpdT: { color: '#9a9aa2', fontSize: 11, fontWeight: '700' },
   dig: { marginHorizontal: 14, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 14, padding: 13 },
   dh: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   da: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: SEM.brand, alignItems: 'center', justifyContent: 'center' },
