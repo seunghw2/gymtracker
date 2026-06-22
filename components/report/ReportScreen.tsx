@@ -21,7 +21,7 @@ import { RT } from '../../components/report/theme';
 // 기간탭·주차칩·선택체크 = 네비/액션 → 레드 액센트(상태색 아님).
 const GREEN = RT.action;
 const GREEN_INK = '#FFFFFF';
-const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기' };
+const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기', year: '연' };
 
 // 성공 리포트 캐시 — 한 번 본 기간은 재방문 시 스피너 없이 즉시 표시.
 // 메모리 + AsyncStorage 영속(앱을 껐다 켜도 마지막 본 리포트가 바로 뜸). 최근 16개로 제한.

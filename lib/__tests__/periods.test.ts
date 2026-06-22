@@ -38,4 +38,10 @@ describe('buildBuckets', () => {
     expect(b[0].label).toBe('2026 상반기');
     expect(b[0].sublabel).toBe('1–6월');
   });
+  test('연간: 2025·2026 두 해, 최신이 앞', () => {
+    const b = buildBuckets('year', '2025-03-01', NOW);
+    expect(b.map(x => x.label)).toEqual(['2026년', '2025년']);
+    expect(b[0].start).toBe('2026-01-01');
+    expect(b[0].end).toBe('2026-12-31');
+  });
 });

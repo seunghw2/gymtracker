@@ -6,7 +6,7 @@ import type { ReportPeriodType } from '../db/queries';
  * 최초 기록일이 속한 기간 ~ 현재(진행 중) 기간까지, 최신이 맨 앞.
  * 각 버킷의 start/end는 그대로 백엔드 getReportV2(range)로 넘어간다.
  */
-export type PeriodUnit = 'week' | 'month' | 'quarter' | 'half';
+export type PeriodUnit = 'week' | 'month' | 'quarter' | 'half' | 'year';
 
 export type PeriodBucket = {
   label: string;      // 메인 라벨 (예: "6월 3주", "2026년 6월", "2026 2분기", "2026 상반기")
@@ -22,6 +22,7 @@ export const PERIOD_UNITS: { unit: PeriodUnit; label: string; type: ReportPeriod
   { unit: 'month', label: '월별', type: 'month' },
   { unit: 'quarter', label: '분기', type: 'quarter' },
   { unit: 'half', label: '반기', type: 'half' },
+  { unit: 'year', label: '연간', type: 'year' },
 ];
 
 // ── 날짜 헬퍼(로컬 기준) ────────────────────────────────────────────────
@@ -83,13 +84,19 @@ export function buildBuckets(unit: PeriodUnit, firstISO: string | null, now: Dat
       const end = new Date(q.getFullYear(), q.getMonth() + 3, 0);
       out.push(mk(`${q.getFullYear()} ${q.getMonth() / 3 + 1}분기`, `${q.getMonth() + 1}–${end.getMonth() + 1}월`, q, end));
     }
-  } else {
+  } else if (unit === 'half') {
     const halfStartMonth = (d: Date) => (d.getMonth() < 6 ? 0 : 6);
     const firstH = new Date(first.getFullYear(), halfStartMonth(first), 1);
     for (let h = new Date(today.getFullYear(), halfStartMonth(today), 1); h >= firstH; h = new Date(h.getFullYear(), h.getMonth() - 6, 1)) {
       const end = new Date(h.getFullYear(), h.getMonth() + 6, 0);
       const h1 = h.getMonth() === 0;
       out.push(mk(`${h.getFullYear()} ${h1 ? '상' : '하'}반기`, h1 ? '1–6월' : '7–12월', h, end));
+    }
+  } else {
+    const firstY = new Date(first.getFullYear(), 0, 1);
+    for (let y = new Date(today.getFullYear(), 0, 1); y >= firstY; y = new Date(y.getFullYear() - 1, 0, 1)) {
+      const end = new Date(y.getFullYear(), 11, 31);
+      out.push(mk(`${y.getFullYear()}년`, '1–12월', y, end));
     }
   }
   return out;
