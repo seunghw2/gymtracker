@@ -19,7 +19,10 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { exportWorkoutsCsv } from '../../lib/export';
 
 const TRACK = { false: '#3A3A3C', true: SEM.brand };
-const TONES: [string, string][] = [['plain', '담백'], ['cheer', '응원'], ['blunt', '직설']];
+const TRAINER_NAME: Record<string, string> = {
+  terry: '테리', baptiste: '바티스트', crystal: '크리스탈',
+  plain: '테리', cheer: '크리스탈', blunt: '바티스트', // legacy
+};
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -30,7 +33,7 @@ export default function SettingsScreen() {
   const [showSessionNote, setShowSessionNote] = useState(true);
   const [weightPrompt, setWeightPrompt] = useState(true);
   const [autoTagPrompt, setAutoTagPrompt] = useState(true);
-  const [coachTone, setCoachTone] = useState('plain');
+  const [coachTone, setCoachTone] = useState('terry');
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -39,13 +42,12 @@ export default function SettingsScreen() {
       setWeightPrompt((await getSetting('weight_prompt_enabled', '1')) !== '0');
       setAutoTagPrompt((await getSetting('auto_tag_prompt', '1')) !== '0');
       setSoundOnSilent((await getSetting('sound_silent_override', '1')) === '1');
-      setCoachTone(await getSetting('ai_coach_tone', 'plain'));
+      setCoachTone(await getSetting('ai_coach_tone', 'terry'));
     })().catch(() => {});
   }, []);
 
   const flag = (key: string, set: (v: boolean) => void) => (v: boolean) => { set(v); setSetting(key, v ? '1' : '0').catch(() => {}); };
   const toggleSound = (v: boolean) => { setSoundOnSilent(v); setSetting('sound_silent_override', v ? '1' : '0').catch(() => {}); };
-  const changeTone = (t: string) => { setCoachTone(t); setSetting('ai_coach_tone', t).catch(() => {}); };
 
   const handleExport = async () => {
     if (exporting) return;
@@ -101,17 +103,9 @@ export default function SettingsScreen() {
             right={<Switch value={autoTagPrompt} onValueChange={flag('auto_tag_prompt', setAutoTagPrompt)} trackColor={TRACK} thumbColor="#FFFFFF" />} />
         </Section>
 
-        {/* AI 코치 톤 — 인라인 세그먼트 */}
-        <Section title="AI 코치 톤">
-          <View style={styles.segWrap}>
-            <View style={styles.seg}>
-              {TONES.map(([k, label]) => (
-                <Pressable key={k} style={[styles.segItem, coachTone === k && styles.segOn]} onPress={() => changeTone(k)}>
-                  <Text style={[styles.segT, coachTone === k && styles.segTOn]}>{label}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+        {/* AI 트레이너 — 말투 페르소나 선택 화면으로 */}
+        <Section title="AI 트레이너">
+          <Row first icon="person" label="담당 트레이너" value={TRAINER_NAME[coachTone] ?? '테리'} onPress={() => router.push('/trainer')} />
         </Section>
 
         {/* 정보 */}

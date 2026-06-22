@@ -240,7 +240,8 @@ export default function AiIntake() {
     setSaving(true);
     try {
       await putAiProfile(answersToProfile(answersRef.current));
-      if (mounted.current) router.replace('/ai');
+      // 온보딩 끝 → 트레이너 선택 화면(고르면 /ai로)
+      if (mounted.current) router.replace({ pathname: '/trainer', params: { onboarding: '1' } });
     } catch {
       if (!mounted.current) return;
       setTyping(false);
