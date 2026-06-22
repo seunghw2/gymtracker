@@ -90,9 +90,33 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
   const w = r.bodyComposition?.weight;
   const show = (k: string) => editing || !hidden.has(k);
   const editDot = (k: string) => editing ? <View style={s.kpiEdit}><EditDot on={hidden.has(k)} onPress={() => toggle(k)} /></View> : null;
+  const up = (r.monthGrowth?.volumeGrowthPct ?? 0) >= 0;
   return (
     <View>
       <Text style={s.hero}>{r.headline}</Text>
+
+      {r.period.type === 'month' && r.monthGrowth && (
+        <View style={s.mg}>
+          <Text style={s.mgCap}>📈 이번 달 성장</Text>
+          <View style={s.mgRow}>
+            <Text style={[s.mgPct, { color: up ? RT.good : RT.bad }]}>
+              {up ? '▲' : '▼'} {Math.abs(r.monthGrowth.volumeGrowthPct)}%
+            </Text>
+            <Text style={s.mgSub}>{r.monthGrowth.prevLabel} 대비 총 볼륨</Text>
+          </View>
+          {(r.detail.growth?.length ?? 0) > 0 && (
+            <View style={s.mgGrow}>
+              {r.detail.growth!.slice(0, 3).map((g, i) => (
+                <View key={i} style={s.mgItem}>
+                  <Text style={s.mgName} numberOfLines={1}>{g.name}</Text>
+                  <Text style={s.mgVal}>{g.change}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       <View style={s.kpiGrid}>
         {show('kpi_attendance') && <View style={[s.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'good'} />{editDot('kpi_attendance')}</View>}
         {show('kpi_weight') && <View style={[s.kpiWrap, editing && hidden.has('kpi_weight') && { opacity: 0.4 }]}><Kpi v={w?.current != null ? `${w.current}kg` : '–'} l="체중" sub={w?.delta ?? undefined} tone={w?.delta?.startsWith('-') ? 'good' : undefined} />{editDot('kpi_weight')}</View>}
@@ -520,6 +544,16 @@ const s = StyleSheet.create({
 
   // 브리핑
   hero: { color: RT.ink, fontSize: 23, fontWeight: '800', lineHeight: 31, letterSpacing: -0.5, marginVertical: 8 },
+  // 월간 '성장' 히어로
+  mg: { backgroundColor: RT.goodBg, borderRadius: 14, padding: 14, marginBottom: 11, gap: 8 },
+  mgCap: { color: RT.good, fontSize: 12, fontWeight: '800' },
+  mgRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  mgPct: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  mgSub: { color: RT.ink3, fontSize: 12.5, fontWeight: '600' },
+  mgGrow: { gap: 5, marginTop: 2 },
+  mgItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  mgName: { color: RT.ink, fontSize: 13, fontWeight: '600', flex: 1 },
+  mgVal: { color: RT.good, fontSize: 13, fontWeight: '800' },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 11 },
   kpiWrap: { width: '48%', position: 'relative' },
   kpiEdit: { position: 'absolute', top: 6, right: 8 },

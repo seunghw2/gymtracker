@@ -226,6 +226,7 @@ export type AiReportV2 = {
   coaching: RCoachItem[] | null;
   cards: RCards | null;
   tone: string | null;
+  monthGrowth: { volumeGrowthPct: number; prevLabel: string } | null; // 월간 '성장' 섹션
 };
 
 export type AiReportV2Response = {
