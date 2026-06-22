@@ -91,6 +91,7 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
   const show = (k: string) => editing || !hidden.has(k);
   const editDot = (k: string) => editing ? <View style={s.kpiEdit}><EditDot on={hidden.has(k)} onPress={() => toggle(k)} /></View> : null;
   const up = (r.monthGrowth?.volumeGrowthPct ?? 0) >= 0;
+  const balanceLow = (r.detail.balance ?? []).filter(b => b.status === 'low').map(b => b.part);
   return (
     <View>
       <Text style={s.hero}>{r.headline}</Text>
@@ -120,6 +121,30 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
                   <Text style={s.mgVal}>{g.change}</Text>
                 </View>
               ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {r.period.type === 'quarter' && (
+        <View style={s.mg}>
+          <Text style={s.mgCap}>🎯 전략 점검</Text>
+          {r.monthGrowth && (
+            <View style={s.mgRow}>
+              <Text style={[s.mgPct, { color: up ? RT.good : RT.bad }]}>{up ? '▲' : '▼'} {Math.abs(r.monthGrowth.volumeGrowthPct)}%</Text>
+              <Text style={s.mgSub}>{r.monthGrowth.prevLabel} 대비 총 볼륨</Text>
+            </View>
+          )}
+          {(r.detail.stagnation?.length ?? 0) > 0 && (
+            <View style={s.mgSec}>
+              <Text style={s.mgSecK}>정체</Text>
+              <Text style={s.mgSecV} numberOfLines={2}>{r.detail.stagnation!.slice(0, 3).map(st => `${st.name} ${st.weeksFlat}주`).join(' · ')}</Text>
+            </View>
+          )}
+          {balanceLow.length > 0 && (
+            <View style={s.mgSec}>
+              <Text style={s.mgSecK}>밸런스</Text>
+              <Text style={s.mgSecV} numberOfLines={2}>{balanceLow.join(', ')} 부족</Text>
             </View>
           )}
         </View>
@@ -566,6 +591,9 @@ const s = StyleSheet.create({
   mgItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   mgName: { color: RT.ink, fontSize: 13, fontWeight: '600', flex: 1 },
   mgVal: { color: RT.good, fontSize: 13, fontWeight: '800' },
+  mgSec: { flexDirection: 'row', gap: 10 },
+  mgSecK: { color: RT.ink3, fontSize: 12, fontWeight: '700', width: 44 },
+  mgSecV: { color: RT.ink, fontSize: 13, fontWeight: '600', flex: 1 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 11 },
   kpiWrap: { width: '48%', position: 'relative' },
   kpiEdit: { position: 'absolute', top: 6, right: 8 },
