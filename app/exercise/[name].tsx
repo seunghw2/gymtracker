@@ -91,6 +91,10 @@ export default function ExerciseReport() {
 
   // 체크리스트는 코드 계산값으로 프리필(사용자 편집 가능)
   useEffect(() => { if (data) setItems(buildChecklist(data)); }, [data]);
+  // AI 구조화 리포트가 주는 '운동 중 확인 가능한' 체크리스트로 교체(코드 템플릿보다 우선)
+  useEffect(() => {
+    if (exReport?.checklist?.length) setItems(exReport.checklist.map(t => ({ text: t, done: false })));
+  }, [exReport]);
 
   // 렙기록 탭 진입 시 1회 로드(반복수 1~12 역대 최고)
   useEffect(() => {
@@ -209,17 +213,19 @@ export default function ExerciseReport() {
             </Pressable>
           </View>
           <View style={s.cbox}>
-            <View style={s.rx}>
-              <Text style={s.rxK}>목표·방법</Text>
-              <Text style={s.rxB}>{goalMethod}</Text>
-            </View>
-            {whyLine ? <Text style={s.rxWhy}>{whyLine}</Text> : null}
-
-            {exReport && (
+            {exReport ? (
               <View style={s.exr}>
+                {/* ① 목표 대비 현재 상태 */}
                 {!!exReport.goalBasis && (
                   <Text style={s.exrBasis}>{exReport.status ? `${exReport.status} · ` : ''}{exReport.goalBasis}</Text>
                 )}
+                {!!whyLine && (
+                  <View style={s.exrSec}>
+                    <Text style={s.exrK}>🎯 목표 대비 현재 상태</Text>
+                    <Text style={s.exrBody}>{whyLine}</Text>
+                  </View>
+                )}
+                {/* ② 원인 */}
                 {exReport.causes.length > 0 && (
                   <View style={s.exrSec}>
                     <Text style={s.exrK}>원인</Text>
@@ -233,6 +239,8 @@ export default function ExerciseReport() {
                   </View>
                 )}
               </View>
+            ) : (
+              whyLine ? <Text style={s.rxWhy}>{whyLine}</Text> : null
             )}
 
             <View style={s.memo}>
@@ -846,6 +854,7 @@ const s = StyleSheet.create({
   exrSec: { gap: 3 },
   exrK: { color: '#7a7a7e', fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   exrLi: { color: '#EDEDF0', fontSize: 13, lineHeight: 18 },
+  exrBody: { color: '#EDEDF0', fontSize: 14, lineHeight: 20, fontWeight: '600' },
   memo: { backgroundColor: '#14130d', borderWidth: 1, borderColor: '#3a3320', borderRadius: 11, padding: 11, marginTop: 11 },
   memoH: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   memoHT: { color: '#caa94a', fontSize: 10.5, fontWeight: '800', flex: 1, marginRight: 8 },

@@ -109,7 +109,8 @@ export type ExerciseReport = {
   currentSituation: string | null;
   causes: string[];
   nextActions: string[];
-  generatedAt: string | null; // 마지막 AI 업데이트(ISO)
+  checklist: string[];          // 운동 중 확인 가능한 체크리스트(AI 생성)
+  generatedAt: string | null;   // 마지막 AI 업데이트(ISO)
 };
 export async function getExerciseReport(exerciseId: number, force = false): Promise<ExerciseReport | null> {
   try {
