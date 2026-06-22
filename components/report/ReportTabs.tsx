@@ -147,6 +147,12 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
               <Text style={s.mgSecV} numberOfLines={2}>{balanceLow.join(', ')} 부족</Text>
             </View>
           )}
+          {r.forecast && (
+            <View style={s.mgSec}>
+              <Text style={s.mgSecK}>예측</Text>
+              <Text style={s.mgSecV} numberOfLines={2}>{r.forecast.exercise} 이 추세면 {r.forecast.periodLabel} ~{r.forecast.projectedE1rm}kg</Text>
+            </View>
+          )}
         </View>
       )}
 
