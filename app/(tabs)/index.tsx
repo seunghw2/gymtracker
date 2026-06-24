@@ -85,6 +85,7 @@ export default function BriefingHome() {
   const [loaded, setLoaded] = useState(false);
   const [reportFetched, setReportFetched] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [pollTick, setPollTick] = useState(0);
 
   // SUCCESS면 디스크 캐시 저장 + '오늘' 날짜도장 + dirty 해제(다음 트리거까지 재생성 안 함)
   const persistFresh = useCallback((r: { status: string; report: AiReportV2 | null }) => {
@@ -166,17 +167,19 @@ export default function BriefingHome() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // 생성 중이면 2초 폴링 → 완료 시 헤드라인/처방으로 교체
+  // pollTick 의존으로 percent가 같아도 반드시 다음 폴을 예약(이전 구현은 percent 불변 시 polling 중단 버그)
   useEffect(() => {
     if (reportStatus !== 'GENERATING') return;
     const id = setTimeout(() => {
       getReportV2('week').then(r => {
         setReportStatus(r.status); setReport(r.report);
         setReportPct(r.percent ?? 0); setReportStep(r.step ?? null);
-        persistFresh(r);   // 폴링으로 완성된 SUCCESS도 날짜도장(중복 재생성 방지)
-      }).catch(() => {});
+        if (r.status === 'SUCCESS') persistFresh(r);
+        if (r.status === 'GENERATING') setPollTick(t => t + 1);
+      }).catch(() => { setPollTick(t => t + 1); });
     }, 2000);
     return () => clearTimeout(id);
-  }, [reportStatus, reportPct, persistFresh]);
+  }, [reportStatus, pollTick, persistFresh]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
