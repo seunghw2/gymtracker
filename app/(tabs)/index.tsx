@@ -138,7 +138,13 @@ export default function BriefingHome() {
       setReport(r.report);
       setReportPct(r.percent ?? 0);
       setReportStep(r.step ?? null);
-      persistFresh(r);   // SUCCESS면 캐시+날짜도장+dirty 해제
+      if (r.status === 'SUCCESS') {
+        persistFresh(r);   // 캐시+날짜도장+dirty 해제
+      } else if (r.status === 'GENERATING') {
+        // 생성 시작됐으면 즉시 dirty 해제 — 탭 이동 후 돌아올 때 force=true로 재시작 방지
+        AsyncStorage.setItem(BRIEFING_DAY_KEY, today).catch(() => {});
+        AsyncStorage.setItem(BRIEFING_DIRTY_KEY, '0').catch(() => {});
+      }
     } catch {
       setReportStatus('FAILED');
     } finally {
