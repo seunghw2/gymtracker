@@ -79,8 +79,8 @@ function Orbit({ size, duration, reverse, dot, color }: { size: number; duration
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  orbitArea: { width: 180, height: 180, alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
+  wrap: { alignItems: 'center', paddingVertical: 20 },
+  orbitArea: { width: 180, height: 180, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   glow: { position: 'absolute', width: 70, height: 70, borderRadius: 35, backgroundColor: ACCENT },
   core: { width: 26, height: 26, borderRadius: 13, backgroundColor: ACCENT },
   orbit: { position: 'absolute', borderWidth: 1, borderColor: 'rgba(255,59,48,0.12)', borderRadius: 999 },

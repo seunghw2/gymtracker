@@ -240,9 +240,7 @@ export default function BriefingHome() {
         <Text style={styles.dateChip}>{dateChip}</Text>
 
         {reportStatus === 'GENERATING' ? (
-          <View style={{ height: 300 }}>
-            <BriefingLoading percent={reportPct} step={reportStep} />
-          </View>
+          <BriefingLoading percent={reportPct} step={reportStep} />
         ) : !reportFetched ? (
           <View style={styles.headlineSkeleton}>
             <View style={[styles.skelBar, { width: '72%' }]} />

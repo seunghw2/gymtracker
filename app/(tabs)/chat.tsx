@@ -1,180 +1,190 @@
-import React, { useCallback, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   ScrollView,
-  RefreshControl,
-  InteractionManager,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { Swipeable } from 'react-native-gesture-handler';
+import { useFocusEffect } from 'expo-router';
 import { AI } from '../../constants/colors';
-import { markAllNotificationsRead } from '../../db/api/notifications';
 import { useChatStore } from '../../store/useChatStore';
 import { useUiStore } from '../../store/useUiStore';
-import { useWorkoutStore } from '../../store/useStore';
-import { ensureWeeklyConversation } from '../../db/api/chat';
+import { markAllNotificationsRead } from '../../db/api/notifications';
 
-/** Chat 탭(허브): 접힌 알림 strip + 동적 스타터 + 최근 대화 + 입력창. 상세는 /chat/[id]. */
+const GENERAL_KEY = 'general';
+
 export default function ChatTab() {
-  const router = useRouter();
   const setUnread = useUiStore(s => s.setUnread);
-  const conversations = useChatStore(s => s.conversations);
-  const loadConversations = useChatStore(s => s.loadConversations);
   const findOrCreateByKey = useChatStore(s => s.findOrCreateByKey);
-  const removeConv = useChatStore(s => s.remove);
+  const messages = useChatStore(s => s.messagesByConv);
+  const loadMessages = useChatStore(s => s.loadMessages);
+  const appendLocal = useChatStore(s => s.appendLocal);
+  const send = useChatStore(s => s.send);
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [firstLoading, setFirstLoading] = useState(true);   // 최초 로드 중 여부(스켈레톤 표시용)
-  const workoutActive = useWorkoutStore(s => s.activeSessionId != null);
+  const [convId, setConvId] = useState<number | null>(null);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [streaming, setStreaming] = useState<string | null>(null);
+  const [suggested, setSuggested] = useState<string[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
-    // 코치 허브 진입 → 알림 배지 비움(알림은 이제 주간 채팅 메시지로 들어옴)
-    setUnread(0);
-    markAllNotificationsRead().catch(() => {});
-    // 이번 주 코치 대화 보장(크론이 못 돌았어도 보완) 후 목록 갱신
-    try { await ensureWeeklyConversation(); } catch { /* ignore */ }
-    await loadConversations();
-  }, [loadConversations, setUnread]);
+  const scrollEnd = () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 40);
 
   useFocusEffect(useCallback(() => {
-    // 화면 전환 애니메이션이 끝난 뒤 네트워크 로드 → 진입이 매끄럽고,
-    // 그동안 캐시(persist)된 목록이나 스켈레톤이 먼저 자리잡는다.
-    const task = InteractionManager.runAfterInteractions(() => {
-      load().finally(() => setFirstLoading(false));
+    setUnread(0);
+    markAllNotificationsRead().catch(() => {});
+
+    findOrCreateByKey({ source: 'direct', sourceKey: GENERAL_KEY, title: 'AI 코치' }).then(conv => {
+      if (!conv) return;
+      setConvId(conv.id);
+      loadMessages(conv.id);
     });
-    return () => task.cancel();
-  }, [load]));
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  }, [findOrCreateByKey, loadMessages, setUnread]));
 
-  const starters = ['이번 주 어땠어', '정체 풀기', '루틴 짜줘'];
-
-  const goConv = (id: number, title: string, extra?: Record<string, string>) =>
-    router.push({ pathname: '/chat/[conversationId]', params: { conversationId: String(id), title, ...(extra ?? {}) } });
-
-  const startDirect = async (seed: string) => {
-    const q = seed.trim();
-    if (!q) return;
-    const conv = await findOrCreateByKey({ source: 'direct', title: q.length > 20 ? q.slice(0, 20) + '…' : q });
-    if (conv) goConv(conv.id, conv.title, { seed: q });
-  };
-  // 새 빈 대화 시작(FAB) — 상세 화면에서 입력
-  const newChat = async () => {
-    const conv = await findOrCreateByKey({ source: 'direct', title: '새 대화' });
-    if (conv) goConv(conv.id, conv.title);
+  const streamIn = (full: string, id: number) => {
+    setStreaming('');
+    let i = 0;
+    const step = Math.max(1, Math.ceil(full.length / 60));
+    timer.current = setInterval(() => {
+      i += step;
+      setStreaming(full.slice(0, i));
+      scrollEnd();
+      if (i >= full.length) {
+        if (timer.current) clearInterval(timer.current);
+        setStreaming(null);
+        appendLocal(id, 'assistant', full);
+      }
+    }, 28);
   };
 
-  const tag = (src: string) => src === 'weekly' ? { t: '이번 주', c: AI.accent } : src === 'report' ? { t: '리포트', c: '#c3a8e8' } : src === 'alert' ? { t: '알림', c: AI.warn } : null;
+  const handleSend = async (raw: string) => {
+    if (!convId) return;
+    const text = raw.trim();
+    if (!text || sending) return;
+    setInput('');
+    setSuggested([]);
+    setSending(true);
+    appendLocal(convId, 'user', text);
+    scrollEnd();
+    const res = await send(convId, text);
+    setSending(false);
+    if (res) {
+      setSuggested(res.suggestedQuestions ?? []);
+      streamIn(res.assistantMessage.text, convId);
+    } else {
+      appendLocal(convId, 'assistant', '지금은 답하기 어려워요. 잠시 후 다시 시도해 주세요.');
+    }
+  };
+
+  const list = convId ? (messages[convId] ?? []) : [];
 
   return (
     <SafeAreaView style={s.safe}>
-        <View style={s.headTop}><Text style={s.title}>AI 코치</Text></View>
-
-        <ScrollView contentContainerStyle={s.body}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AI.accent} />}>
-
-          <Text style={s.lbl}>바로 물어보기</Text>
-          <View style={s.starters}>
-            {starters.map((st, i) => (
-              <Pressable key={i} style={[s.start, i === 0 && s.startHl]} onPress={() => startDirect(st)}>
-                <Text style={[s.startT, i === 0 && s.startTHl]}>{st}</Text>
-              </Pressable>
-            ))}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={s.header}>
+          <View style={s.avatar}><Text style={{ fontSize: 15 }}>🤖</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.hName}>AI 코치</Text>
+            <Text style={s.hSub}>운동에 대해 뭐든 물어보세요</Text>
           </View>
+        </View>
 
-          {conversations.length > 0 && <Text style={s.lbl}>최근 대화</Text>}
-          {[...conversations].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')).map(c => {
-            const tg = tag(c.source);
-            return (
-              <Swipeable key={c.id} renderRightActions={() => (
-                <Pressable style={s.swipeDel} onPress={() => removeConv(c.id)}><Text style={s.swipeDelT}>삭제</Text></Pressable>
-              )}>
-                <Pressable style={s.ses} onPress={() => goConv(c.id, c.title)}>
-                  <Text style={s.sesT} numberOfLines={1}>💬 {c.title}</Text>
-                  {!!c.preview && <Text style={s.sesP} numberOfLines={1}>{c.preview}</Text>}
-                  <View style={s.sesMeta}>
-                    {tg && <Text style={[s.tagx, { color: tg.c, backgroundColor: tg.c + '22' }]}>{tg.t}</Text>}
-                    <Text style={s.tm}>{fmtDay(c.updatedAt)}</Text>
-                  </View>
+        <ScrollView ref={scrollRef} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled"
+          onContentSizeChange={scrollEnd}>
+
+          {list.length === 0 && streaming === null && !sending && (
+            <>
+              <View style={[s.bub, s.aBub]}>
+                <Text style={s.aText}>안녕! 오늘 운동은 어땠어? 궁금한 거 편하게 물어봐 💪</Text>
+              </View>
+              <View style={s.qr}>
+                {['이번 주 어땠어?', '내 약점이 뭐야?', '루틴 짜줘'].map((q, i) => (
+                  <Pressable key={i} style={s.qrChip} onPress={() => handleSend(q)}>
+                    <Text style={s.qrText}>{q}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
+          {list.map(m => (
+            <View key={m.id} style={[s.bub, m.role === 'user' ? s.uBub : s.aBub]}>
+              <Text style={m.role === 'user' ? s.uText : s.aText}>{m.text}</Text>
+            </View>
+          ))}
+
+          {streaming !== null && (
+            <View style={[s.bub, s.aBub]}><Text style={s.aText}>{streaming || '…'}</Text></View>
+          )}
+          {sending && streaming === null && (
+            <View style={[s.bub, s.aBub]}>
+              <View style={s.typing}><Dot d={0} /><Dot d={150} /><Dot d={300} /></View>
+            </View>
+          )}
+
+          {!sending && streaming === null && suggested.length > 0 && (
+            <View style={s.qr}>
+              {suggested.map((q, i) => (
+                <Pressable key={i} style={s.qrChip} onPress={() => handleSend(q)}>
+                  <Text style={s.qrText}>{q}</Text>
                 </Pressable>
-              </Swipeable>
-            );
-          })}
-
-          {/* 첫 로딩 중엔 스켈레톤으로 골격을 먼저 고정(빈→채움 팝인 방지) */}
-          {conversations.length === 0 && firstLoading && <ChatSkeleton />}
-          {conversations.length === 0 && !firstLoading && (
-            <View style={s.empty}><Text style={{ fontSize: 36, marginBottom: 10 }}>🤖</Text><Text style={s.emptyT}>운동에 대해 뭐든 물어보세요.</Text></View>
+              ))}
+            </View>
           )}
         </ScrollView>
 
-        {/* 새 대화 FAB — 운동 중이면 배너 위로 올려 안 가리게 */}
-        <Pressable style={[s.fab, { bottom: workoutActive ? 78 : 22 }]} onPress={newChat} accessibilityLabel="새 대화 시작">
-          <Text style={s.fabIcon}>✎</Text>
-        </Pressable>
+        <View style={s.composer}>
+          <TextInput style={s.inp} placeholder="AI 코치에게 물어보기…" placeholderTextColor={AI.faint}
+            value={input} onChangeText={setInput} onSubmitEditing={() => handleSend(input)} returnKeyType="send" />
+          <Pressable style={[s.snd, (!input.trim() || sending) && { opacity: 0.4 }]}
+            disabled={!input.trim() || sending} onPress={() => handleSend(input)}>
+            <Text style={s.sndText}>↑</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-/** 최근 대화 자리표시(스켈레톤) — 실제 카드(s.ses)와 같은 크기로 골격을 잡아 레이아웃 점프를 막는다. */
-function ChatSkeleton() {
-  return (
-    <View>
-      <Text style={s.lbl}>최근 대화</Text>
-      {[0, 1].map(i => (
-        <View key={i} style={s.ses}>
-          <View style={[s.skel, { width: '55%', height: 13 }]} />
-          <View style={[s.skel, { width: '80%', height: 11, marginTop: 8 }]} />
-          <View style={[s.skel, { width: 48, height: 10, marginTop: 9 }]} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function fmtDay(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+function Dot({ d }: { d: number }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const t = setInterval(() => setOn(o => !o), 500);
+    const to = setTimeout(() => setOn(true), d);
+    return () => { clearInterval(t); clearTimeout(to); };
+  }, [d]);
+  return <View style={[s.dot, { opacity: on ? 1 : 0.3 }]} />;
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
-  headTop: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  body: { padding: 14, paddingBottom: 24 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: AI.line },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: AI.tint, borderWidth: 1, borderColor: AI.accent, alignItems: 'center', justifyContent: 'center' },
+  hName: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  hSub: { color: AI.textSub, fontSize: 11, marginTop: 1 },
 
-  strip: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 12, padding: 12 },
-  stripT: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
-  stripS: { color: '#7a7a7e', fontSize: 10.5, marginTop: 2 },
-  go: { color: AI.textSub, fontSize: 15 },
+  body: { padding: 14, paddingBottom: 24, gap: 9 },
+  bub: { maxWidth: '86%', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14 },
+  aBub: { alignSelf: 'flex-start', backgroundColor: '#141416', borderWidth: 1, borderColor: '#1c1c22', borderBottomLeftRadius: 4 },
+  uBub: { alignSelf: 'flex-end', backgroundColor: AI.accent, borderBottomRightRadius: 4 },
+  aText: { color: '#EDEDF0', fontSize: 14.5, lineHeight: 21 },
+  uText: { color: '#fff', fontSize: 14.5, lineHeight: 21, fontWeight: '600' },
 
-  lbl: { color: '#6a6a6e', fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 16, marginBottom: 8, marginLeft: 2 },
-  starters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  start: { borderWidth: 1, borderColor: '#2a2a30', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#0d0d0f' },
-  startHl: { borderColor: AI.accent, backgroundColor: 'rgba(255,59,48,0.14)' },
-  startT: { color: '#e4e4ea', fontSize: 12.5, fontWeight: '700' },
-  startTHl: { color: '#fff' },
+  typing: { flexDirection: 'row', gap: 5, alignItems: 'center', paddingVertical: 3 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: AI.textSub },
 
-  ses: { backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#15151a', borderRadius: 12, padding: 12, marginBottom: 8 },
-  sesT: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
-  sesP: { color: '#8a8a8e', fontSize: 11.5, marginTop: 4 },
-  sesMeta: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 7 },
-  tagx: { fontSize: 9.5, fontWeight: '800', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
-  tm: { color: '#6a6a6e', fontSize: 10, marginLeft: 'auto', fontVariant: ['tabular-nums'] },
+  qr: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 2 },
+  qrChip: { borderWidth: 1, borderColor: AI.accent, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
+  qrText: { color: AI.accent, fontSize: 12.5, fontWeight: '700' },
 
-  empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyT: { color: AI.textSub, fontSize: 13 },
-  skel: { backgroundColor: '#1a1a1f', borderRadius: 6 },
-
-  swipeDel: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 76, marginBottom: 8, borderRadius: 12 },
-  swipeDelT: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  fab: { position: 'absolute', right: 18, width: 56, height: 56, borderRadius: 28, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  fabIcon: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: -2 },
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: AI.line },
+  inp: { flex: 1, backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1c1c22', borderRadius: 22, paddingHorizontal: 15, paddingVertical: 11, color: '#fff', fontSize: 14 },
+  snd: { width: 38, height: 38, borderRadius: 19, backgroundColor: AI.accent, alignItems: 'center', justifyContent: 'center' },
+  sndText: { color: '#fff', fontSize: 18, fontWeight: '800' },
 });
