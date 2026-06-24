@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getSetting, setSetting, getSessionHistory, SessionSummary } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
-import { useChatStore } from '../../store/useChatStore';
 import type { AiReportV2, RCoachItem } from '../../db/api/ai';
 import SessionPreviewSheet from '../SessionPreviewSheet';
 import { RT, toneColor } from './theme';
@@ -492,23 +491,11 @@ function PeriodSessions({ start, end }: { start: string; end: string }) {
 const CHAPTERS = [{ n: 1, label: '진단 · 무슨 일이 있었나' }, { n: 2, label: '처방 · 뭘 하면 되나' }, { n: 3, label: '계속 가기 · 동기' }];
 function CoachTab({ r, editing, hidden, toggle, tone, onTone }: { r: AiReportV2; onAsk?: () => void; editing: boolean; hidden: Set<string>; toggle: (k: string) => void; tone: string; onTone: (t: string) => void }) {
   const router = useRouter();
-  const findOrCreateByKey = useChatStore(st => st.findOrCreateByKey);
   const all = r.coaching ?? [];
   const visible = (it: RCoachItem) => editing ? true : (it.defaultOn && !hidden.has('coach_' + it.key));
   const items = all.filter(visible);
 
-  // 주차당 1세션 이어가기(중복 방지) — 같은 리포트면 기존 대화로 복귀
-  const continueChat = async (seed?: string) => {
-    const conv = await findOrCreateByKey({
-      source: 'report',
-      sourceKey: `report:${r.period.type}:${r.period.start}`,
-      title: `${r.period.label} 회고`,
-      periodType: r.period.type,
-      from: r.period.start,
-      to: r.period.end,
-    });
-    if (conv) router.push({ pathname: '/chat/[conversationId]', params: { conversationId: String(conv.id), title: conv.title, ctx: `${r.period.label} 리포트에서 이어옴`, ...(seed ? { seed } : {}) } });
-  };
+  const continueChat = () => router.navigate('/(tabs)/chat');
 
   return (
     <View>
@@ -716,6 +703,6 @@ const s = StyleSheet.create({
   qchips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 12 },
   qchip: { borderWidth: 1.3, borderColor: RT.purpleLine, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 13 },
   qtext: { color: RT.ink, fontSize: 12.5, fontWeight: '600' },
-  ask: { backgroundColor: RT.purple, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  ask: { backgroundColor: RT.action, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   askText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });
