@@ -1,185 +1,47 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Modal,
-  TextInput,
-  RefreshControl,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, StyleSheet, ScrollView, Pressable, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  getTodayBodyLog,
-  getLatestBodyLog,
-  getBodyLogs,
-  upsertBodyLog,
-  getWeeklyWorkoutCount,
-  getAllWorkoutDates,
-  getSetting,
-  getReportV2,
-  AiReportV2,
-  BodyLog,
-} from '../../db/queries';
-import { useSettingsStore } from '../../store/useStore';
-import RulerPicker from '../../components/RulerPicker';
-import BriefingLoading from '../../components/BriefingLoading';
-import { ACCENT, ACCENT_INK, AI, SEM } from '../../constants/colors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { readCache, writeCache } from '../../lib/diskCache';
-import { shouldRefreshBriefing, BRIEFING_DAY_KEY, BRIEFING_DIRTY_KEY } from '../../lib/briefingRefresh';
+import { ACCENT, SEM } from '../../constants/colors';
+import { useOverloadStore } from '../../store/useOverloadStore';
+import { getWeeklyPattern } from '../../db/api/overload';
+import type { PartSummaryDto, ExerciseGoalDto } from '../../db/api/overload';
 
-const WEIGHT_PROMPT_KEY = 'weight_prompt_dismissed';
-const REPORT_CACHE_KEY = 'briefing:week';
-const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const MG_KOR: Record<string, string> = {
+  Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체',
+  Arms: '팔', Core: '코어', Cardio: '유산소',
+};
 
-function getTodayStr() {
-  return iso(new Date());
-}
-function iso(d: Date) {
-  // 로컬 기준 'YYYY-MM-DD' (toISOString은 UTC라 자정 전후로 하루 어긋남)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function getWeekRange() {
-  const today = new Date();
-  const day = today.getDay();
-  const mon = new Date(today);
-  mon.setDate(today.getDate() - ((day + 6) % 7));
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  return { start: iso(mon), end: iso(sun) };
-}
-/** 오늘(또는 어제)부터 거꾸로 이어진 연속 운동일 수. */
-function computeStreak(dates: string[]): number {
-  const set = new Set(dates);
-  const d = new Date();
-  if (!set.has(iso(d))) d.setDate(d.getDate() - 1);
-  let s = 0;
-  while (set.has(iso(d))) { s++; d.setDate(d.getDate() - 1); }
-  return s;
-}
+function korPart(p: string) { return MG_KOR[p] ?? p; }
 
-export default function BriefingHome() {
+export default function Dashboard() {
   const router = useRouter();
-  const { goalWeightKg } = useSettingsStore();
-  const [report, setReport] = useState<AiReportV2 | null>(null);
-  const [reportStatus, setReportStatus] = useState<string>('');
-  const [reportPct, setReportPct] = useState(0);
-  const [reportStep, setReportStep] = useState<string | null>(null);
-  const [weekCount, setWeekCount] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [todayWeight, setTodayWeight] = useState<number | null>(null);
-  const [showWeightModal, setShowWeightModal] = useState(false);
-  const [dialValue, setDialValue] = useState(70);
-  const [bodyFatInput, setBodyFatInput] = useState('');
-  const [todayBodyFat, setTodayBodyFat] = useState<number | null>(null);
-  const [waistInput, setWaistInput] = useState('');
-  const [todayWaist, setTodayWaist] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [reportFetched, setReportFetched] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [pollTick, setPollTick] = useState(0);
+  const { goalSetting, exerciseGoals, loadGoalSetting, loadExerciseGoals } = useOverloadStore();
 
-  // SUCCESS면 디스크 캐시 저장 + '오늘' 날짜도장 + dirty 해제(다음 트리거까지 재생성 안 함)
-  const persistFresh = useCallback((r: { status: string; report: AiReportV2 | null }) => {
-    if (r.status === 'SUCCESS' && r.report) {
-      writeCache(REPORT_CACHE_KEY, r.report);
-      AsyncStorage.setItem(BRIEFING_DAY_KEY, getTodayStr()).catch(() => {});
-      AsyncStorage.setItem(BRIEFING_DIRTY_KEY, '0').catch(() => {});
-    }
-  }, []);
+  const [pattern, setPattern] = useState<PartSummaryDto[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const today = getTodayStr();
-    const { start, end } = getWeekRange();
-    try {
-      const [count, todayLog, latestLog, allDates] = await Promise.all([
-        getWeeklyWorkoutCount(start, end),
-        getTodayBodyLog(today),
-        getLatestBodyLog(),
-        getAllWorkoutDates(),
-      ]);
-      setWeekCount(count);
-      setStreak(computeStreak(allDates));
+    await Promise.all([loadGoalSetting(), loadExerciseGoals()]);
+    const p = await getWeeklyPattern().catch(() => [] as PartSummaryDto[]);
+    setPattern(p);
+  }, [loadGoalSetting, loadExerciseGoals]);
 
-      if (todayLog?.weight_kg) {
-        setTodayWeight(todayLog.weight_kg);
-        setTodayBodyFat(todayLog.body_fat_pct ?? null);
-        setTodayWaist(todayLog.waist_cm ?? null);
-      } else {
-        const enabled = await getSetting('weight_prompt_enabled', '1').catch(() => '1');
-        const dismissed = await AsyncStorage.getItem(WEIGHT_PROMPT_KEY).catch(() => null);
-        if (enabled !== '0' && dismissed !== today) setShowWeightModal(true);
-        setDialValue(latestLog?.weight_kg ?? 70);
-        setBodyFatInput(latestLog?.body_fat_pct ? String(latestLog.body_fat_pct) : '');
-        setWaistInput(latestLog?.waist_cm ? String(latestLog.waist_cm) : '');
-      }
-    } catch {
-      // 무시 — 폴백 UI
+  useFocusEffect(useCallback(() => {
+    if (goalSetting === null) {
+      loadGoalSetting().then(gs => {
+        if (!useOverloadStore.getState().goalSetting?.onboarded) {
+          router.replace('/onboarding');
+        }
+      });
+    } else if (!goalSetting.onboarded) {
+      router.replace('/onboarding');
+      return;
     }
-    setLoaded(true);
-
-    // v2 주간 브리핑 — 라이브 재계산이 아니라 정해진 시점에만 재생성:
-    // 날짜 변경(자정 경과·'매일 0시') 또는 세션 완료(dirty)일 때만 force.
-    try {
-      const [lastDay, dirty] = await Promise.all([
-        AsyncStorage.getItem(BRIEFING_DAY_KEY).catch(() => null),
-        AsyncStorage.getItem(BRIEFING_DIRTY_KEY).catch(() => null),
-      ]);
-      const force = shouldRefreshBriefing(lastDay, today, dirty === '1');
-      const r = await getReportV2('week', 0, force);
-      setReportStatus(r.status);
-      setReport(r.report);
-      setReportPct(r.percent ?? 0);
-      setReportStep(r.step ?? null);
-      if (r.status === 'SUCCESS') {
-        persistFresh(r);   // 캐시+날짜도장+dirty 해제
-      } else if (r.status === 'GENERATING') {
-        // 생성 시작됐으면 즉시 dirty 해제 — 탭 이동 후 돌아올 때 force=true로 재시작 방지
-        AsyncStorage.setItem(BRIEFING_DAY_KEY, today).catch(() => {});
-        AsyncStorage.setItem(BRIEFING_DIRTY_KEY, '0').catch(() => {});
-      }
-    } catch {
-      setReportStatus('FAILED');
-    } finally {
-      setReportFetched(true);   // 리포트 응답 전엔 폴백 헤드라인 대신 스켈레톤(깜빡임 방지)
-    }
-  }, [persistFresh]);
-
-  // 콜드 스타트 즉시 표시: 마지막 성공 브리핑을 디스크에서 바로 띄우고(네트워크 안 기다림),
-  // 위 load가 백그라운드로 갱신(stale-while-revalidate). 이미 본 화면이면 로딩 없이 바로 뜸.
-  useEffect(() => {
-    readCache<AiReportV2>(REPORT_CACHE_KEY).then(cached => {
-      if (!cached) return;
-      setReport(prev => prev ?? cached);
-      setReportStatus(prev => prev || 'SUCCESS');
-      setReportFetched(true);
-    });
-  }, []);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  // 생성 중이면 2초 폴링 → 완료 시 헤드라인/처방으로 교체
-  // pollTick 의존으로 percent가 같아도 반드시 다음 폴을 예약(이전 구현은 percent 불변 시 polling 중단 버그)
-  useEffect(() => {
-    if (reportStatus !== 'GENERATING') return;
-    const id = setTimeout(() => {
-      getReportV2('week').then(r => {
-        setReportStatus(r.status); setReport(r.report);
-        setReportPct(r.percent ?? 0); setReportStep(r.step ?? null);
-        if (r.status === 'SUCCESS') persistFresh(r);
-        if (r.status === 'GENERATING') setPollTick(t => t + 1);
-      }).catch(() => { setPollTick(t => t + 1); });
-    }, 2000);
-    return () => clearTimeout(id);
-  }, [reportStatus, pollTick, persistFresh]);
+    load();
+  }, [goalSetting, load, loadGoalSetting, router]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -187,241 +49,236 @@ export default function BriefingHome() {
     setRefreshing(false);
   }, [load]);
 
-  const openWeightModal = () => {
-    setDialValue(todayWeight ?? dialValue);
-    setBodyFatInput(todayBodyFat != null ? String(todayBodyFat) : bodyFatInput);
-    setWaistInput(todayWaist != null ? String(todayWaist) : waistInput);
-    setShowWeightModal(true);
-  };
-  const handleSaveWeight = async () => {
-    const fat = parseFloat(bodyFatInput);
-    const fatValue = Number.isFinite(fat) && fat > 0 ? fat : todayBodyFat ?? undefined;
-    const waist = parseFloat(waistInput);
-    const waistValue = Number.isFinite(waist) && waist > 0 ? waist : todayWaist ?? undefined;
-    try { await upsertBodyLog(getTodayStr(), dialValue, fatValue, waistValue); } catch {}
-    setTodayWeight(dialValue);
-    if (fatValue != null) setTodayBodyFat(fatValue);
-    if (waistValue != null) setTodayWaist(waistValue);
-    AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {});
-    setShowWeightModal(false);
-  };
-  const closeWeightModal = () => {
-    AsyncStorage.setItem(WEIGHT_PROMPT_KEY, getTodayStr()).catch(() => {});
-    setShowWeightModal(false);
-  };
+  const maxSets = pattern.length > 0 ? pattern[0].setCount : 1;
 
-  const now = new Date();
-  const dateChip = `${now.getMonth() + 1}월 ${now.getDate()}일 ${DAYS[now.getDay()]} · 브리핑`;
-  const goalDiff = todayWeight != null ? todayWeight - goalWeightKg : null;
-  const profileNeeded = reportStatus === 'PROFILE_REQUIRED';
+  // 다음 운동: 빈도 대비 이번 주 세션 가장 적은 부위
+  const nextPart = (() => {
+    if (!goalSetting || pattern.length === 0) return null;
+    const perWeek = goalSetting.weeklyFrequency;
+    let minRatio = Infinity;
+    let minPart: PartSummaryDto | null = null;
+    for (const p of pattern) {
+      const ratio = p.sessionCount / perWeek;
+      if (ratio < minRatio) { minRatio = ratio; minPart = p; }
+    }
+    return minPart;
+  })();
 
-  // 헤드라인/처방: v2 리포트 있으면 사용, 없으면 폴백
-  const headline = report?.headline
-    ?? (profileNeeded ? 'AI 분석을 켜볼까요?' : weekCount > 0 ? '이번 주, 잘 쌓고 있어요.' : '오늘부터 다시 시작.');
-  const rx = report?.prescription;
-  // 오늘 추천(DAILY·코드 계산): 가장 오래 쉰 부위 = 회복돼서 오늘 하기 좋음
-  const recovery = report?.cards?.recovery ?? [];
-  const todayRec = recovery.length ? [...recovery].sort((a, b) => b.days - a.days)[0] : null;
-
-  if (!loaded) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingWrap}><ActivityIndicator size="large" color={ACCENT} /></View>
-      </SafeAreaView>
-    );
-  }
+  if (!goalSetting?.onboarded) return null;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={s.safe}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={s.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
       >
-        {/* 헤더 */}
-        <View style={styles.headerRow}>
-          <Text style={styles.brand}>브리핑</Text>
-          <View style={styles.headerIcons}>
-            <Pressable hitSlop={10} onPress={() => router.push('/(tabs)/settings')}>
-              <Ionicons name="settings-outline" size={22} color={AI.textSub} />
-            </Pressable>
-          </View>
-        </View>
-        <Text style={styles.dateChip}>{dateChip}</Text>
+        <Text style={s.greet}>{weekdayLabel()} · 이번 주 {totalSessions(pattern)}일째</Text>
+        <Text style={s.title}>점진적으로 강해지는 중 💪</Text>
 
-        {reportStatus === 'GENERATING' ? (
-          <BriefingLoading percent={reportPct} step={reportStep} />
-        ) : !reportFetched ? (
-          <View style={styles.headlineSkeleton}>
-            <View style={[styles.skelBar, { width: '72%' }]} />
-            <View style={[styles.skelBar, { width: '48%', marginTop: 12 }]} />
-          </View>
-        ) : (<>
-        {/* 큰 헤드라인 */}
-        <Pressable onPress={() => router.push('/ai/reports')}>
-          <Text style={styles.headline}>{headline}</Text>
-        </Pressable>
+        {/* 이번 주 패턴 */}
+        {pattern.length > 0 && (
+          <>
+            <SectionHeader title="이번 주 패턴" />
+            <View style={s.patCard}>
+              {pattern.map(p => (
+                <View key={p.part} style={s.patRow}>
+                  <Text style={s.patName}>{korPart(p.part)}</Text>
+                  <View style={s.patTrack}>
+                    <View style={[s.patFill, {
+                      width: `${Math.round(p.setCount / maxSets * 100)}%`,
+                      backgroundColor: p.part === pattern[0].part ? ACCENT : '#3a3a3e',
+                    }]} />
+                  </View>
+                  <Text style={s.patVal}>{p.sessionCount}회 · {p.setCount}세트</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
-        {/* 처방 / CTA */}
-        {profileNeeded ? (
-          <Pressable style={styles.rxCard} onPress={() => router.push('/ai/intake')}>
-            <Text style={styles.rxCap}>시작하기</Text>
-            <Text style={styles.rxAction}>목표를 알려주면 매주 브리핑을 만들어줄게요.</Text>
-            <Text style={styles.rxTodo}>탭하여 1분 설정 →</Text>
-          </Pressable>
-        ) : rx ? (
-          <Pressable style={styles.rxCard} onPress={() => router.push('/ai/reports')}>
-            <Text style={styles.rxCap}>처방 · 이번 주</Text>
-            <Text style={styles.rxAction}>{rx.action}</Text>
-            {!!rx.todo && <Text style={styles.rxTodo}>{rx.todo}</Text>}
-          </Pressable>
-        ) : null}
+        {/* 종목별 진행도 */}
+        {exerciseGoals.length > 0 && (
+          <>
+            <SectionHeader title="종목별 진행도" right="증량 준비순 ↓" />
+            {exerciseGoals.map(g => <GoalCard key={g.id} goal={g} />)}
+          </>
+        )}
 
-        {/* 오늘 추천(DAILY) — 가장 오래 쉰 부위 */}
-        {todayRec && !profileNeeded && (
-          <View style={styles.todayCard}>
-            <Text style={styles.todayCap}>🎯 오늘 추천</Text>
-            <Text style={styles.todayAction}>{todayRec.part} 어때요?</Text>
-            <Text style={styles.todaySub}>{todayRec.days}일 쉬어서 회복됐어요</Text>
+        {exerciseGoals.length === 0 && pattern.length === 0 && (
+          <View style={s.empty}>
+            <Text style={s.emptyT}>종목을 선택하면{'\n'}진행도가 여기 보여요.</Text>
           </View>
         )}
 
-        {/* 부위별 하드세트 · 빈도(주간) */}
-        {(report?.detail?.balance?.length ?? 0) > 0 && (
-          <Pressable style={styles.msCard} onPress={() => router.push('/ai/reports')}>
-            <Text style={styles.msTitle}>부위별 볼륨 <Text style={styles.msCap}>하드세트 · 빈도 / 주</Text></Text>
-            {report!.detail.balance!.map((b, i) => {
-              const f = report?.cards?.muscleFreqDays?.find(m => m.part === b.part);
-              const low = b.status === 'low';
-              return (
-                <View key={i} style={styles.msRow}>
-                  <Text style={styles.msPart}>{b.part}</Text>
-                  <Text style={[styles.msSets, low && { color: SEM.bad }]}>{b.sets}세트{low ? ' 부족' : ''}</Text>
-                  <Text style={[styles.msFreq, f?.low && { color: SEM.bad }]}>{f != null ? `주 ${f.perWeek}회` : '—'}</Text>
-                </View>
-              );
-            })}
-          </Pressable>
-        )}
-        </>)}
-
-        {/* 핵심 지표 3 */}
-        <View style={styles.metrics}>
-          <View style={styles.metric}>
-            <Text style={styles.metricV}>{weekCount}</Text>
-            <Text style={styles.metricL}>이번 주</Text>
-          </View>
-          <View style={styles.metric}>
-            <Text style={styles.metricV}>{streak}</Text>
-            <Text style={styles.metricL}>스트릭</Text>
-          </View>
-          <Pressable style={styles.metric} onPress={openWeightModal}>
-            <Text style={styles.metricV}>{goalDiff != null ? `${Math.abs(goalDiff).toFixed(1)}` : '–'}</Text>
-            <Text style={styles.metricL}>{goalDiff == null ? '체중 입력' : `목표까지 kg`}</Text>
-          </Pressable>
-        </View>
-
-        {/* 운동 시작 */}
-        <Pressable style={styles.startBtn} onPress={() => router.push('/workout')}>
-          <Ionicons name="play" size={18} color={ACCENT_INK} />
-          <Text style={styles.startBtnText}>운동 시작</Text>
-        </Pressable>
-      </ScrollView>
-
-      {/* 체중 입력 모달 */}
-      <Modal visible={showWeightModal} transparent animationType="slide" onRequestClose={closeWeightModal}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <Pressable style={styles.modalOverlay} onPress={closeWeightModal}>
-              <View style={styles.modalCard}>
-                <Text style={styles.modalTitle}>오늘의 체중</Text>
-                <Text style={styles.weightReadout}>{dialValue.toFixed(1)}<Text style={styles.weightUnit}>kg</Text></Text>
-                <RulerPicker initial={dialValue} onChange={v => setDialValue(v)} />
-                <View style={styles.fatRow}>
-                  <Text style={styles.fatLabel}>체지방</Text>
-                  <TextInput
-                    style={styles.fatInput}
-                    value={bodyFatInput}
-                    onChangeText={setBodyFatInput}
-                    placeholder="선택"
-                    placeholderTextColor="#48484A"
-                    keyboardType="decimal-pad"
-                    maxLength={4}
-                  />
-                  <Text style={styles.fatUnit}>%</Text>
-                </View>
-                <View style={styles.fatRow}>
-                  <Text style={styles.fatLabel}>허리</Text>
-                  <TextInput
-                    style={styles.fatInput}
-                    value={waistInput}
-                    onChangeText={setWaistInput}
-                    placeholder="선택"
-                    placeholderTextColor="#48484A"
-                    keyboardType="decimal-pad"
-                    maxLength={5}
-                  />
-                  <Text style={styles.fatUnit}>cm</Text>
-                </View>
-                <Pressable style={styles.saveBtn} onPress={handleSaveWeight}>
-                  <Text style={styles.saveBtnText}>저장</Text>
-                </Pressable>
+        {/* 다음 운동 */}
+        {nextPart && (
+          <>
+            <SectionHeader title="다음 운동" />
+            <Pressable style={s.nextCard} onPress={() => router.navigate('/workout')}>
+              <View style={s.nextIco}><Text style={{ fontSize: 22 }}>{partEmoji(nextPart.part)}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.nextTitle}>{korPart(nextPart.part)} 차례예요</Text>
+                <Text style={s.nextSub}>이번 주 {nextPart.setCount}세트 · 가장 적게 한 부위</Text>
               </View>
+              <Text style={s.nextArrow}>›</Text>
             </Pressable>
-          </KeyboardAvoidingView>
-        </GestureHandlerRootView>
-      </Modal>
+          </>
+        )}
+
+        {exerciseGoals.length === 0 && (
+          <Pressable style={s.setupCta} onPress={() => router.navigate('/onboarding')}>
+            <Text style={s.setupCtaT}>목표 설정하기</Text>
+          </Pressable>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000000' },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingBottom: 40 },
+function GoalCard({ goal }: { goal: ExerciseGoalDto }) {
+  const ready = goal.status === 'ready_to_increase';
+  const hold = goal.status === 'hold';
 
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  brand: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-  dateChip: { color: AI.textSub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
+  const fromLabel = goal.currentValue != null
+    ? (goal.ruleType === 'bodyweight' ? `${goal.currentValue}회` : `${goal.currentValue}kg`)
+    : '—';
 
-  headline: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', lineHeight: 38, letterSpacing: -0.5, marginTop: 18 },
-  headlineSkeleton: { marginTop: 22, marginBottom: 6 },
-  skelBar: { height: 26, borderRadius: 8, backgroundColor: '#1c1c1e' },
+  const progress = (() => {
+    if (ready || hold) return 1;
+    return 0.6; // server-computed in future; placeholder
+  })();
 
-  rxCard: { backgroundColor: '#161618', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 12, padding: 15, marginTop: 18 },
-  rxCap: { color: ACCENT, fontSize: 11, fontWeight: '800' },
-  rxAction: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
-  rxTodo: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
-  todayCard: { backgroundColor: '#161618', borderLeftWidth: 3, borderLeftColor: SEM.good, borderRadius: 12, padding: 15, marginTop: 10 },
-  todayCap: { color: SEM.good, fontSize: 11, fontWeight: '800' },
-  todayAction: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700', lineHeight: 22, marginTop: 6 },
-  todaySub: { color: AI.textSub, fontSize: 12.5, lineHeight: 18, marginTop: 6 },
+  return (
+    <View style={[s.pcard, ready && s.pcardReady]}>
+      <View style={s.pcardTop}>
+        <View>
+          <Text style={s.pcardName}>{goal.exerciseName ?? '—'}</Text>
+          <Text style={s.pcardType}>{ruleLabel(goal.ruleType)}</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={s.pcardFrom}>{fromLabel}</Text>
+          <Text style={[s.pcardNext, hold && { color: SEM.muted }]}>
+            → {goal.nextTarget ?? '—'}
+          </Text>
+        </View>
+      </View>
+      <View style={s.pcardBar}>
+        <View style={[s.pcardFill, {
+          width: `${Math.round(progress * 100)}%`,
+          backgroundColor: ready ? SEM.good : ACCENT,
+        }]} />
+      </View>
+      {ready && (
+        <View style={s.readyTag}>
+          <View style={[s.readyDot, { backgroundColor: SEM.good }]} />
+          <Text style={[s.readyT, { color: SEM.good }]}>증량 준비됨</Text>
+        </View>
+      )}
+      {!ready && !hold && (
+        <Text style={s.pcardCond}>
+          {condText(goal)}
+        </Text>
+      )}
+    </View>
+  );
+}
 
-  msCard: { backgroundColor: '#161618', borderRadius: 12, padding: 15, marginTop: 11 },
-  msTitle: { color: '#fff', fontSize: 14, fontWeight: '800', marginBottom: 10 },
-  msCap: { color: AI.textSub, fontSize: 11, fontWeight: '600' },
-  msRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#222226' },
-  msPart: { color: '#EDEDF0', fontSize: 13.5, flex: 1 },
-  msSets: { color: '#fff', fontSize: 13.5, fontWeight: '800', width: 92, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  msFreq: { color: AI.textSub, fontSize: 12.5, fontWeight: '700', width: 70, textAlign: 'right', fontVariant: ['tabular-nums'] },
+function condText(g: ExerciseGoalDto): string {
+  if (g.ruleType === 'barbell_main') {
+    return `목표 ${g.targetReps ?? '—'}회 ${g.targetSets ?? '—'}세트 달성 시 증량`;
+  }
+  if (g.ruleType === 'machine_cable') {
+    return `반복 범위 ${g.repRangeMin ?? '—'}–${g.repRangeMax ?? '—'}회 채우는 중`;
+  }
+  if (g.ruleType === 'bodyweight') {
+    return `총 반복수 늘리는 중`;
+  }
+  return '반복 범위 유지';
+}
 
-  metrics: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  metric: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  metricV: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  metricL: { color: AI.textSub, fontSize: 11.5, marginTop: 4 },
+function ruleLabel(rt: string): string {
+  const map: Record<string, string> = {
+    barbell_main: '바벨 메인', machine_cable: '머신 / 케이블',
+    bodyweight: '맨몸', isolation: '고립',
+  };
+  return map[rt] ?? rt;
+}
 
-  startBtn: { flexDirection: 'row', gap: 7, backgroundColor: ACCENT, borderRadius: 16, paddingVertical: 17, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-  startBtnText: { color: ACCENT_INK, fontSize: 17, fontWeight: '800' },
+function partEmoji(part: string): string {
+  const map: Record<string, string> = {
+    Chest: '🫁', Back: '🔙', Shoulder: '🏋️', Legs: '🦵',
+    Arms: '💪', Core: '🧘', Cardio: '🏃',
+  };
+  return map[part] ?? '🏋️';
+}
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 44, alignItems: 'center' },
-  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  weightReadout: { color: '#FFFFFF', fontSize: 56, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
-  weightUnit: { color: '#8E8E93', fontSize: 24, fontWeight: '600' },
-  saveBtn: { backgroundColor: ACCENT, borderRadius: 14, paddingVertical: 14, alignItems: 'center', alignSelf: 'stretch', marginTop: 20 },
-  saveBtnText: { color: ACCENT_INK, fontSize: 17, fontWeight: '700' },
-  fatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
-  fatLabel: { color: '#8E8E93', fontSize: 15 },
-  fatInput: { backgroundColor: '#2C2C2E', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, color: '#FFFFFF', fontSize: 16, minWidth: 90, textAlign: 'center' },
-  fatUnit: { color: '#8E8E93', fontSize: 15 },
+function weekdayLabel() {
+  const d = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+  return d[new Date().getDay()];
+}
+
+function totalSessions(pattern: PartSummaryDto[]) {
+  if (pattern.length === 0) return 0;
+  return Math.max(...pattern.map(p => p.sessionCount));
+}
+
+function SectionHeader({ title, right }: { title: string; right?: string }) {
+  return (
+    <View style={s.secH}>
+      <Text style={s.secHT}>{title}</Text>
+      {right && <Text style={s.secHR}>{right}</Text>}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#000' },
+  body: { padding: 20, paddingBottom: 32 },
+
+  greet: { fontSize: 13, color: SEM.muted, marginBottom: 2 },
+  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, marginBottom: 22 },
+
+  secH: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 26, marginBottom: 13 },
+  secHT: { fontSize: 15.5, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
+  secHR: { fontSize: 12.5, color: SEM.muted },
+
+  patCard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
+    borderRadius: 14, paddingHorizontal: 18, paddingVertical: 6 },
+  patRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9,
+    borderTopWidth: 0 },
+  patName: { fontSize: 13.5, fontWeight: '700', width: 36, color: '#fff' },
+  patTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: SEM.surface2, overflow: 'hidden' },
+  patFill: { height: '100%', borderRadius: 4 },
+  patVal: { fontSize: 12, color: SEM.muted, width: 84, textAlign: 'right' },
+
+  pcard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
+    borderRadius: 14, padding: 16, marginBottom: 11 },
+  pcardReady: { borderColor: 'rgba(43,217,106,0.4)' },
+  pcardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  pcardName: { fontSize: 15.5, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
+  pcardType: { fontSize: 11, fontWeight: '700', color: '#555', marginTop: 3 },
+  pcardFrom: { fontSize: 13, color: SEM.muted, fontWeight: '600' },
+  pcardNext: { fontSize: 17, fontWeight: '800', color: SEM.good },
+  pcardBar: { height: 7, borderRadius: 4, backgroundColor: SEM.surface2, marginVertical: 13, overflow: 'hidden' },
+  pcardFill: { height: '100%', borderRadius: 4 },
+  pcardCond: { fontSize: 12, color: SEM.muted },
+  readyTag: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  readyDot: { width: 6, height: 6, borderRadius: 3 },
+  readyT: { fontSize: 11, fontWeight: '800' },
+
+  nextCard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
+    borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  nextIco: { width: 46, height: 46, borderRadius: 13, backgroundColor: 'rgba(255,59,48,0.14)',
+    alignItems: 'center', justifyContent: 'center' },
+  nextTitle: { fontSize: 15.5, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
+  nextSub: { fontSize: 12.5, color: SEM.muted, marginTop: 3 },
+  nextArrow: { marginLeft: 'auto', color: ACCENT, fontSize: 20, fontWeight: '700' },
+
+  empty: { alignItems: 'center', paddingVertical: 60 },
+  emptyT: { color: SEM.muted, fontSize: 15, textAlign: 'center', lineHeight: 22 },
+
+  setupCta: { marginTop: 20, height: 52, borderRadius: 14, backgroundColor: ACCENT,
+    alignItems: 'center', justifyContent: 'center' },
+  setupCtaT: { color: '#fff', fontSize: 15.5, fontWeight: '800' },
 });

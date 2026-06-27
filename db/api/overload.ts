@@ -98,3 +98,15 @@ export async function getWeeklyFocus(weekStart: string): Promise<WeeklyFocusDto 
 export async function saveWeeklyFocus(bodyPart: string, weekStart: string): Promise<WeeklyFocusDto> {
   return apiRequest<WeeklyFocusDto>('/api/v1/weekly-focus', { method: 'POST', body: { bodyPart, weekStart } });
 }
+
+export type PartSummaryDto = { part: string; sessionCount: number; setCount: number };
+
+export async function getWeeklyPattern(): Promise<PartSummaryDto[]> {
+  return apiRequest<PartSummaryDto[]>('/api/v1/overload/weekly-pattern');
+}
+
+export type WeeklyCheckInResult = { messageId: number | null; messageText: string; bodyParts: string[] };
+
+export async function weeklyCheckIn(): Promise<WeeklyCheckInResult> {
+  return apiRequest<WeeklyCheckInResult>('/api/v1/weekly-check-in', { method: 'POST' });
+}

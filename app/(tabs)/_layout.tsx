@@ -23,7 +23,7 @@ export default function TabLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="index" options={{ title: '브리핑' }} />
+      <Tabs.Screen name="index" options={{ title: '홈' }} />
       <Tabs.Screen name="calendar" options={{ title: '기록' }} />
       <Tabs.Screen name="exercises" options={{ title: '종목' }} />
       <Tabs.Screen name="reports" options={{ title: '리포트' }} />

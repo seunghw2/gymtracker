@@ -543,7 +543,7 @@ function CoachTab({ r, editing, hidden, toggle, tone, onTone }: { r: AiReportV2;
       {r.suggestedQuestions?.length > 0 && (
         <View style={s.qa}>
           <Text style={s.qh}>💬 더 물어보기</Text>
-          <View style={s.qchips}>{r.suggestedQuestions.map((q, i) => <Pressable key={i} style={s.qchip} onPress={() => continueChat(q)}><Text style={s.qtext}>{q}</Text></Pressable>)}</View>
+          <View style={s.qchips}>{r.suggestedQuestions.map((q, i) => <Pressable key={i} style={s.qchip} onPress={() => continueChat()}><Text style={s.qtext}>{q}</Text></Pressable>)}</View>
         </View>
       )}
       <Pressable style={s.ask} onPress={() => continueChat()}><Text style={s.askText}>AI 코치랑 대화 이어가기</Text></Pressable>
