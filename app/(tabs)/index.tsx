@@ -8,18 +8,18 @@ import { ACCENT, SEM } from '../../constants/colors';
 import { useOverloadStore } from '../../store/useOverloadStore';
 import { getWeeklySummary } from '../../db/api/overload';
 import type { WeeklySummaryDto, ExerciseGoalDto } from '../../db/api/overload';
+import ExerciseGoalSheet from '../../components/ExerciseGoalSheet';
 
 const MG_KOR: Record<string, string> = {
   Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체',
   Arms: '팔', Core: '코어', Cardio: '유산소',
 };
-function korPart(p: string) { return MG_KOR[p] ?? p; }
 
 function weekdayLabel() {
   return ['일', '월', '화', '수', '목', '금', '토'][new Date().getDay()] + '요일';
 }
 
-/** 주간 무기 바: ●●●○○ */
+/** 주간 도트 바: ●●●○○ */
 function DotBar({ done, total }: { done: number; total: number }) {
   const n = Math.max(total, 1);
   return (
@@ -36,11 +36,12 @@ export default function Dashboard() {
   const { goalSetting, exerciseGoals, loadGoalSetting, loadExerciseGoals } = useOverloadStore();
   const [summary, setSummary] = useState<WeeklySummaryDto | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sheetGoal, setSheetGoal] = useState<ExerciseGoalDto | null>(null);
 
   const load = useCallback(async () => {
     await Promise.all([loadGoalSetting(), loadExerciseGoals()]);
-    const s = await getWeeklySummary();
-    setSummary(s);
+    const sum = await getWeeklySummary();
+    setSummary(sum);
   }, [loadGoalSetting, loadExerciseGoals]);
 
   useFocusEffect(useCallback(() => {
@@ -60,10 +61,15 @@ export default function Dashboard() {
   const att = summary?.attendance;
   const imp = summary?.improvements;
   const gaps = summary?.bodyPartGaps ?? [];
+  const volumes = summary?.bodyPartVolumes ?? [];
+
+  // 핵심/보조 분리, 각 그룹 내 증량준비 → 진행중 → hold 순
+  const coreGoals = exerciseGoals.filter(g => g.role === 'core');
+  const supportGoals = exerciseGoals.filter(g => g.role === 'support');
+  const logOnlyGoals = exerciseGoals.filter(g => g.role === 'log_only');
 
   return (
     <SafeAreaView style={s.safe}>
-      {/* 헤더 */}
       <View style={s.headerRow}>
         <View />
         <Pressable onPress={() => router.navigate('/settings')} hitSlop={10}>
@@ -75,10 +81,8 @@ export default function Dashboard() {
         contentContainerStyle={s.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
       >
-        {/* 날짜 + 요약 제목 */}
         <Text style={s.greet}>{weekdayLabel()} · 점진적으로 강해지는 중</Text>
 
-        {/* AI 코멘트 (규칙 기반) */}
         {summary?.comment ? (
           <View style={s.commentRow}>
             <Text style={s.commentIcon}>💬</Text>
@@ -86,20 +90,16 @@ export default function Dashboard() {
           </View>
         ) : null}
 
-        {/* 이번 주 목표 카드 */}
+        {/* 이번 주 목표 */}
         <View style={s.card}>
           <Text style={s.cardTitle}>이번 주 목표</Text>
 
-          {/* 출석 */}
           <View style={s.goalRow}>
             <Text style={s.goalLabel}>출석</Text>
             <DotBar done={att?.done ?? 0} total={att?.target ?? goalSetting.weeklyFrequency} />
-            <Text style={s.goalVal}>
-              {att ? `${att.done}/${att.target}회` : `0/${goalSetting.weeklyFrequency}회`}
-            </Text>
+            <Text style={s.goalVal}>{att ? `${att.done}/${att.target}회` : `0/${goalSetting.weeklyFrequency}회`}</Text>
           </View>
 
-          {/* 종목 개선 */}
           <View style={s.goalRow}>
             <Text style={s.goalLabel}>개선</Text>
             {imp?.hasData ? (
@@ -111,47 +111,63 @@ export default function Dashboard() {
               <Text style={s.noDataText}>다음 운동부터 추적 시작</Text>
             )}
           </View>
-
-          {/* 부위 부족 */}
-          {gaps.length > 0 && (
-            <View style={s.gapRow}>
-              {gaps.map(g => (
-                <View key={g.part} style={s.gapChip}>
-                  <Text style={s.gapChipT}>{g.korPart} {g.missing}회 부족</Text>
-                </View>
-              ))}
-            </View>
-          )}
-          {gaps.length === 0 && att && att.done > 0 && (
-            <View style={[s.gapRow]}>
-              <View style={[s.gapChip, { backgroundColor: 'rgba(43,217,106,0.12)', borderColor: 'rgba(43,217,106,0.3)' }]}>
-                <Text style={[s.gapChipT, { color: SEM.good }]}>이번 주 부위 목표 달성 ✓</Text>
-              </View>
-            </View>
-          )}
         </View>
+
+        {/* 부위별 주간 세트 진행도 */}
+        {volumes.length > 0 && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>목표 부위 주간 세트</Text>
+            {volumes.map(v => {
+              const pct = Math.min(1, v.targetSets > 0 ? v.currentSets / v.targetSets : 0);
+              const enough = v.currentSets >= v.targetSets;
+              return (
+                <View key={v.part} style={s.volRow}>
+                  <Text style={s.volName}>{v.korPart}</Text>
+                  <View style={s.volTrack}>
+                    <View style={[s.volFill, {
+                      width: `${Math.round(pct * 100)}%`,
+                      backgroundColor: enough ? SEM.good : ACCENT,
+                    }]} />
+                  </View>
+                  <Text style={[s.volVal, enough && { color: SEM.good }]}>
+                    {v.currentSets}/{v.targetSets}세트
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* 오늘 운동하면 */}
         {summary?.todayPlan && (
           <View style={s.todayCard}>
             <Text style={s.todayLabel}>오늘 운동하면</Text>
             <Text style={s.todayPlan}>{summary.todayPlan}</Text>
-            {att && (
-              <Text style={s.todayAttend}>
-                출석 {att.done + 1}/{att.target}회 달성
-              </Text>
-            )}
+            {att && <Text style={s.todayAttend}>출석 {att.done + 1}/{att.target}회 달성</Text>}
           </View>
         )}
 
-        {/* 종목별 진행도 */}
-        {exerciseGoals.length > 0 && (
+        {/* 핵심 종목 */}
+        {coreGoals.length > 0 && (
           <>
-            <View style={s.secH}>
-              <Text style={s.secHT}>종목별 진행도</Text>
-              <Text style={s.secHR}>증량 준비순 ↓</Text>
-            </View>
-            {exerciseGoals.map(g => <GoalCard key={g.id} goal={g} />)}
+            <View style={s.secH}><Text style={s.secHT}>핵심 종목</Text></View>
+            {coreGoals.map(g => <GoalCard key={g.id} goal={g} onPress={() => setSheetGoal(g)} />)}
+          </>
+        )}
+
+        {/* 보조 종목 */}
+        {supportGoals.length > 0 && (
+          <>
+            <View style={s.secH}><Text style={s.secHT}>보조 종목</Text></View>
+            {supportGoals.map(g => <GoalCard key={g.id} goal={g} onPress={() => setSheetGoal(g)} compact />)}
+          </>
+        )}
+
+        {/* 기록만 */}
+        {logOnlyGoals.length > 0 && (
+          <>
+            <View style={s.secH}><Text style={s.secHT}>기록만</Text></View>
+            {logOnlyGoals.map(g => <GoalCard key={g.id} goal={g} onPress={() => setSheetGoal(g)} compact />)}
           </>
         )}
 
@@ -162,48 +178,64 @@ export default function Dashboard() {
         )}
       </ScrollView>
 
-      {/* 채팅 FAB */}
       <Pressable style={s.chatFab} onPress={() => router.navigate('/(tabs)/chat')}>
         <Text style={s.chatFabIcon}>💬</Text>
       </Pressable>
+
+      <ExerciseGoalSheet goal={sheetGoal} onClose={() => setSheetGoal(null)} />
     </SafeAreaView>
   );
 }
 
-function GoalCard({ goal }: { goal: ExerciseGoalDto }) {
+function GoalCard({ goal, onPress, compact }: { goal: ExerciseGoalDto; onPress: () => void; compact?: boolean }) {
   const ready = goal.status === 'ready_to_increase';
   const hold = goal.status === 'hold';
-  const fromLabel = goal.currentValue != null
+  const hasBase = goal.hasBaseline && goal.currentValue != null && goal.currentValue > 0;
+  const fromLabel = hasBase
     ? (goal.ruleType === 'bodyweight' ? `${goal.currentValue}회` : `${goal.currentValue}kg`)
-    : '—';
+    : null;
 
   return (
-    <View style={[s.pcard, ready && s.pcardReady]}>
+    <Pressable style={[s.pcard, ready && s.pcardReady]} onPress={onPress}>
       <View style={s.pcardTop}>
         <View style={{ flex: 1 }}>
           <Text style={s.pcardName}>{goal.exerciseName ?? '—'}</Text>
           <Text style={s.pcardType}>{ruleLabel(goal.ruleType)}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={s.pcardFrom}>{fromLabel}</Text>
-          <Text style={[s.pcardNext, hold && { color: SEM.muted }]}>→ {goal.nextTarget ?? '—'}</Text>
+          {hasBase ? (
+            <>
+              <Text style={s.pcardFrom}>{fromLabel}</Text>
+              {!hold && <Text style={[s.pcardNext, ready && { color: SEM.good }]}>→ {goal.nextTarget ?? '—'}</Text>}
+              {hold && <Text style={[s.pcardNext, { color: SEM.muted }]}>유지</Text>}
+            </>
+          ) : (
+            <Text style={s.pcardNoBase}>기준 기록 필요</Text>
+          )}
         </View>
       </View>
-      <View style={s.pcardBar}>
-        <View style={[s.pcardFill, {
-          width: ready || hold ? '100%' : '60%',
-          backgroundColor: ready ? SEM.good : ACCENT,
-        }]} />
-      </View>
-      {ready ? (
-        <View style={s.readyTag}>
-          <View style={[s.readyDot, { backgroundColor: SEM.good }]} />
-          <Text style={[s.readyT, { color: SEM.good }]}>증량 준비됨</Text>
-        </View>
-      ) : !hold ? (
-        <Text style={s.pcardCond}>{condText(goal)}</Text>
-      ) : null}
-    </View>
+
+      {!compact && (
+        <>
+          <View style={s.pcardBar}>
+            <View style={[s.pcardFill, {
+              width: hasBase ? (ready || hold ? '100%' : '60%') : '0%',
+              backgroundColor: ready ? SEM.good : ACCENT,
+            }]} />
+          </View>
+          {ready ? (
+            <View style={s.readyTag}>
+              <View style={[s.readyDot, { backgroundColor: SEM.good }]} />
+              <Text style={[s.readyT, { color: SEM.good }]}>증량 준비됨</Text>
+            </View>
+          ) : !hasBase ? (
+            <Text style={s.pcardCond}>다음 운동에서 첫 기준을 만들어요</Text>
+          ) : !hold ? (
+            <Text style={s.pcardCond}>{condText(goal)}</Text>
+          ) : null}
+        </>
+      )}
+    </Pressable>
   );
 }
 
@@ -237,8 +269,7 @@ const s = StyleSheet.create({
   greet: { fontSize: 13, color: SEM.muted, marginBottom: 8 },
 
   commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14,
-    backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1e1e22',
-    borderRadius: 12, padding: 12 },
+    backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1e1e22', borderRadius: 12, padding: 12 },
   commentIcon: { fontSize: 14, marginTop: 1 },
   commentText: { flex: 1, fontSize: 13.5, color: '#d0d0d8', lineHeight: 20 },
 
@@ -250,17 +281,17 @@ const s = StyleSheet.create({
   goalRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   goalLabel: { fontSize: 13, fontWeight: '700', color: '#fff', width: 40 },
   goalVal: { fontSize: 13, fontWeight: '800', color: '#fff', marginLeft: 12, minWidth: 48, textAlign: 'right' },
-  dotRow: { flex: 1, flexDirection: 'row', gap: 5, marginLeft: 8 },
+  dotRow: { flex: 1, flexDirection: 'row', gap: 5, marginLeft: 8, flexWrap: 'wrap' },
   dot: { width: 10, height: 10, borderRadius: 5 },
   dotOn: { backgroundColor: ACCENT },
   dotOff: { backgroundColor: '#2a2a2f' },
   noDataText: { flex: 1, fontSize: 12, color: '#555', marginLeft: 8, fontStyle: 'italic' },
 
-  gapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 4 },
-  gapChip: { backgroundColor: 'rgba(255,138,0,0.1)', borderWidth: 1,
-    borderColor: 'rgba(255,138,0,0.3)', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 5 },
-  gapChipT: { fontSize: 12, fontWeight: '700', color: SEM.bad },
+  volRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 11 },
+  volName: { fontSize: 13, fontWeight: '700', color: '#fff', width: 40 },
+  volTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: SEM.surface2, marginLeft: 8, overflow: 'hidden' },
+  volFill: { height: '100%', borderRadius: 4 },
+  volVal: { fontSize: 12, color: SEM.muted, marginLeft: 10, minWidth: 56, textAlign: 'right', fontWeight: '600' },
 
   todayCard: { backgroundColor: '#0a0f0a', borderWidth: 1, borderColor: 'rgba(43,217,106,0.2)',
     borderRadius: 14, padding: 16, marginBottom: 14 },
@@ -270,9 +301,8 @@ const s = StyleSheet.create({
   todayAttend: { fontSize: 12, color: SEM.muted, marginTop: 6 },
 
   secH: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 20, marginBottom: 12 },
+    marginTop: 18, marginBottom: 10 },
   secHT: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
-  secHR: { fontSize: 12, color: SEM.muted },
 
   pcard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 16, marginBottom: 10 },
@@ -282,6 +312,7 @@ const s = StyleSheet.create({
   pcardType: { fontSize: 11, fontWeight: '700', color: '#555', marginTop: 3 },
   pcardFrom: { fontSize: 12.5, color: SEM.muted, fontWeight: '600' },
   pcardNext: { fontSize: 16, fontWeight: '800', color: SEM.good },
+  pcardNoBase: { fontSize: 12.5, color: '#6a6a6e', fontWeight: '700', fontStyle: 'italic' },
   pcardBar: { height: 6, borderRadius: 3, backgroundColor: SEM.surface2, marginVertical: 12, overflow: 'hidden' },
   pcardFill: { height: '100%', borderRadius: 3 },
   pcardCond: { fontSize: 12, color: SEM.muted },

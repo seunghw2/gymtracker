@@ -24,12 +24,15 @@ export type GoalSettingRequest = {
   complete: boolean;
 };
 
+export type ExerciseRole = 'core' | 'support' | 'log_only';
+
 export type ExerciseGoalDto = {
   id: number;
   exerciseId: number;
   exerciseName: string | null;
   muscleGroup: string | null;
   ruleType: RuleType;
+  role: ExerciseRole;
   overridden: boolean;
   targetReps: number | null;
   targetSets: number | null;
@@ -39,6 +42,9 @@ export type ExerciseGoalDto = {
   status: ProgressionStatus;
   currentValue: number | null;
   nextTarget: string | null;
+  hasBaseline: boolean;
+  comparability: 'high' | 'medium' | 'low';
+  lastRecord: string | null;
 };
 
 export type ExerciseGoalBulkRequest = {
@@ -47,6 +53,7 @@ export type ExerciseGoalBulkRequest = {
 
 export type ExerciseGoalUpdateRequest = {
   ruleType?: RuleType;
+  role?: ExerciseRole;
   targetReps?: number;
   targetSets?: number;
   repRangeMin?: number;
@@ -101,10 +108,13 @@ export async function saveWeeklyFocus(bodyPart: string, weekStart: string): Prom
 
 export type PartSummaryDto = { part: string; sessionCount: number; setCount: number };
 
+export type BodyPartVolumeDto = { part: string; korPart: string; currentSets: number; targetSets: number };
+
 export type WeeklySummaryDto = {
   attendance: { done: number; target: number };
   improvements: { done: number; total: number; hasData: boolean };
   bodyPartGaps: { part: string; korPart: string; missing: number }[];
+  bodyPartVolumes: BodyPartVolumeDto[];
   todayPlan: string;
   comment: string;
 };
