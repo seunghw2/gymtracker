@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  useRouter } from 'expo-router';
+  useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
   Text,
@@ -146,6 +146,9 @@ function useElapsedTime(startTime: number | null) {
 
 export default function WorkoutScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ start?: string }>();
+  const homeScrollRef = useRef<ScrollView>(null);
+  const historyYRef = useRef<number>(0);
   const {
     activeSessionId,
     sessionDate,
@@ -268,7 +271,12 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     if (!activeSessionId) {
-      getSessionHistory().then(setHistory);
+      getSessionHistory().then(list => {
+        setHistory(list);
+        if (params.start === 'history') {
+          setTimeout(() => homeScrollRef.current?.scrollTo({ y: historyYRef.current, animated: true }), 300);
+        }
+      });
       getTemplates().then(setTemplates).catch(() => {});
     }
   }, [activeSessionId]);
@@ -1254,7 +1262,7 @@ export default function WorkoutScreen() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.homeContent}>
+        <ScrollView ref={homeScrollRef} contentContainerStyle={styles.homeContent}>
           {/* 헤더 — 좌측 접기, 우측 휴식 타이머 버튼 */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="닫기">
@@ -1293,7 +1301,8 @@ export default function WorkoutScreen() {
           {/* 히스토리 */}
           {history.length > 0 && (
             <>
-              <Text style={styles.historyTitle}>지난 운동</Text>
+              <Text style={styles.historyTitle}
+                onLayout={e => { historyYRef.current = e.nativeEvent.layout.y; }}>지난 운동</Text>
               {history.map(session => (
                 <SessionCard
                   key={session.id}
