@@ -68,6 +68,7 @@ import DatePickerSheet from '../components/DatePickerSheet';
 import SessionCard from '../components/SessionCard';
 import RulerPicker from '../components/RulerPicker';
 import { useUiStore } from '../store/useUiStore';
+import { useOverloadStore } from '../store/useOverloadStore';
 import { formatDateWithDay, todayStr } from '../lib/date';
 import { logError } from '../lib/log';
 import { toDisplay, fromInput, unitLabel } from '../lib/units';
@@ -229,6 +230,11 @@ export default function WorkoutScreen() {
   const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
   const [repeatLoading, setRepeatLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+
+  // RIR 팝업 — 추적 종목 마지막 작업 세트 후
+  const [rirPending, setRirPending] = useState<{ exerciseName: string } | null>(null);
+  const [rirSession, setRirSession] = useState<Record<string, string>>({});  // exerciseName → rir tag
+  const trackedExerciseIds = useOverloadStore(s => new Set(s.exerciseGoals.map(g => g.exerciseId)));
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
@@ -888,6 +894,16 @@ export default function WorkoutScreen() {
     startRestTimer(restSec, { nextLabel });
     setRestTotal(restSec);
     setRestAnchor({ ex: exIdx, set: setIdx });
+
+    // 추적 종목의 마지막 작업 세트 완료 시 RIR 팝업
+    if (trackedExerciseIds.has(ex.exerciseId) && (s.setType ?? 'NORMAL') !== 'WARMUP') {
+      const remainingWorkSets = ex.sets.filter((st, j) =>
+        j !== setIdx && !st.done && (st.setType ?? 'NORMAL') !== 'WARMUP'
+      );
+      if (remainingWorkSets.length === 0) {
+        setTimeout(() => setRirPending({ exerciseName: ex.exerciseName ?? ex.exerciseId.toString() }), 800);
+      }
+    }
   };
 
   const saveCustomExercise = async () => {
@@ -2098,8 +2114,54 @@ export default function WorkoutScreen() {
 
       {renderExerciseModal()}
 
+      {/* RIR 팝업 — 추적 종목 마지막 작업 세트 후 */}
+      <Modal visible={rirPending !== null} transparent animationType="slide">
+        <Pressable style={styles.gymBackdrop} onPress={() => setRirPending(null)}>
+          <Pressable style={rirStyles.sheet} onPress={() => {}}>
+            <View style={rirStyles.handle} />
+            <Text style={rirStyles.title}>마지막 세트 어땠나요?</Text>
+            <Text style={rirStyles.sub}>{rirPending?.exerciseName}</Text>
+            <View style={rirStyles.btnRow}>
+              {RIR_OPTIONS.map(opt => (
+                <Pressable key={opt.key} style={rirStyles.btn} onPress={() => {
+                  if (rirPending) {
+                    setRirSession(prev => ({ ...prev, [rirPending.exerciseName]: opt.key }));
+                  }
+                  setRirPending(null);
+                }}>
+                  <Text style={rirStyles.btnEmoji}>{opt.emoji}</Text>
+                  <Text style={rirStyles.btnLabel}>{opt.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
+
+const RIR_OPTIONS = [
+  { key: 'easy',        emoji: '😌', label: '여유 많음' },
+  { key: 'rpe_2_3',    emoji: '💪', label: '2~3개 남음' },
+  { key: 'near_fail',  emoji: '🔥', label: '거의 한계' },
+  { key: 'failed',     emoji: '❌', label: '실패' },
+] as const;
+
+import { StyleSheet as RNStyleSheet } from 'react-native';
+const rirStyles = RNStyleSheet.create({
+  sheet: { backgroundColor: '#111113', borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    padding: 20, paddingBottom: 36 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#3a3a3c',
+    alignSelf: 'center', marginBottom: 18 },
+  title: { fontSize: 16, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 4 },
+  sub: { fontSize: 13, color: '#6a6a6e', textAlign: 'center', marginBottom: 20 },
+  btnRow: { flexDirection: 'row', gap: 10 },
+  btn: { flex: 1, backgroundColor: '#1c1c22', borderRadius: 14, padding: 14,
+    alignItems: 'center', gap: 6 },
+  btnEmoji: { fontSize: 22 },
+  btnLabel: { fontSize: 12, fontWeight: '700', color: '#fff', textAlign: 'center' },
+});
 

@@ -101,6 +101,22 @@ export async function saveWeeklyFocus(bodyPart: string, weekStart: string): Prom
 
 export type PartSummaryDto = { part: string; sessionCount: number; setCount: number };
 
+export type WeeklySummaryDto = {
+  attendance: { done: number; target: number };
+  improvements: { done: number; total: number; hasData: boolean };
+  bodyPartGaps: { part: string; korPart: string; missing: number }[];
+  todayPlan: string;
+  comment: string;
+};
+
+export async function getWeeklySummary(): Promise<WeeklySummaryDto | null> {
+  try {
+    return await apiRequest<WeeklySummaryDto>('/api/v1/overload/weekly-summary');
+  } catch {
+    return null;
+  }
+}
+
 export async function getWeeklyPattern(): Promise<PartSummaryDto[]> {
   return apiRequest<PartSummaryDto[]>('/api/v1/overload/weekly-pattern');
 }
