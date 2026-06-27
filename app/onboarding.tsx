@@ -37,6 +37,11 @@ const EQ_LABEL: Record<string, string> = {
   Barbell: '바벨', Dumbbell: '덤벨', Machine: '머신', Cable: '케이블', Bodyweight: '맨몸',
 };
 
+function exEqLabel(ex: Exercise): string {
+  if (ex.equipment_type === 'Machine' && ex.brand) return `머신 · ${ex.brand}`;
+  return EQ_LABEL[ex.equipment_type] ?? ex.equipment_type;
+}
+
 export default function Onboarding() {
   const router = useRouter();
   const { saveGoalSetting, bulkCreateGoals } = useOverloadStore();
@@ -132,19 +137,19 @@ export default function Onboarding() {
           <>
             <Text style={s.stepNo}>2 / 5 · 추적 종목</Text>
             <Text style={s.q}>어떤 종목을{'\n'}추적할까요?</Text>
-            <Text style={s.sub}>선택한 종목만 진행도와 증량 알림을 받아요.</Text>
             <Pressable style={s.pickerBtn} onPress={openPicker}>
               <Text style={s.pickerBtnT}>
                 {selectedExercises.length > 0 ? `${selectedExercises.length}개 선택됨 — 변경하기` : '종목 선택하기'}
               </Text>
               <Text style={s.pickerBtnArrow}>›</Text>
             </Pressable>
+            <Text style={s.sub}>선택한 종목만 진행도와 증량 알림을 받아요.</Text>
             {selectedExercises.length > 0 && (
               <View style={s.selectedList}>
                 {selectedExercises.map(ex => (
                   <View key={ex.id} style={s.selectedItem}>
                     <Text style={s.selectedName}>{ex.name}</Text>
-                    <Text style={s.selectedEq}>{EQ_LABEL[ex.equipment_type] ?? ex.equipment_type}</Text>
+                    <Text style={s.selectedEq}>{exEqLabel(ex)}</Text>
                   </View>
                 ))}
               </View>
@@ -267,7 +272,7 @@ const s = StyleSheet.create({
 
   stepNo: { fontSize: 12, fontWeight: '700', color: ACCENT, letterSpacing: 0.5, marginBottom: 10 },
   q: { fontSize: 25, fontWeight: '800', lineHeight: 33, letterSpacing: -0.6, marginBottom: 8 },
-  sub: { fontSize: 14, color: SEM.muted, lineHeight: 21, marginBottom: 24 },
+  sub: { fontSize: 13.5, color: SEM.muted, lineHeight: 20, marginBottom: 16 },
 
   opt: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SEM.surface1, borderWidth: 1.5, borderColor: SEM.line,
@@ -283,7 +288,7 @@ const s = StyleSheet.create({
 
   pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SEM.surface1, borderWidth: 1.5, borderColor: ACCENT,
-    borderRadius: 14, padding: 18, marginBottom: 16 },
+    borderRadius: 14, padding: 18, marginBottom: 8 },
   pickerBtnT: { fontSize: 15, fontWeight: '700', color: ACCENT },
   pickerBtnArrow: { fontSize: 20, color: ACCENT, fontWeight: '700' },
   selectedList: { gap: 0 },
