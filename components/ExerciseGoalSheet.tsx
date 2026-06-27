@@ -33,26 +33,8 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
 
   if (!goal) return null;
 
-  const fromLabel = goal.currentValue != null && goal.currentValue > 0
-    ? (goal.ruleType === 'bodyweight' ? `${goal.currentValue}회` : `${goal.currentValue}kg`)
-    : null;
-
-  const todayGoal = (() => {
-    if (goal.ruleType === 'isolation') return `${goal.repRangeMin ?? 12}~${goal.repRangeMax ?? 15}회 × ${goal.targetSets ?? 3}세트 유지`;
-    if (goal.ruleType === 'bodyweight') return `총 반복수 늘리기 (목표 ${goal.targetReps ?? 15}회)`;
-    if (goal.ruleType === 'machine_cable') return `${goal.repRangeMin ?? 10}~${goal.repRangeMax ?? 12}회 × ${goal.targetSets ?? 3}세트`;
-    return `${goal.targetReps ?? 8}회 × ${goal.targetSets ?? 3}세트`;
-  })();
-
-  const incCondition = (() => {
-    if (goal.ruleType === 'isolation') return '반복 범위 안에서 안정적으로 — 무게보다 자극·자세 우선';
-    if (goal.ruleType === 'bodyweight') return `총 반복수 목표 달성 시 다음 단계`;
-    if (goal.ruleType === 'machine_cable') return `${goal.targetSets ?? 3}세트 모두 ${goal.repRangeMax ?? 12}회 달성 시 ${goal.nextTarget ?? '증량'}`;
-    return `${goal.targetSets ?? 3}세트 모두 ${goal.targetReps ?? 8}회 달성 시 ${goal.nextTarget ?? '증량'}`;
-  })();
-
   const compLabel = goal.comparability === 'high' ? '비교 가능'
-    : goal.comparability === 'medium' ? '유사 조건' : '비교 보류';
+    : goal.comparability === 'medium' ? '참고 비교' : '비교 보류';
   const compColor = goal.comparability === 'high' ? SEM.good
     : goal.comparability === 'medium' ? SEM.warn : SEM.muted;
 
@@ -60,6 +42,8 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
     setRoleEditing(false);
     await updateGoal(goal.id, { role });
   };
+
+  const needBase = goal.stage === 'NEED_BASELINE';
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -78,33 +62,39 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
               </Text>
             </View>
 
-            {/* 현재 상태 */}
-            <Section label="현재 상태">
-              {goal.hasBaseline && goal.lastRecord ? (
-                <>
-                  <Text style={s.bodyText}>지난 비교 가능 기록</Text>
-                  <Text style={s.bigRecord}>{goal.lastRecord}</Text>
-                  <View style={[s.compChip, { borderColor: compColor }]}>
-                    <Text style={[s.compChipT, { color: compColor }]}>{compLabel}</Text>
-                  </View>
-                </>
-              ) : (
-                <Text style={s.noBaseline}>기준 기록 필요 — 다음 운동에서 첫 기준을 만들어요</Text>
-              )}
+            {/* 현재 단계 */}
+            <Section label="현재 단계">
+              <Text style={s.bigRecord}>{goal.stageLabel}</Text>
             </Section>
+
+            {/* 현재 상태 / 지난 기록 */}
+            {!needBase && goal.lastRecord && (
+              <Section label="지난 비교 가능 기록">
+                <Text style={s.bigRecord}>{goal.lastRecord}</Text>
+                <View style={[s.compChip, { borderColor: compColor }]}>
+                  <Text style={[s.compChipT, { color: compColor }]}>{compLabel}</Text>
+                </View>
+              </Section>
+            )}
 
             {/* 오늘 목표 */}
             <Section label="오늘 목표">
-              <Text style={s.bigRecord}>{todayGoal}</Text>
-              {goal.ruleType !== 'isolation' && (
-                <Text style={s.bodyTextDim}>마지막 세트 1~2개 남기는 느낌이면 성공</Text>
-              )}
+              <Text style={s.bigRecord}>{goal.todayTarget}</Text>
+              {goal.caution && <Text style={s.cautionText}>⚠ {goal.caution}</Text>}
             </Section>
 
-            {/* 증량 조건 */}
-            <Section label="증량 조건">
-              <Text style={s.bodyText}>{incCondition}</Text>
+            {/* 다음 단계 조건 */}
+            <Section label="다음 단계">
+              <Text style={s.bodyText}>{goal.nextCondition}</Text>
             </Section>
+
+            {/* 단기/장기 목표 */}
+            {(goal.shortTermTarget || goal.longTermTarget) && (
+              <Section label="목표">
+                {goal.shortTermTarget && <Text style={s.bodyText}>단기: {goal.shortTermTarget}</Text>}
+                {goal.longTermTarget && <Text style={[s.bodyText, { marginTop: 4 }]}>장기: {goal.longTermTarget}</Text>}
+              </Section>
+            )}
 
             {/* 역할 수정 */}
             <Section label="역할">
@@ -174,6 +164,7 @@ const s = StyleSheet.create({
   bodyTextDim: { fontSize: 12.5, color: SEM.muted, marginTop: 4 },
   bigRecord: { fontSize: 19, fontWeight: '800', color: '#fff', marginTop: 2 },
   noBaseline: { fontSize: 14, color: SEM.muted, fontStyle: 'italic', lineHeight: 20 },
+  cautionText: { fontSize: 12.5, color: SEM.warn, marginTop: 6, lineHeight: 18 },
 
   compChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginTop: 10 },
   compChipT: { fontSize: 12, fontWeight: '800' },

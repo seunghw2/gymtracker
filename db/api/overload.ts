@@ -45,6 +45,14 @@ export type ExerciseGoalDto = {
   hasBaseline: boolean;
   comparability: 'high' | 'medium' | 'low';
   lastRecord: string | null;
+  // 점진적 과부하 단계 가이드
+  stage: string;            // NEED_BASELINE | BUILD_REPS | READY_TO_INCREASE | ...
+  stageLabel: string;       // "반복수 쌓는 중" 등
+  todayTarget: string;      // 오늘 목표 문구
+  nextCondition: string;    // 다음 단계 조건
+  caution: string | null;
+  shortTermTarget: string | null;
+  longTermTarget: string | null;
 };
 
 export type ExerciseGoalBulkRequest = {

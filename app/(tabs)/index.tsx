@@ -188,62 +188,52 @@ export default function Dashboard() {
 }
 
 function GoalCard({ goal, onPress, compact }: { goal: ExerciseGoalDto; onPress: () => void; compact?: boolean }) {
-  const ready = goal.status === 'ready_to_increase';
-  const hold = goal.status === 'hold';
-  const hasBase = goal.hasBaseline && goal.currentValue != null && goal.currentValue > 0;
-  const fromLabel = hasBase
-    ? (goal.ruleType === 'bodyweight' ? `${goal.currentValue}회` : `${goal.currentValue}kg`)
-    : null;
+  const ready = goal.stage === 'READY_TO_INCREASE';
+  const needBase = goal.stage === 'NEED_BASELINE';
+  const stall = goal.stage === 'STALL_REVIEW' || goal.stage === 'DELOAD_OR_RESET';
 
   return (
-    <Pressable style={[s.pcard, ready && s.pcardReady]} onPress={onPress}>
+    <Pressable style={[s.pcard, ready && s.pcardReady, stall && s.pcardStall]} onPress={onPress}>
       <View style={s.pcardTop}>
         <View style={{ flex: 1 }}>
           <Text style={s.pcardName}>{goal.exerciseName ?? '—'}</Text>
           <Text style={s.pcardType}>{ruleLabel(goal.ruleType)}</Text>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          {hasBase ? (
-            <>
-              <Text style={s.pcardFrom}>{fromLabel}</Text>
-              {!hold && <Text style={[s.pcardNext, ready && { color: SEM.good }]}>→ {goal.nextTarget ?? '—'}</Text>}
-              {hold && <Text style={[s.pcardNext, { color: SEM.muted }]}>유지</Text>}
-            </>
-          ) : (
-            <Text style={s.pcardNoBase}>기준 기록 필요</Text>
-          )}
+        <View style={[s.stageBadge, stageBadgeStyle(goal.stage)]}>
+          <Text style={[s.stageBadgeT, { color: stageTextColor(goal.stage) }]}>{goal.stageLabel}</Text>
         </View>
       </View>
 
+      {/* 기준 기록 or 오늘 목표 */}
+      <View style={s.pcardGoalRow}>
+        {!needBase && goal.lastRecord && (
+          <Text style={s.pcardLast}>지난 기록 {goal.lastRecord}</Text>
+        )}
+        <Text style={s.pcardToday} numberOfLines={2}>
+          {needBase ? goal.todayTarget : `오늘 ${goal.todayTarget}`}
+        </Text>
+      </View>
+
       {!compact && (
-        <>
-          <View style={s.pcardBar}>
-            <View style={[s.pcardFill, {
-              width: hasBase ? (ready || hold ? '100%' : '60%') : '0%',
-              backgroundColor: ready ? SEM.good : ACCENT,
-            }]} />
-          </View>
-          {ready ? (
-            <View style={s.readyTag}>
-              <View style={[s.readyDot, { backgroundColor: SEM.good }]} />
-              <Text style={[s.readyT, { color: SEM.good }]}>증량 준비됨</Text>
-            </View>
-          ) : !hasBase ? (
-            <Text style={s.pcardCond}>다음 운동에서 첫 기준을 만들어요</Text>
-          ) : !hold ? (
-            <Text style={s.pcardCond}>{condText(goal)}</Text>
-          ) : null}
-        </>
+        <Text style={s.pcardCond} numberOfLines={2}>
+          {goal.caution ?? goal.nextCondition}
+        </Text>
       )}
     </Pressable>
   );
 }
 
-function condText(g: ExerciseGoalDto): string {
-  if (g.ruleType === 'barbell_main') return `목표 ${g.targetReps ?? '—'}회 ${g.targetSets ?? '—'}세트 달성 시 증량`;
-  if (g.ruleType === 'machine_cable') return `반복 범위 ${g.repRangeMin ?? '—'}–${g.repRangeMax ?? '—'}회 채우는 중`;
-  if (g.ruleType === 'bodyweight') return `총 반복수 늘리는 중`;
-  return '반복 범위 유지';
+function stageBadgeStyle(stage: string) {
+  if (stage === 'READY_TO_INCREASE') return { backgroundColor: 'rgba(43,217,106,0.14)', borderColor: 'rgba(43,217,106,0.4)' };
+  if (stage === 'NEED_BASELINE') return { backgroundColor: '#1f1f23', borderColor: '#2c2c2e' };
+  if (stage === 'STALL_REVIEW' || stage === 'DELOAD_OR_RESET') return { backgroundColor: 'rgba(255,138,0,0.12)', borderColor: 'rgba(255,138,0,0.35)' };
+  return { backgroundColor: 'rgba(255,59,48,0.12)', borderColor: 'rgba(255,59,48,0.35)' };
+}
+function stageTextColor(stage: string) {
+  if (stage === 'READY_TO_INCREASE') return SEM.good;
+  if (stage === 'NEED_BASELINE') return '#9a9aa1';
+  if (stage === 'STALL_REVIEW' || stage === 'DELOAD_OR_RESET') return SEM.bad;
+  return ACCENT;
 }
 
 function ruleLabel(rt: string): string {
@@ -307,18 +297,16 @@ const s = StyleSheet.create({
   pcard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 16, marginBottom: 10 },
   pcardReady: { borderColor: 'rgba(43,217,106,0.4)' },
+  pcardStall: { borderColor: 'rgba(255,138,0,0.35)' },
   pcardTop: { flexDirection: 'row', alignItems: 'flex-start' },
   pcardName: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
   pcardType: { fontSize: 11, fontWeight: '700', color: '#555', marginTop: 3 },
-  pcardFrom: { fontSize: 12.5, color: SEM.muted, fontWeight: '600' },
-  pcardNext: { fontSize: 16, fontWeight: '800', color: SEM.good },
-  pcardNoBase: { fontSize: 12.5, color: '#6a6a6e', fontWeight: '700', fontStyle: 'italic' },
-  pcardBar: { height: 6, borderRadius: 3, backgroundColor: SEM.surface2, marginVertical: 12, overflow: 'hidden' },
-  pcardFill: { height: '100%', borderRadius: 3 },
-  pcardCond: { fontSize: 12, color: SEM.muted },
-  readyTag: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  readyDot: { width: 6, height: 6, borderRadius: 3 },
-  readyT: { fontSize: 11, fontWeight: '800' },
+  stageBadge: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3 },
+  stageBadgeT: { fontSize: 11, fontWeight: '800' },
+  pcardGoalRow: { marginTop: 12 },
+  pcardLast: { fontSize: 12, color: '#6a6a6e', marginBottom: 3 },
+  pcardToday: { fontSize: 14.5, fontWeight: '800', color: '#fff', lineHeight: 20 },
+  pcardCond: { fontSize: 12, color: SEM.muted, marginTop: 8, lineHeight: 17 },
 
   setupCta: { marginTop: 20, height: 52, borderRadius: 14, backgroundColor: ACCENT,
     alignItems: 'center', justifyContent: 'center' },

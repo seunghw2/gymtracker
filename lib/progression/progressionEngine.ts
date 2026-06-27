@@ -7,6 +7,13 @@ import {
   getDefaultProgressionMethod, getDefaultRepRange, getDefaultSets,
   totalReps, topWorkingWeight, topWeightReps, workingSets, getComparisonConfidence,
 } from './progressionRules';
+import type { ExerciseKind } from './progressionTypes';
+
+/** 진행 기준 반복수 — 맨몸은 전체 작업 세트, 무게 기반은 대표(최대) 무게 세트만 합산. */
+function progressionReps(kind: ExerciseKind, rec: ExerciseRecord): number {
+  if (kind === 'BODYWEIGHT') return totalReps(rec);
+  return topWeightReps(rec).reduce((s, r) => s + r, 0);
+}
 import { STAGE_LABEL, comparisonNote } from './progressionMessages';
 
 // 유형별 "반복수 쌓기" 1회 증가 폭 [floor, ceil]
@@ -29,10 +36,10 @@ function metTopOfRange(rec: ExerciseRecord, repMax: number, sets: number): boole
 }
 
 /** 최근 비교 가능 기록들에서 총 반복수가 정체(비증가)인지 — 3회 이상 변화 없음. */
-function isStalling(records: ExerciseRecord[] | undefined): boolean {
+function isStalling(records: ExerciseRecord[] | undefined, kind: ExerciseKind): boolean {
   if (!records || records.length < 3) return false;
   const recent = [...records].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
-  const totals = recent.map(totalReps);
+  const totals = recent.map(r => progressionReps(kind, r));
   // 최신이 가장 오래된 것보다 크지 않으면(개선 없음) 정체로 본다
   return totals[0] <= totals[2];
 }
@@ -58,11 +65,11 @@ export function getNextTarget(input: ProgressionInput): ExerciseProgressionGoal 
   }
 
   const w = topWorkingWeight(prev);
-  const prevTotal = totalReps(prev);
+  const prevTotal = progressionReps(kind, prev);
   const [lowBump, highBump] = BUILD_BUMP[kind];
 
   // 정체 점검
-  if (isStalling(recentRecords)) {
+  if (isStalling(recentRecords, kind)) {
     return {
       role, kind, stage: 'STALL_REVIEW', method,
       targetRepMin: range.min, targetRepMax: range.max, targetSets: sets,
@@ -170,8 +177,8 @@ export function evaluateWorkoutResult(args: {
     };
   }
 
-  const prevTotal = totalReps(prev);
-  const curTotal = totalReps(cur);
+  const prevTotal = progressionReps(goal.kind, prev);
+  const curTotal = progressionReps(goal.kind, cur);
   const range = { min: goal.targetRepMin ?? 0, max: goal.targetRepMax ?? 0 };
   const sets = goal.targetSets ?? workingSets(cur).length;
   const metTop = goal.kind !== 'BODYWEIGHT' && metTopOfRange(cur, range.max, sets);
@@ -200,7 +207,7 @@ export function evaluateWorkoutResult(args: {
 
   // 미달 + 거의 한계/실패 → 같은 목표 재도전, 반복되면 정체
   if (curTotal < prevTotal && (effortLevel === 'NEAR_LIMIT' || effortLevel === 'FAILURE')) {
-    if (isStalling(args.recentRecords)) {
+    if (isStalling(args.recentRecords, goal.kind)) {
       return {
         result: 'STALL_POSSIBLE',
         previousStage, nextStage: 'STALL_REVIEW', comparisonConfidence: confidence,
@@ -218,10 +225,10 @@ export function evaluateWorkoutResult(args: {
     };
   }
 
-  // 유지
+  // 유지 (NEED_BASELINE은 앞에서 이미 처리됨)
   return {
     result: 'MAINTAINED',
-    previousStage, nextStage: previousStage === 'NEED_BASELINE' ? 'BUILD_REPS' : previousStage,
+    previousStage, nextStage: previousStage,
     comparisonConfidence: confidence,
     reason: `total reps ${prevTotal} ~= ${curTotal}`,
     userMessage: '기준을 유지했어요. 다음 운동에서 총 반복수 1~2회 증가를 노려보세요.',
@@ -230,9 +237,9 @@ export function evaluateWorkoutResult(args: {
 }
 
 /** 다음 목표 텍스트 — 기록 기준 다음 단계 제안. */
-function nextTargetText(kind: string, rec: ExerciseRecord): string {
-  const total = totalReps(rec);
-  if (kind === 'BODYWEIGHT') return `총 ${total + 1}회`;
+function nextTargetText(kind: ExerciseKind, rec: ExerciseRecord): string {
+  if (kind === 'BODYWEIGHT') return `총 ${totalReps(rec) + 1}회`;
+  const total = progressionReps(kind, rec);
   const w = topWorkingWeight(rec);
   const [low, high] = BUILD_BUMP[kind] ?? [1, 2];
   return `${fmtKg(w)} 총 ${total + low}~${total + high}회`;
