@@ -16,6 +16,7 @@ import { formatShortWithDay, formatShortWithWeekday, todayStr, toDateStr, addDay
 import { formatDuration } from '../../lib/format';
 import SessionCard from '../../components/SessionCard';
 import SessionPreviewSheet from '../../components/SessionPreviewSheet';
+import { MUSCLE_KO } from '../../constants/exercises';
 import { ACCENT, AI } from '../../constants/colors';
 import { useWorkoutStore } from '../../store/useStore';
 
@@ -170,7 +171,7 @@ export default function HistoryScreen() {
                 // 휴식 갭(이 세션 이후 더 오래된 세션과의 간격)
                 const older = sorted[i + 1];
                 const gap = older ? diffDays(s.date, older.date) - 1 : 0;
-                const tags = s.tags ? s.tags.split(',').filter(Boolean) : [];
+                const tags = s.tags ? s.tags.split(',').filter(Boolean).map(t => MUSCLE_KO[t] ?? t) : [];
                 return (
                   <React.Fragment key={s.id}>
                     {showHeader && <Text style={styles.bucket}>{label}</Text>}
