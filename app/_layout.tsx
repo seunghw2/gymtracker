@@ -69,6 +69,8 @@ export default function RootLayout() {
           <Stack.Screen name="workout" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-add" options={{ presentation: 'modal' }} />
           <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="templates" />
+          <Stack.Screen name="template-edit" options={{ presentation: 'modal' }} />
         </Stack>
       </GestureHandlerRootView>
     </SafeAreaProvider>

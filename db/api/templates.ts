@@ -28,6 +28,28 @@ export async function createTemplate(
   return res.id;
 }
 
+export async function updateTemplate(
+  id: number,
+  name: string,
+  exercises: { exerciseId: number; sets: number; reps: number; weightKg: number }[],
+): Promise<void> {
+  await apiRequest(`/api/v1/templates/${id}`, { method: 'PUT', body: { name, exercises } });
+}
+
 export async function deleteTemplate(id: number): Promise<void> {
   await apiRequest(`/api/v1/templates/${id}`, { method: 'DELETE' });
+}
+
+export type SuggestedTemplate = {
+  name: string;
+  reason: string;
+  exercises: { exerciseId: number; name: string; muscleGroup: string | null; sets: number; reps: number; weightKg: number }[];
+};
+
+export async function getSuggestedTemplates(): Promise<SuggestedTemplate[]> {
+  try {
+    return await apiRequest<SuggestedTemplate[]>('/api/v1/overload/suggested-templates');
+  } catch {
+    return [];
+  }
 }

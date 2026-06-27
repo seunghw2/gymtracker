@@ -74,7 +74,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
 
   const handleStartTemplate = () => {
     setSheetOpen(false);
-    router.navigate({ pathname: '/workout', params: { start: 'template' } });
+    router.navigate('/templates');
   };
 
   const handleStartHistory = () => {
