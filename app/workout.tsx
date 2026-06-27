@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   findNodeHandle,
   Dimensions,
+  StyleSheet as RNStyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
@@ -231,6 +232,19 @@ export default function WorkoutScreen() {
   const [repeatLoading, setRepeatLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
 
+  // 지난 운동 부위 필터
+  const [historyFilter, setHistoryFilter] = useState('전체');
+  const historyTags = useMemo(() => {
+    const s = new Set<string>();
+    history.forEach(h => h.tags?.split(',').filter(Boolean).forEach(t => s.add(t)));
+    return ['전체', ...Array.from(s)];
+  }, [history]);
+  const filteredHistory = useMemo(() =>
+    historyFilter === '전체'
+      ? history
+      : history.filter(h => h.tags?.split(',').includes(historyFilter)),
+    [history, historyFilter]);
+
   // RIR 팝업 — 추적 종목 마지막 작업 세트 후
   const [rirPending, setRirPending] = useState<{ exerciseName: string } | null>(null);
   const [rirSession, setRirSession] = useState<Record<string, string>>({});  // exerciseName → rir tag
@@ -373,14 +387,6 @@ export default function WorkoutScreen() {
     setExerciseRmBasis(ex.exerciseId, reps).catch(() => {});
     setExerciseRmMode(ex.exerciseId, mode).catch(() => {});
     // TODO: 'estimated' 모드의 환산 표시를 뱃지/통계에 실제 연결
-  };
-
-  const handleStartWorkout = async () => {
-    const date = getTodayStr();
-    const sessionId = await createWorkoutSession(date, '');
-    startSession(sessionId, date, null);
-    setSessionNote('');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   // 진행 중 세션 부위 태그 토글 — 세션 이름도 선택 부위로 자동 설정
@@ -1280,17 +1286,13 @@ export default function WorkoutScreen() {
       <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safe}>
         <ScrollView ref={homeScrollRef} contentContainerStyle={styles.homeContent}>
-          {/* 헤더 — 좌측 접기, 우측 휴식 타이머 버튼 */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          {/* 헤더 */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="닫기">
               <Text style={{ color: '#8E8E93', fontSize: 22, fontWeight: '700' }}>⌄</Text>
             </Pressable>
             <HeaderTimerButton />
           </View>
-          {/* 시작 — 바로 시작, 이름·헬스장·태그는 진행 중에 */}
-          <Pressable style={styles.startBtnBig} onPress={handleStartWorkout}>
-            <Text style={styles.startBtnText}>운동 시작</Text>
-          </Pressable>
 
           {/* 내 루틴 */}
           {templates.length > 0 && (
@@ -1315,18 +1317,40 @@ export default function WorkoutScreen() {
             </>
           )}
 
-          {/* 히스토리 */}
+          {/* 히스토리 + 부위 필터 */}
           {history.length > 0 && (
             <>
-              <Text style={styles.historyTitle}
-                onLayout={e => { historyYRef.current = e.nativeEvent.layout.y; }}>지난 운동</Text>
-              {history.map(session => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: templates.length > 0 ? 8 : 0 }}>
+                <Text style={styles.historyTitle}
+                  onLayout={e => { historyYRef.current = e.nativeEvent.layout.y; }}>지난 운동</Text>
+              </View>
+
+              {/* 부위 필터 칩 */}
+              {historyTags.length > 1 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 7, paddingBottom: 14 }}>
+                  {historyTags.map(tag => (
+                    <Pressable key={tag}
+                      style={[histFilterChip.chip, historyFilter === tag && histFilterChip.on]}
+                      onPress={() => setHistoryFilter(tag)}>
+                      <Text style={[histFilterChip.text, historyFilter === tag && histFilterChip.textOn]}>{tag}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+
+              {filteredHistory.map(session => (
                 <SessionCard
                   key={session.id}
                   session={session}
                   onChanged={() => { getSessionHistory().then(setHistory); getTemplates().then(setTemplates); }}
                 />
               ))}
+              {filteredHistory.length === 0 && (
+                <Text style={{ color: '#6a6a6e', fontSize: 14, textAlign: 'center', paddingVertical: 30 }}>
+                  {historyFilter} 운동 기록이 없어요
+                </Text>
+              )}
             </>
           )}
         </ScrollView>
@@ -2151,7 +2175,6 @@ const RIR_OPTIONS = [
   { key: 'failed',     emoji: '❌', label: '실패' },
 ] as const;
 
-import { StyleSheet as RNStyleSheet } from 'react-native';
 const rirStyles = RNStyleSheet.create({
   sheet: { backgroundColor: '#111113', borderTopLeftRadius: 22, borderTopRightRadius: 22,
     padding: 20, paddingBottom: 36 },
@@ -2164,5 +2187,13 @@ const rirStyles = RNStyleSheet.create({
     alignItems: 'center', gap: 6 },
   btnEmoji: { fontSize: 22 },
   btnLabel: { fontSize: 12, fontWeight: '700', color: '#fff', textAlign: 'center' },
+});
+
+const histFilterChip = RNStyleSheet.create({
+  chip: { borderWidth: 1, borderColor: '#2a2a2f', borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#0d0d0f' },
+  on: { borderColor: '#FF3B30', backgroundColor: 'rgba(255,59,48,0.14)' },
+  text: { color: '#9a9aa1', fontSize: 13, fontWeight: '700' },
+  textOn: { color: '#fff' },
 });
 

@@ -50,7 +50,12 @@ export default function SessionCard({ session, onChanged }: Props) {
         </View>
       </View>
 
-      <Text style={styles.title} numberOfLines={1}>{session.title?.trim() || '운동'}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={1}>{session.title?.trim() || '운동'}</Text>
+        <Pressable style={styles.quickStart} hitSlop={8} onPress={() => startAsIs(session)}>
+          <Text style={styles.quickStartText}>이대로 시작</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.stats}>
         <Text style={styles.statNum}>{session.exercise_count}</Text>종목 · <Text style={styles.statNum}>{session.set_count}</Text>세트
@@ -58,7 +63,7 @@ export default function SessionCard({ session, onChanged }: Props) {
       </Text>
 
       {session.exercise_names ? (
-        <Text style={styles.exercises} numberOfLines={1}>{session.exercise_names}</Text>
+        <Text style={styles.exercises} numberOfLines={2}>{session.exercise_names}</Text>
       ) : null}
 
       <Modal visible={menu} transparent animationType="fade" onRequestClose={close}>
@@ -103,14 +108,18 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     paddingHorizontal: 2,
   },
-  tagText: { color: '#5AB0FF', fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3 },
+  tagText: { color: '#E5E5EA', fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3 },
   tagDivider: { width: 1, height: 12, backgroundColor: '#48484A' },
   menuBtn: { paddingHorizontal: 4, marginLeft: 2 },
   menuDots: { color: '#8E8E93', fontSize: 22, fontWeight: '700', lineHeight: 24 },
-  title: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginTop: 6 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  title: { color: '#FFFFFF', fontSize: 24, fontWeight: '800', letterSpacing: -0.5, flex: 1, marginRight: 10 },
+  quickStart: { backgroundColor: 'rgba(255,59,48,0.14)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.4)',
+    borderRadius: 9, paddingHorizontal: 12, paddingVertical: 7 },
+  quickStartText: { color: '#FF3B30', fontSize: 12.5, fontWeight: '800' },
   stats: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginTop: 8 },
   statNum: { color: '#FF3B30', fontWeight: '700' },
-  exercises: { color: '#8E8E93', fontSize: 13, marginTop: 8 },
+  exercises: { color: '#8E8E93', fontSize: 13, marginTop: 8, lineHeight: 19 },
 
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   menuSheet: {
