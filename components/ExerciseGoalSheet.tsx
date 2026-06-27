@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, Pressable, Modal, ScrollView } from 'react-nati
 import { ACCENT, SEM } from '../constants/colors';
 import type { ExerciseGoalDto, ExerciseRole } from '../db/api/overload';
 import { useOverloadStore } from '../store/useOverloadStore';
+import { getSessionHistory } from '../db/api/sessions';
+import type { SessionSummary } from '../db/api/types';
+import SessionPreviewSheet from './SessionPreviewSheet';
 
 const ROLE_LABEL: Record<ExerciseRole, string> = {
   core: '핵심', support: '보조', log_only: '기록만',
@@ -30,6 +33,20 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
 }) {
   const updateGoal = useOverloadStore(s => s.updateGoal);
   const [roleEditing, setRoleEditing] = useState(false);
+  const [previewSession, setPreviewSession] = useState<SessionSummary | null>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+
+  // 지난 기록 탭 → 그 날짜의 세션 찾아 미리보기
+  const openLastSession = async () => {
+    if (!goal?.lastRecordDate || loadingSession) return;
+    setLoadingSession(true);
+    try {
+      const list = await getSessionHistory(90);
+      const found = list.find(s => s.date === goal.lastRecordDate);
+      if (found) setPreviewSession(found);
+    } catch { /* ignore */ }
+    setLoadingSession(false);
+  };
 
   if (!goal) return null;
 
@@ -67,10 +84,22 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
               <Text style={s.bigRecord}>{goal.stageLabel}</Text>
             </Section>
 
-            {/* 현재 상태 / 지난 기록 */}
+            {/* 현재 상태 / 지난 기록 — 탭하면 그 운동 세션으로 */}
             {!needBase && goal.lastRecord && (
               <Section label="지난 비교 가능 기록">
-                <Text style={s.bigRecord}>{goal.lastRecord}</Text>
+                <Pressable
+                  onPress={openLastSession}
+                  disabled={!goal.lastRecordDate || loadingSession}
+                  style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                >
+                  <View style={s.lastRow}>
+                    <Text style={s.bigRecord}>{goal.lastRecord}</Text>
+                    {goal.lastRecordDate && <Text style={s.lastChevron}>›</Text>}
+                  </View>
+                  {goal.lastRecordDate && (
+                    <Text style={s.lastHint}>{loadingSession ? '여는 중…' : '탭하면 그날 운동 기록으로'}</Text>
+                  )}
+                </Pressable>
                 <View style={[s.compChip, { borderColor: compColor }]}>
                   <Text style={[s.compChipT, { color: compColor }]}>{compLabel}</Text>
                 </View>
@@ -121,6 +150,9 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
           </Pressable>
         </Pressable>
       </Pressable>
+
+      {/* 지난 기록 세션 미리보기 */}
+      <SessionPreviewSheet session={previewSession} onClose={() => setPreviewSession(null)} />
     </Modal>
   );
 }
@@ -165,6 +197,9 @@ const s = StyleSheet.create({
   bigRecord: { fontSize: 19, fontWeight: '800', color: '#fff', marginTop: 2 },
   noBaseline: { fontSize: 14, color: SEM.muted, fontStyle: 'italic', lineHeight: 20 },
   cautionText: { fontSize: 12.5, color: SEM.warn, marginTop: 6, lineHeight: 18 },
+  lastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  lastChevron: { fontSize: 22, color: ACCENT, fontWeight: '700' },
+  lastHint: { fontSize: 11.5, color: ACCENT, marginTop: 2 },
 
   compChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginTop: 10 },
   compChipT: { fontSize: 12, fontWeight: '800' },

@@ -55,6 +55,7 @@ export type ExerciseGoalDto = {
   longTermTarget: string | null;
   targetTotalReps: number | null;
   targetWeight: number | null;
+  lastRecordDate: string | null;
 };
 
 export type ExerciseGoalBulkRequest = {
