@@ -5,6 +5,10 @@ import { formatShortWithWeekday } from '../lib/date';
 import { formatDuration } from '../lib/format';
 import { useSessionActions } from '../hooks/useSessionActions';
 import SessionPreviewSheet from './SessionPreviewSheet';
+import { MUSCLE_KO } from '../constants/exercises';
+
+/** 부위 태그를 한글로 정규화 — 예전 영문 저장(Chest/Shoulder 등) 호환. */
+const partKo = (t: string) => MUSCLE_KO[t] ?? t;
 
 type Props = {
   session: SessionSummary;
@@ -39,7 +43,7 @@ export default function SessionCard({ session, onChanged }: Props) {
               {tags.map((t, i) => (
                 <React.Fragment key={t}>
                   {i > 0 && <View style={styles.tagDivider} />}
-                  <Text style={styles.tagText}>{t}</Text>
+                  <Text style={styles.tagText}>{partKo(t)}</Text>
                 </React.Fragment>
               ))}
             </View>

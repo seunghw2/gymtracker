@@ -10,6 +10,7 @@ import { useSettingsStore } from '../store/useStore';
 import { toDisplay, unitLabel } from '../lib/units';
 import { formatDateWithDay } from '../lib/date';
 import { formatDuration } from '../lib/format';
+import { MUSCLE_KO } from '../constants/exercises';
 
 const SET_TYPE_BADGE: Record<string, { label: string; color: string }> = {
   WARMUP: { label: 'W', color: '#FF9F0A' },
@@ -75,7 +76,7 @@ export default function SessionPreviewSheet({ session, onClose }: Props) {
           )}
           {session?.tags ? (
             <View style={styles.tagBadgeRow}>
-              {session.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{t}</Text>)}
+              {session.tags.split(',').filter(Boolean).map(t => <Text key={t} style={styles.tagBadge}>{MUSCLE_KO[t] ?? t}</Text>)}
             </View>
           ) : null}
           {session?.note?.trim() ? (
