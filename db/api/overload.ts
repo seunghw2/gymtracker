@@ -53,6 +53,8 @@ export type ExerciseGoalDto = {
   caution: string | null;
   shortTermTarget: string | null;
   longTermTarget: string | null;
+  targetTotalReps: number | null;
+  targetWeight: number | null;
 };
 
 export type ExerciseGoalBulkRequest = {
@@ -130,6 +132,44 @@ export type WeeklySummaryDto = {
 export async function getWeeklySummary(): Promise<WeeklySummaryDto | null> {
   try {
     return await apiRequest<WeeklySummaryDto>('/api/v1/overload/weekly-summary');
+  } catch {
+    return null;
+  }
+}
+
+export type SessionEvalItem = {
+  exerciseName: string;
+  result: 'BASELINE_CREATED' | 'IMPROVED' | 'MAINTAINED' | 'MISSED' | 'COMPARISON_DEFERRED';
+  resultLabel: string;
+  previous: string | null;
+  current: string;
+  userMessage: string;
+};
+export type SessionEvalDto = {
+  items: SessionEvalItem[];
+  aiSummary: string;
+  nextActions: string[];
+};
+
+export async function getSessionEval(sessionId: number): Promise<SessionEvalDto | null> {
+  try {
+    return await apiRequest<SessionEvalDto>(`/api/v1/overload/session-eval/${sessionId}`);
+  } catch {
+    return null;
+  }
+}
+
+export type WeeklyProgressionDto = {
+  baselineCreated: string[];
+  repImproved: string[];
+  readyToIncrease: string[];
+  stallReview: string[];
+  nextActions: string[];
+};
+
+export async function getWeeklyProgression(): Promise<WeeklyProgressionDto | null> {
+  try {
+    return await apiRequest<WeeklyProgressionDto>('/api/v1/overload/weekly-progression');
   } catch {
     return null;
   }

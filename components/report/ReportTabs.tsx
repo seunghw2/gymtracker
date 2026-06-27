@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getSetting, setSetting, getSessionHistory, SessionSummary } from '../../db/queries';
 import { useSettingsStore } from '../../store/useStore';
+import { getWeeklyProgression, type WeeklyProgressionDto } from '../../db/api/overload';
 import type { AiReportV2, RCoachItem } from '../../db/api/ai';
 import SessionPreviewSheet from '../SessionPreviewSheet';
 import { RT, toneColor } from './theme';
@@ -81,6 +82,52 @@ function EditDot({ on, onPress }: { on: boolean; onPress: () => void }) {
 }
 
 // ── 브리핑 ──────────────────────────────────────────────────────────
+/** 이번 주 진행 단계 요약 (§12) — 점진적 과부하 단계 데이터. */
+function ProgressionSection() {
+  const [data, setData] = useState<WeeklyProgressionDto | null>(null);
+  useEffect(() => { getWeeklyProgression().then(setData).catch(() => {}); }, []);
+  if (!data) return null;
+  const empty = !data.baselineCreated.length && !data.repImproved.length
+    && !data.readyToIncrease.length && !data.stallReview.length;
+  if (empty) return null;
+
+  const Row = ({ label, items, color }: { label: string; items: string[]; color: string }) =>
+    items.length === 0 ? null : (
+      <View style={ps.row}>
+        <Text style={[ps.rowLabel, { color }]}>{label}</Text>
+        {items.map((it, i) => <Text key={i} style={ps.rowItem}>· {it}</Text>)}
+      </View>
+    );
+
+  return (
+    <View style={ps.card}>
+      <Text style={ps.title}>📊 이번 주 진행 단계</Text>
+      <Row label="기준 생성" items={data.baselineCreated} color="#5AB0FF" />
+      <Row label="반복수 개선" items={data.repImproved} color={RT.good} />
+      <Row label="증량 준비" items={data.readyToIncrease} color={RT.good} />
+      <Row label="정체 점검" items={data.stallReview} color={RT.bad} />
+      {data.nextActions.length > 0 && (
+        <View style={ps.actions}>
+          <Text style={ps.actionsTitle}>다음 주 액션</Text>
+          {data.nextActions.map((a, i) => <Text key={i} style={ps.actionItem}>{i + 1}. {a}</Text>)}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const ps = StyleSheet.create({
+  card: { backgroundColor: RT.surface, borderWidth: 1, borderColor: RT.hair,
+    borderRadius: 14, padding: 16, marginBottom: 14 },
+  title: { fontSize: 13, fontWeight: '800', color: RT.ink, marginBottom: 12 },
+  row: { marginBottom: 10 },
+  rowLabel: { fontSize: 11.5, fontWeight: '800', marginBottom: 4 },
+  rowItem: { fontSize: 13, color: RT.ink2, lineHeight: 20 },
+  actions: { marginTop: 6, borderTopWidth: 1, borderTopColor: RT.hair, paddingTop: 12 },
+  actionsTitle: { fontSize: 11.5, fontWeight: '800', color: RT.ink, marginBottom: 6 },
+  actionItem: { fontSize: 13, color: RT.ink2, lineHeight: 21 },
+});
+
 function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: boolean; hidden: Set<string>; toggle: (k: string) => void }) {
   const c = r.consistency;
   const cards = r.cards;
@@ -94,6 +141,9 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
   return (
     <View>
       <Text style={s.hero}>{r.headline}</Text>
+
+      {/* 점진적 과부하 — 이번 주 진행 단계 (주간 리포트에서만) */}
+      {r.period.type === 'week' && <ProgressionSection />}
 
       {r.period.type === 'month' && (r.monthScore || r.monthGrowth) && (
         <View style={s.mg}>

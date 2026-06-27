@@ -70,6 +70,7 @@ import SessionCard from '../components/SessionCard';
 import RulerPicker from '../components/RulerPicker';
 import { useUiStore } from '../store/useUiStore';
 import { useOverloadStore } from '../store/useOverloadStore';
+import { getSessionEval } from '../db/api/overload';
 import { formatDateWithDay, todayStr } from '../lib/date';
 import { logError } from '../lib/log';
 import { toDisplay, fromInput, unitLabel } from '../lib/units';
@@ -250,6 +251,11 @@ export default function WorkoutScreen() {
   const [rirSession, setRirSession] = useState<Record<string, string>>({});  // exerciseName → rir tag
   const trackedGoals = useOverloadStore(s => s.exerciseGoals);
   const trackedExerciseIds = useMemo(() => new Set(trackedGoals.map(g => g.exerciseId)), [trackedGoals]);
+  const goalByExId = useMemo(() => {
+    const m = new Map<number, typeof trackedGoals[number]>();
+    trackedGoals.forEach(g => m.set(g.exerciseId, g));
+    return m;
+  }, [trackedGoals]);
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
@@ -266,6 +272,7 @@ export default function WorkoutScreen() {
   const [selectedToAdd, setSelectedToAdd] = useState<Record<number, SelectableExercise>>({});
   const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
+  const [sessionEval, setSessionEval] = useState<import('../db/api/overload').SessionEvalDto | null>(null);
   // 앱 자체 숫자패드 편집 상태
   const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -512,6 +519,10 @@ export default function WorkoutScreen() {
           const prs = doneSets.filter(s => s.isPR).length;
           const exCount = exercises.filter(e => e.sets.some(s => s.done)).length;
           setSummary({ volume, sets: doneSets.length, exercises: exCount, prs, durationSec });
+          // 진행 단계 평가(개선/유지/보류) — 추적 종목이 있을 때만
+          if (activeSessionId && trackedExerciseIds.size > 0) {
+            getSessionEval(activeSessionId).then(setSessionEval).catch(() => {});
+          }
         },
       },
     ]);
@@ -519,6 +530,7 @@ export default function WorkoutScreen() {
 
   const closeSummary = () => {
     setSummary(null);
+    setSessionEval(null);
     finishSession();
   };
 
@@ -1689,6 +1701,43 @@ export default function WorkoutScreen() {
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
+              {/* 핵심/추적 종목 — 오늘 목표 + 남은 반복수 배너 */}
+              {(() => {
+                const goal = goalByExId.get(ex.exerciseId);
+                if (!goal || goal.role === 'log_only') return null;
+                const isBodyweight = goal.ruleType === 'bodyweight';
+                // 작업 세트(워밍업 제외) 완료 반복수 합
+                const doneReps = ex.sets
+                  .filter(s => s.done && (s.setType ?? 'NORMAL') !== 'WARMUP')
+                  .reduce((sum, s) => sum + (s.reps ?? 0), 0);
+                // 무게 기반은 대표 무게(최대 완료 무게) 세트만 합산
+                const topW = ex.sets.filter(s => s.done && (s.setType ?? 'NORMAL') !== 'WARMUP')
+                  .reduce((m, s) => Math.max(m, s.weight_kg), 0);
+                const doneTopReps = isBodyweight ? doneReps : ex.sets
+                  .filter(s => s.done && (s.setType ?? 'NORMAL') !== 'WARMUP' && s.weight_kg === topW)
+                  .reduce((sum, s) => sum + (s.reps ?? 0), 0);
+                const target = goal.targetTotalReps ?? null;
+                const remaining = target != null ? Math.max(0, target - doneTopReps) : null;
+                const reached = target != null && doneTopReps >= target;
+                const isAssist = goal.role === 'support';
+                return (
+                  <View style={[wgStyles.banner, reached && wgStyles.bannerDone, isAssist && wgStyles.bannerAssist]}>
+                    <View style={wgStyles.bannerRow}>
+                      <Text style={wgStyles.bannerStage}>{goal.stageLabel}</Text>
+                      {goal.comparability === 'low' && <Text style={wgStyles.bannerNote}>· 비교 보류</Text>}
+                    </View>
+                    <Text style={wgStyles.bannerTarget}>{goal.todayTarget}</Text>
+                    {goal.caution ? (
+                      <Text style={wgStyles.bannerCaution}>{goal.caution}</Text>
+                    ) : target != null ? (
+                      reached
+                        ? <Text style={wgStyles.bannerReached}>✓ 오늘 목표 달성 ({doneTopReps}회)</Text>
+                        : <Text style={wgStyles.bannerRemain}>현재 {doneTopReps}회 · 목표까지 {remaining}회</Text>
+                    ) : null}
+                  </View>
+                );
+              })()}
+
               {/* 종목 메모 — 버튼 없이 항상 표시 */}
               <TextInput
                 key={`note-${ex.exerciseId}`}
@@ -2073,6 +2122,42 @@ export default function WorkoutScreen() {
                 )}
               </View>
             )}
+
+            {/* 진행 단계 평가 (§11) */}
+            {sessionEval && sessionEval.items.length > 0 && (
+              <ScrollView style={evStyles.wrap} showsVerticalScrollIndicator={false}>
+                {!!sessionEval.aiSummary && (
+                  <View style={evStyles.aiRow}>
+                    <Text style={evStyles.aiIcon}>💬</Text>
+                    <Text style={evStyles.aiText}>{sessionEval.aiSummary}</Text>
+                  </View>
+                )}
+                {sessionEval.items.map((it, i) => (
+                  <View key={i} style={evStyles.item}>
+                    <View style={[evStyles.tag, evTagStyle(it.result)]}>
+                      <Text style={[evStyles.tagT, { color: evTagColor(it.result) }]}>{it.resultLabel}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={evStyles.exName}>{it.exerciseName}</Text>
+                      <Text style={evStyles.exDetail} numberOfLines={2}>
+                        {it.result === 'COMPARISON_DEFERRED'
+                          ? it.userMessage
+                          : (it.previous ? `${it.previous} → ${it.current}` : it.current)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {sessionEval.nextActions.length > 0 && (
+                  <View style={evStyles.actions}>
+                    <Text style={evStyles.actionsTitle}>다음 운동에서</Text>
+                    {sessionEval.nextActions.map((a, i) => (
+                      <Text key={i} style={evStyles.actionItem}>· {a}</Text>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+            )}
+
             <Pressable style={styles.summaryBtn} onPress={closeSummary}>
               <Text style={styles.summaryBtnText}>확인</Text>
             </Pressable>
@@ -2195,5 +2280,50 @@ const histFilterChip = RNStyleSheet.create({
   on: { borderColor: '#FF3B30', backgroundColor: 'rgba(255,59,48,0.14)' },
   text: { color: '#9a9aa1', fontSize: 13, fontWeight: '700' },
   textOn: { color: '#fff' },
+});
+
+// 종료 요약 진행 평가
+function evTagColor(result: string) {
+  if (result === 'IMPROVED') return '#30D158';
+  if (result === 'BASELINE_CREATED') return '#5AB0FF';
+  if (result === 'MISSED') return '#FF8A00';
+  if (result === 'COMPARISON_DEFERRED') return '#8a8a8e';
+  return '#c8c8ce';
+}
+function evTagStyle(result: string) {
+  const c = evTagColor(result);
+  return { borderColor: c + '66', backgroundColor: c + '1f' };
+}
+const evStyles = RNStyleSheet.create({
+  wrap: { maxHeight: 280, marginTop: 8, alignSelf: 'stretch' },
+  aiRow: { flexDirection: 'row', gap: 7, backgroundColor: '#0d0d0f', borderRadius: 10,
+    padding: 11, marginBottom: 10 },
+  aiIcon: { fontSize: 13, marginTop: 1 },
+  aiText: { flex: 1, fontSize: 13, color: '#d0d0d8', lineHeight: 19 },
+  item: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingVertical: 8,
+    borderTopWidth: 1, borderTopColor: '#1c1c1e' },
+  tag: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3, marginTop: 1 },
+  tagT: { fontSize: 11, fontWeight: '800' },
+  exName: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  exDetail: { fontSize: 12.5, color: '#9a9aa1', marginTop: 2, lineHeight: 17 },
+  actions: { marginTop: 12, backgroundColor: '#0d0d0f', borderRadius: 10, padding: 12 },
+  actionsTitle: { fontSize: 11, fontWeight: '800', color: '#8a8a8e', letterSpacing: 0.4,
+    textTransform: 'uppercase', marginBottom: 6 },
+  actionItem: { fontSize: 13, color: '#d8d8de', lineHeight: 20 },
+});
+
+// 운동 중 핵심 종목 오늘 목표 배너
+const wgStyles = RNStyleSheet.create({
+  banner: { backgroundColor: 'rgba(255,59,48,0.08)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.3)',
+    borderRadius: 10, padding: 11, marginTop: 8, marginBottom: 2 },
+  bannerAssist: { backgroundColor: '#161618', borderColor: '#2c2c2e' },
+  bannerDone: { backgroundColor: 'rgba(43,217,106,0.1)', borderColor: 'rgba(43,217,106,0.4)' },
+  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bannerStage: { fontSize: 11, fontWeight: '800', color: '#FF6A5E', letterSpacing: 0.2 },
+  bannerNote: { fontSize: 11, color: '#8a8a8e' },
+  bannerTarget: { fontSize: 15, fontWeight: '800', color: '#fff', marginTop: 4 },
+  bannerRemain: { fontSize: 12.5, color: '#c8c8ce', marginTop: 4, fontWeight: '600' },
+  bannerReached: { fontSize: 12.5, color: '#30D158', marginTop: 4, fontWeight: '800' },
+  bannerCaution: { fontSize: 12, color: '#FFC53D', marginTop: 4 },
 });
 
