@@ -234,7 +234,8 @@ export default function WorkoutScreen() {
   // RIR 팝업 — 추적 종목 마지막 작업 세트 후
   const [rirPending, setRirPending] = useState<{ exerciseName: string } | null>(null);
   const [rirSession, setRirSession] = useState<Record<string, string>>({});  // exerciseName → rir tag
-  const trackedExerciseIds = useOverloadStore(s => new Set(s.exerciseGoals.map(g => g.exerciseId)));
+  const trackedGoals = useOverloadStore(s => s.exerciseGoals);
+  const trackedExerciseIds = useMemo(() => new Set(trackedGoals.map(g => g.exerciseId)), [trackedGoals]);
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
   const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
