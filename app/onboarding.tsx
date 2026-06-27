@@ -230,7 +230,13 @@ export default function Onboarding() {
       </ScrollView>
 
       <View style={s.footer}>
-        <Pressable style={[s.cta, !valid && s.ctaGhost]} onPress={handleNext} disabled={!valid || saving}>
+        {step > 1 && (
+          <Pressable style={s.backBtn} onPress={() => setStep(s => s - 1)}>
+            <Text style={s.backBtnT}>이전</Text>
+          </Pressable>
+        )}
+        <Pressable style={[s.cta, !valid && s.ctaGhost, step > 1 && { flex: 1 }]}
+          onPress={handleNext} disabled={!valid || saving}>
           {saving
             ? <ActivityIndicator color="#fff" />
             : <Text style={[s.ctaT, !valid && s.ctaTGhost]}>{step < TOTAL_STEPS ? '다음' : '시작하기'}</Text>}
@@ -332,8 +338,12 @@ const s = StyleSheet.create({
   stepVal: { fontSize: 17, fontWeight: '800', minWidth: 64, textAlign: 'center', color: '#fff' },
   incNote: { fontSize: 12.5, color: '#555', marginTop: 6, lineHeight: 18 },
 
-  footer: { padding: 16, paddingBottom: 8 },
-  cta: { height: 54, borderRadius: 14, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
+  footer: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 8 },
+  backBtn: { height: 54, borderRadius: 14, borderWidth: 1, borderColor: SEM.line,
+    backgroundColor: SEM.surface1, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 22 },
+  backBtnT: { fontSize: 15, fontWeight: '700', color: SEM.muted },
+  cta: { height: 54, flex: 1, borderRadius: 14, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
   ctaGhost: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line },
   ctaT: { fontSize: 16.5, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
   ctaTGhost: { color: SEM.muted },
