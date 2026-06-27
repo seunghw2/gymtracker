@@ -38,9 +38,15 @@ function metTopOfRange(rec: ExerciseRecord, repMax: number, sets: number): boole
 /** 최근 비교 가능 기록들에서 총 반복수가 정체(비증가)인지 — 3회 이상 변화 없음. */
 function isStalling(records: ExerciseRecord[] | undefined, kind: ExerciseKind): boolean {
   if (!records || records.length < 3) return false;
-  const recent = [...records].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
-  const totals = recent.map(r => progressionReps(kind, r));
-  // 최신이 가장 오래된 것보다 크지 않으면(개선 없음) 정체로 본다
+  const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date));
+  // 무게 기반은 같은 작업 무게 기록만 비교(무게 제각각이면 정체 아님)
+  let comparable = sorted;
+  if (kind !== 'BODYWEIGHT') {
+    const w = topWorkingWeight(sorted[0]);
+    comparable = sorted.filter(r => topWorkingWeight(r) === w);
+  }
+  if (comparable.length < 3) return false;
+  const totals = comparable.slice(0, 3).map(r => progressionReps(kind, r));
   return totals[0] <= totals[2];
 }
 

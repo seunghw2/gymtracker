@@ -81,49 +81,69 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
 
             {/* 현재 단계 */}
             <Section label="현재 단계">
-              <Text style={s.bigRecord}>{goal.stageLabel}</Text>
+              <Text style={s.stageText}>{goal.stageLabel}</Text>
             </Section>
 
-            {/* 현재 상태 / 지난 기록 — 탭하면 그 운동 세션으로 */}
-            {!needBase && goal.lastRecord && (
-              <Section label="지난 비교 가능 기록">
-                <Pressable
-                  onPress={openLastSession}
-                  disabled={!goal.lastRecordDate || loadingSession}
-                  style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-                >
-                  <View style={s.lastRow}>
-                    <Text style={s.bigRecord}>{goal.lastRecord}</Text>
-                    {goal.lastRecordDate && <Text style={s.lastChevron}>›</Text>}
+            {/* 비교 기준 — 직전 / 최고 / 전체 PR */}
+            {!needBase && (goal.lastRecord || goal.bestRecord) && (
+              <Section label="비교 기준">
+                {goal.lastRecord && (
+                  <Pressable
+                    onPress={openLastSession}
+                    disabled={!goal.lastRecordDate || loadingSession}
+                    style={({ pressed }) => [s.cmpRow, pressed && { opacity: 0.6 }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cmpLabel}>직전 비교 기록</Text>
+                      <Text style={s.cmpValue}>{goal.lastRecord}</Text>
+                    </View>
+                    {goal.lastRecordDate && <Text style={s.cmpChevron}>›</Text>}
+                  </Pressable>
+                )}
+                {goal.bestRecord && (
+                  <View style={s.cmpRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cmpLabel}>최고 비교 기록</Text>
+                      <Text style={s.cmpValue}>{goal.bestRecord}</Text>
+                    </View>
                   </View>
-                  {goal.lastRecordDate && (
-                    <Text style={s.lastHint}>{loadingSession ? '여는 중…' : '탭하면 그날 운동 기록으로'}</Text>
-                  )}
-                </Pressable>
+                )}
+                {goal.allTimePr && (
+                  <View style={s.cmpRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cmpLabel}>전체 PR</Text>
+                      <Text style={s.cmpValuePr}>{goal.allTimePr}</Text>
+                    </View>
+                  </View>
+                )}
+                {/* 비교 신뢰도 + 근거 */}
                 <View style={[s.compChip, { borderColor: compColor }]}>
                   <Text style={[s.compChipT, { color: compColor }]}>{compLabel}</Text>
                 </View>
+                {goal.comparisonReason && <Text style={s.cmpReason}>{goal.comparisonReason}</Text>}
               </Section>
             )}
 
-            {/* 오늘 목표 */}
-            <Section label="오늘 목표">
-              <Text style={s.bigRecord}>{goal.todayTarget}</Text>
+            {/* 오늘 목표 — 가장 크게 */}
+            <View style={s.todayBox}>
+              <Text style={s.todayLabel}>오늘 목표</Text>
+              <Text style={s.todayTarget}>{goal.todayTarget}</Text>
+              {goal.successCondition && <Text style={s.successText}>{goal.successCondition}</Text>}
               {goal.caution && <Text style={s.cautionText}>⚠ {goal.caution}</Text>}
-            </Section>
+            </View>
 
-            {/* 다음 단계 조건 */}
-            <Section label="다음 단계">
-              <Text style={s.bodyText}>{goal.nextCondition}</Text>
-            </Section>
-
-            {/* 단기/장기 목표 */}
+            {/* 단기/장기 목표(맨몸 등) */}
             {(goal.shortTermTarget || goal.longTermTarget) && (
               <Section label="목표">
                 {goal.shortTermTarget && <Text style={s.bodyText}>단기: {goal.shortTermTarget}</Text>}
                 {goal.longTermTarget && <Text style={[s.bodyText, { marginTop: 4 }]}>장기: {goal.longTermTarget}</Text>}
               </Section>
             )}
+
+            {/* 다음 단계 — 성공/여유/실패 분기 */}
+            <Section label="다음 단계">
+              <Text style={s.bodyText}>{goal.nextStep ?? goal.nextCondition}</Text>
+            </Section>
 
             {/* 역할 수정 */}
             <Section label="역할">
@@ -192,17 +212,28 @@ const s = StyleSheet.create({
   section: { marginTop: 20 },
   sectionLabel: { fontSize: 11, fontWeight: '800', color: SEM.muted, letterSpacing: 0.5,
     textTransform: 'uppercase', marginBottom: 8 },
-  bodyText: { fontSize: 14, color: '#d8d8de', lineHeight: 20 },
-  bodyTextDim: { fontSize: 12.5, color: SEM.muted, marginTop: 4 },
-  bigRecord: { fontSize: 19, fontWeight: '800', color: '#fff', marginTop: 2 },
-  noBaseline: { fontSize: 14, color: SEM.muted, fontStyle: 'italic', lineHeight: 20 },
-  cautionText: { fontSize: 12.5, color: SEM.warn, marginTop: 6, lineHeight: 18 },
-  lastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  lastChevron: { fontSize: 22, color: ACCENT, fontWeight: '700' },
-  lastHint: { fontSize: 11.5, color: ACCENT, marginTop: 2 },
+  bodyText: { fontSize: 14, color: '#d8d8de', lineHeight: 21 },
+  stageText: { fontSize: 18, fontWeight: '800', color: '#fff', marginTop: 2 },
+  cautionText: { fontSize: 12.5, color: SEM.warn, marginTop: 8, lineHeight: 18 },
 
-  compChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginTop: 10 },
+  // 비교 기준 행
+  cmpRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8,
+    borderTopWidth: 1, borderTopColor: '#1c1c1e' },
+  cmpLabel: { fontSize: 11.5, color: SEM.muted, marginBottom: 3 },
+  cmpValue: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  cmpValuePr: { fontSize: 15, fontWeight: '800', color: '#c3a8e8' },
+  cmpChevron: { fontSize: 22, color: '#8a8a8e', fontWeight: '700', marginLeft: 8 },
+  cmpReason: { fontSize: 12, color: SEM.muted, marginTop: 6, lineHeight: 17 },
+  compChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
   compChipT: { fontSize: 12, fontWeight: '800' },
+
+  // 오늘 목표 강조 박스
+  todayBox: { marginTop: 20, backgroundColor: 'rgba(255,59,48,0.08)', borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.3)', borderRadius: 14, padding: 16 },
+  todayLabel: { fontSize: 11, fontWeight: '800', color: ACCENT, letterSpacing: 0.5,
+    textTransform: 'uppercase', marginBottom: 6 },
+  todayTarget: { fontSize: 21, fontWeight: '800', color: '#fff', lineHeight: 27 },
+  successText: { fontSize: 12.5, color: '#c8c8ce', marginTop: 8, lineHeight: 18 },
 
   roleEditBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   roleEditDesc: { flex: 1, fontSize: 13.5, color: '#d8d8de' },

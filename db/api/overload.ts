@@ -56,6 +56,13 @@ export type ExerciseGoalDto = {
   targetTotalReps: number | null;
   targetWeight: number | null;
   lastRecordDate: string | null;
+  // 3종 기록 분리 + 성공조건/다음단계/비교근거
+  bestRecord: string | null;
+  bestRecordDate: string | null;
+  allTimePr: string | null;
+  successCondition: string | null;
+  nextStep: string | null;
+  comparisonReason: string | null;
 };
 
 export type ExerciseGoalBulkRequest = {
