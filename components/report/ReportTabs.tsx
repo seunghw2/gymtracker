@@ -175,51 +175,6 @@ function BriefTab({ r, editing, hidden, toggle }: { r: AiReportV2; editing: bool
         </View>
       )}
 
-      {r.period.type === 'quarter' && (
-        <View style={s.mg}>
-          <Text style={s.mgCap}>🎯 전략 점검</Text>
-          {r.monthGrowth && (
-            <View style={s.mgRow}>
-              <Text style={[s.mgPct, { color: up ? RT.good : RT.bad }]}>{up ? '▲' : '▼'} {Math.abs(r.monthGrowth.volumeGrowthPct)}%</Text>
-              <Text style={s.mgSub}>{r.monthGrowth.prevLabel} 대비 총 볼륨</Text>
-            </View>
-          )}
-          {(r.detail.stagnation?.length ?? 0) > 0 && (
-            <View style={s.mgSec}>
-              <Text style={s.mgSecK}>정체</Text>
-              <Text style={s.mgSecV} numberOfLines={3}>{r.detail.stagnation!.slice(0, 3).map(st => `${st.name} ${st.weeksFlat}주${st.cause ? `(${st.cause})` : ''}`).join(' · ')}</Text>
-            </View>
-          )}
-          {balanceLow.length > 0 && (
-            <View style={s.mgSec}>
-              <Text style={s.mgSecK}>밸런스</Text>
-              <Text style={s.mgSecV} numberOfLines={2}>{balanceLow.join(', ')} 부족</Text>
-            </View>
-          )}
-          {r.forecast && (
-            <View style={s.mgSec}>
-              <Text style={s.mgSecK}>예측</Text>
-              <Text style={s.mgSecV} numberOfLines={2}>{r.forecast.exercise} 이 추세면 {r.forecast.periodLabel} ~{r.forecast.projectedE1rm}kg</Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {r.period.type === 'year' && r.yearWrapped && (
-        <View style={s.mg}>
-          <Text style={s.mgCap}>🎁 올해의 기록</Text>
-          <View style={s.mgWrap}>
-            <View style={s.mgWi}><Text style={s.mgWv}>{r.yearWrapped.totalSessions}</Text><Text style={s.mgWl}>운동</Text></View>
-            <View style={s.mgWi}><Text style={s.mgWv}>{r.yearWrapped.totalVolumeTons}t</Text><Text style={s.mgWl}>총 볼륨</Text></View>
-          </View>
-          {!!r.yearWrapped.topGrowth && (
-            <View style={s.mgSec}><Text style={s.mgSecK}>최고 성장</Text><Text style={s.mgSecV}>{r.yearWrapped.topGrowth}</Text></View>
-          )}
-          {(r.detail.milestones?.length ?? 0) > 0 && (
-            <View style={s.mgSec}><Text style={s.mgSecK}>마일스톤</Text><Text style={s.mgSecV} numberOfLines={2}>{r.detail.milestones!.slice(0, 3).map(m => m.text).join(' · ')}</Text></View>
-          )}
-        </View>
-      )}
 
       <View style={s.kpiGrid}>
         {show('kpi_attendance') && <View style={[s.kpiWrap, editing && hidden.has('kpi_attendance') && { opacity: 0.4 }]}><Kpi v={c ? `${c.attendancePct}%` : '–'} l="출석률" sub={c ? `${c.sessions}/${c.planned}` : undefined} tone={c && c.attendancePct < 80 ? 'warn' : 'good'} />{editDot('kpi_attendance')}</View>}

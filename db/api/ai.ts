@@ -123,7 +123,7 @@ export async function getExerciseReport(exerciseId: number, force = false): Prom
 
 // ── 통합 리포트(명세 §7) — 6종 기간을 한 스키마로 ─────────────────────────
 
-export type ReportPeriodType = 'session' | 'week' | 'month' | 'quarter' | 'half' | 'year';
+export type ReportPeriodType = 'session' | 'week' | 'month';
 export type ReportStatusV2 = 'SUCCESS' | 'PROFILE_REQUIRED' | 'INSUFFICIENT_DATA' | 'FAILED' | 'GENERATING';
 
 export type RPoint = { x: string; y: number };
@@ -230,8 +230,6 @@ export type AiReportV2 = {
   tone: string | null;
   monthGrowth: { volumeGrowthPct: number; prevLabel: string } | null; // 월간 '성장' 섹션
   monthScore: { total: number; consistency: number; growth: number; balance: number } | null;
-  yearWrapped: { totalSessions: number; totalVolumeTons: number; topGrowth: string | null } | null;
-  forecast: { exercise: string; currentE1rm: number; projectedE1rm: number; periodLabel: string } | null;
 };
 
 export type AiReportV2Response = {

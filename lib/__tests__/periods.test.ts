@@ -12,36 +12,20 @@ describe('earliestDate', () => {
 });
 
 describe('buildBuckets', () => {
-  test('월별: 최초~현재, 최신이 맨 앞', () => {
+  test('월별: 진행 중(6월) 제외, 완료된 4~5월만 최신순', () => {
     const b = buildBuckets('month', '2026-04-15', NOW);
-    expect(b).toHaveLength(3);
-    expect(b[0].label).toBe('2026년 6월');
-    expect(b[0].isCurrent).toBe(true);
-    expect(b[2].label).toBe('2026년 4월');
-    expect(b[2].isCurrent).toBe(false);
+    expect(b.map(x => x.label)).toEqual(['2026년 5월', '2026년 4월']);
+    expect(b.every(x => !x.isCurrent)).toBe(true);
   });
 
-  test('주별: firstISO 없으면 현재 주 1개', () => {
+  test('주별: firstISO 없으면(이번 주만 가능) 진행 중 제외로 빈 배열', () => {
     const b = buildBuckets('week', null, NOW);
-    expect(b).toHaveLength(1);
-    expect(b[0].isCurrent).toBe(true);
+    expect(b).toHaveLength(0);
   });
 
-  test('분기: Q1~Q2 두 개', () => {
-    const b = buildBuckets('quarter', '2026-01-10', NOW);
-    expect(b.map(x => x.label)).toEqual(['2026 2분기', '2026 1분기']);
-  });
-
-  test('반기: 상반기 1개', () => {
-    const b = buildBuckets('half', '2026-02-01', NOW);
-    expect(b).toHaveLength(1);
-    expect(b[0].label).toBe('2026 상반기');
-    expect(b[0].sublabel).toBe('1–6월');
-  });
-  test('연간: 2025·2026 두 해, 최신이 앞', () => {
-    const b = buildBuckets('year', '2025-03-01', NOW);
-    expect(b.map(x => x.label)).toEqual(['2026년', '2025년']);
-    expect(b[0].start).toBe('2026-01-01');
-    expect(b[0].end).toBe('2026-12-31');
+  test('주별: 완료된 지난 주들만, 이번 주 제외', () => {
+    const b = buildBuckets('week', '2026-05-25', NOW);
+    expect(b.length).toBeGreaterThan(0);
+    expect(b.every(x => !x.isCurrent)).toBe(true);
   });
 });

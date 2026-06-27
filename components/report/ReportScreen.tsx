@@ -21,7 +21,7 @@ import { RT } from '../../components/report/theme';
 // 기간탭·주차칩·선택체크 = 네비/액션 → 레드 액센트(상태색 아님).
 const GREEN = RT.action;
 const GREEN_INK = '#FFFFFF';
-const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월', quarter: '분기', half: '반기', year: '연' };
+const UNIT_NOUN: Record<PeriodUnit, string> = { week: '주', month: '월' };
 
 // 성공 리포트 캐시 — 한 번 본 기간은 재방문 시 스피너 없이 즉시 표시.
 // 메모리 + AsyncStorage 영속(앱을 껐다 켜도 마지막 본 리포트가 바로 뜸). 최근 16개로 제한.
@@ -182,7 +182,7 @@ export function ReportScreen({ showBack = true }: { showBack?: boolean }) {
             return (
               <Pressable key={b.start} style={[styles.chip, on && styles.chipOn]} onPress={() => setIndex(i)}>
                 <Text style={[styles.chipMain, on && styles.chipMainOn]}>{b.label}</Text>
-                <Text style={[styles.chipSub, on && styles.chipSubOn]}>{b.isCurrent ? '진행 중' : b.sublabel}</Text>
+                <Text style={[styles.chipSub, on && styles.chipSubOn]}>{b.sublabel}</Text>
               </Pressable>
             );
           })}
@@ -195,12 +195,7 @@ export function ReportScreen({ showBack = true }: { showBack?: boolean }) {
         ) : loading ? (
           <View style={styles.center}><ActivityIndicator color={RT.action} size="large" /><Text style={styles.dim}>로딩 중…</Text></View>
         ) : res?.status === 'SUCCESS' && res.report ? (
-          <>
-            {res.report.period.nextReportEtaDays != null && (
-              <View style={styles.eta}><Text style={styles.etaText}>🔓 {res.report.period.label} · 진행 중 (D-{res.report.period.nextReportEtaDays})</Text></View>
-            )}
-            <ReportTabs r={res.report} onReload={() => load(false)} onAsk={() => router.push({ pathname: '/ai/chat', params: { reportId: res.report!.id, period: unitType } })} />
-          </>
+          <ReportTabs r={res.report} onReload={() => load(false)} onAsk={() => router.push({ pathname: '/ai/chat', params: { reportId: res.report!.id, period: unitType } })} />
         ) : res?.status === 'PROFILE_REQUIRED' ? (
           <Empty icon="🎯" title="먼저 목표를 알려주세요" desc={res.message ?? '목표 체형·우선 부위를 설정하면 분석을 시작해요.'} cta="설정하기" onPress={() => router.push('/ai/intake')} />
         ) : res?.status === 'INSUFFICIENT_DATA' ? (
@@ -222,7 +217,7 @@ export function ReportScreen({ showBack = true }: { showBack?: boolean }) {
               return (
                 <Pressable key={b.start} style={styles.sheetRow} onPress={() => pickIndex(i)}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.sheetLabel}>{b.label}{b.isCurrent ? '  · 진행 중' : ''}</Text>
+                    <Text style={styles.sheetLabel}>{b.label}</Text>
                     <Text style={styles.sheetSub}>{b.sublabel}</Text>
                   </View>
                   {on && <Text style={styles.check}>✓</Text>}

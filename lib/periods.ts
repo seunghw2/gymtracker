@@ -6,23 +6,20 @@ import type { ReportPeriodType } from '../db/queries';
  * 최초 기록일이 속한 기간 ~ 현재(진행 중) 기간까지, 최신이 맨 앞.
  * 각 버킷의 start/end는 그대로 백엔드 getReportV2(range)로 넘어간다.
  */
-export type PeriodUnit = 'week' | 'month' | 'quarter' | 'half' | 'year';
+export type PeriodUnit = 'week' | 'month';
 
 export type PeriodBucket = {
-  label: string;      // 메인 라벨 (예: "6월 3주", "2026년 6월", "2026 2분기", "2026 상반기")
+  label: string;      // 메인 라벨 (예: "6월 3주", "2026년 6월")
   sublabel: string;   // 보조 라벨 (날짜 범위)
   start: string;      // YYYY-MM-DD
   end: string;        // YYYY-MM-DD
-  isCurrent: boolean; // 진행 중(오늘이 속한) 기간
+  isCurrent: boolean; // 진행 중(오늘이 속한) 기간 — 리포트에선 제외하나 호환 위해 유지
 };
 
-/** 세그먼트 컨트롤 항목 — 단위 라벨 + 백엔드 type 매핑. */
+/** 세그먼트 컨트롤 항목 — 단위 라벨 + 백엔드 type 매핑. 주/월만 지원. */
 export const PERIOD_UNITS: { unit: PeriodUnit; label: string; type: ReportPeriodType }[] = [
   { unit: 'week', label: '주별', type: 'week' },
   { unit: 'month', label: '월별', type: 'month' },
-  { unit: 'quarter', label: '분기', type: 'quarter' },
-  { unit: 'half', label: '반기', type: 'half' },
-  { unit: 'year', label: '연간', type: 'year' },
 ];
 
 // ── 날짜 헬퍼(로컬 기준) ────────────────────────────────────────────────
@@ -72,32 +69,13 @@ export function buildBuckets(unit: PeriodUnit, firstISO: string | null, now: Dat
       const end = addDays(mon, 6);
       out.push(mk(`${mon.getMonth() + 1}월 ${weekOfMonth(mon)}주`, `${md(mon)}–${md(end)}`, mon, end));
     }
-  } else if (unit === 'month') {
+  } else {
     const firstM = new Date(first.getFullYear(), first.getMonth(), 1);
     for (let m = new Date(today.getFullYear(), today.getMonth(), 1); m >= firstM; m = new Date(m.getFullYear(), m.getMonth() - 1, 1)) {
       const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
       out.push(mk(`${m.getFullYear()}년 ${m.getMonth() + 1}월`, `${md(m)}–${md(end)}`, m, end));
     }
-  } else if (unit === 'quarter') {
-    const firstQ = new Date(first.getFullYear(), Math.floor(first.getMonth() / 3) * 3, 1);
-    for (let q = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1); q >= firstQ; q = new Date(q.getFullYear(), q.getMonth() - 3, 1)) {
-      const end = new Date(q.getFullYear(), q.getMonth() + 3, 0);
-      out.push(mk(`${q.getFullYear()} ${q.getMonth() / 3 + 1}분기`, `${q.getMonth() + 1}–${end.getMonth() + 1}월`, q, end));
-    }
-  } else if (unit === 'half') {
-    const halfStartMonth = (d: Date) => (d.getMonth() < 6 ? 0 : 6);
-    const firstH = new Date(first.getFullYear(), halfStartMonth(first), 1);
-    for (let h = new Date(today.getFullYear(), halfStartMonth(today), 1); h >= firstH; h = new Date(h.getFullYear(), h.getMonth() - 6, 1)) {
-      const end = new Date(h.getFullYear(), h.getMonth() + 6, 0);
-      const h1 = h.getMonth() === 0;
-      out.push(mk(`${h.getFullYear()} ${h1 ? '상' : '하'}반기`, h1 ? '1–6월' : '7–12월', h, end));
-    }
-  } else {
-    const firstY = new Date(first.getFullYear(), 0, 1);
-    for (let y = new Date(today.getFullYear(), 0, 1); y >= firstY; y = new Date(y.getFullYear() - 1, 0, 1)) {
-      const end = new Date(y.getFullYear(), 11, 31);
-      out.push(mk(`${y.getFullYear()}년`, '1–12월', y, end));
-    }
   }
-  return out;
+  // 진행 중(이번 주/달)은 제외 — 완료된 기간만 리포트로 본다
+  return out.filter(b => !b.isCurrent);
 }
