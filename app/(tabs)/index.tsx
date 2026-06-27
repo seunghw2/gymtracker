@@ -30,18 +30,15 @@ export default function Dashboard() {
   }, [loadGoalSetting, loadExerciseGoals]);
 
   useFocusEffect(useCallback(() => {
-    if (goalSetting === null) {
-      loadGoalSetting().then(gs => {
-        if (!useOverloadStore.getState().goalSetting?.onboarded) {
-          router.replace('/onboarding');
-        }
-      });
-    } else if (!goalSetting.onboarded) {
-      router.replace('/onboarding');
-      return;
-    }
-    load();
-  }, [goalSetting, load, loadGoalSetting, router]));
+    loadGoalSetting().then(() => {
+      const gs = useOverloadStore.getState().goalSetting;
+      if (!gs?.onboarded) {
+        router.replace('/onboarding');
+        return;
+      }
+      load();
+    });
+  }, [load, loadGoalSetting, router]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -64,7 +61,9 @@ export default function Dashboard() {
     return minPart;
   })();
 
-  if (!goalSetting?.onboarded) return null;
+  if (!goalSetting?.onboarded) return (
+    <View style={{ flex: 1, backgroundColor: '#000' }} />
+  );
 
   return (
     <SafeAreaView style={s.safe}>
