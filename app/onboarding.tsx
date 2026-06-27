@@ -1,15 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ACCENT, SEM } from '../constants/colors';
-import { MUSCLE_GROUPS } from '../constants/exercises';
 import type { Exercise } from '../db/api/types';
-import { getExercises } from '../db/api/exercises';
 import { classifyRuleType } from '../lib/overload';
 import { useOverloadStore } from '../store/useOverloadStore';
+import { useUiStore } from '../store/useUiStore';
 import type { GoalType, ProgressionTrigger } from '../db/api/overload';
 
 const TOTAL_STEPS = 5;
@@ -41,48 +40,38 @@ const EQ_LABEL: Record<string, string> = {
 export default function Onboarding() {
   const router = useRouter();
   const { saveGoalSetting, bulkCreateGoals } = useOverloadStore();
+  const setExercisePickCb = useUiStore(s => s.setExercisePickCb);
 
   const [step, setStep] = useState(1);
   const [goalType, setGoalType] = useState<GoalType | null>(null);
-  const [selectedExIds, setSelectedExIds] = useState<Set<number>>(new Set());
+  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
   const [frequency, setFrequency] = useState(4);
   const [trigger, setTrigger] = useState<ProgressionTrigger>('single');
   const [incUpper, setIncUpper] = useState(1.25);
   const [incLower, setIncLower] = useState(2.5);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { getExercises().then(setExercises).catch(() => {}); }, []);
+  const selectedExIds = useMemo(() => new Set(selectedExercises.map(e => e.id)), [selectedExercises]);
 
-  const valid = step === 1 ? !!goalType : step === 2 ? selectedExIds.size > 0 : true;
+  const openPicker = useCallback(() => {
+    setExercisePickCb((picked) => setSelectedExercises(picked));
+    router.navigate({
+      pathname: '/exercise-add',
+      params: { target: 'pick', preselectedIds: selectedExercises.map(e => e.id).join(',') },
+    });
+  }, [router, selectedExercises, setExercisePickCb]);
 
-  const exercisesByGroup = useMemo(() => {
-    const map = new Map<string, Exercise[]>();
-    for (const mg of MUSCLE_GROUPS) map.set(mg, []);
-    for (const ex of exercises) {
-      if (ex.is_system) map.get(ex.muscle_group)?.push(ex);
-    }
-    return map;
-  }, [exercises]);
+  const valid = step === 1 ? !!goalType : step === 2 ? selectedExercises.length > 0 : true;
 
   const ruleMap = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const ex of exercises) {
-      if (!selectedExIds.has(ex.id)) continue;
+    for (const ex of selectedExercises) {
       const rt = classifyRuleType(ex.equipment_type, ex.muscle_group);
       if (!map.has(rt)) map.set(rt, []);
       map.get(rt)!.push(ex.name);
     }
     return map;
-  }, [exercises, selectedExIds]);
-
-  const toggleEx = useCallback((id: number) => {
-    setSelectedExIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }, []);
+  }, [selectedExercises]);
 
   const triggerHint = TRIGGER_META.find(t => t.key === trigger)?.hint ?? '';
 
@@ -105,7 +94,7 @@ export default function Onboarding() {
       complete: true,
     });
     if (gs) {
-      await bulkCreateGoals({ exercises: [...selectedExIds].map(id => ({ exerciseId: id })) });
+      await bulkCreateGoals({ exercises: selectedExercises.map(e => ({ exerciseId: e.id })) });
     }
     setSaving(false);
     router.replace('/(tabs)');
@@ -144,22 +133,22 @@ export default function Onboarding() {
             <Text style={s.stepNo}>2 / 5 · 추적 종목</Text>
             <Text style={s.q}>어떤 종목을{'\n'}추적할까요?</Text>
             <Text style={s.sub}>선택한 종목만 진행도와 증량 알림을 받아요.</Text>
-            {[...exercisesByGroup.entries()].map(([mg, exList]) => exList.length === 0 ? null : (
-              <View key={mg}>
-                <Text style={s.grpLabel}>{mg}</Text>
-                <View style={s.chips}>
-                  {exList.map(ex => (
-                    <Pressable key={ex.id} style={[s.chip, selectedExIds.has(ex.id) && s.chipSel]}
-                      onPress={() => toggleEx(ex.id)}>
-                      <Text style={[s.chipT, selectedExIds.has(ex.id) && s.chipTSel]}>{ex.name}</Text>
-                      <Text style={[s.chipBadge, selectedExIds.has(ex.id) && s.chipBadgeSel]}>
-                        {EQ_LABEL[ex.equipment_type] ?? ex.equipment_type}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+            <Pressable style={s.pickerBtn} onPress={openPicker}>
+              <Text style={s.pickerBtnT}>
+                {selectedExercises.length > 0 ? `${selectedExercises.length}개 선택됨 — 변경하기` : '종목 선택하기'}
+              </Text>
+              <Text style={s.pickerBtnArrow}>›</Text>
+            </Pressable>
+            {selectedExercises.length > 0 && (
+              <View style={s.selectedList}>
+                {selectedExercises.map(ex => (
+                  <View key={ex.id} style={s.selectedItem}>
+                    <Text style={s.selectedName}>{ex.name}</Text>
+                    <Text style={s.selectedEq}>{EQ_LABEL[ex.equipment_type] ?? ex.equipment_type}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            )}
           </>
         )}
 
@@ -291,15 +280,17 @@ const s = StyleSheet.create({
 
   grpLabel: { fontSize: 11.5, fontWeight: '800', color: SEM.muted, letterSpacing: 0.3,
     marginTop: 18, marginBottom: 10 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: SEM.surface1,
-    borderWidth: 1.5, borderColor: SEM.line, borderRadius: 12, padding: 11 },
-  chipSel: { borderColor: ACCENT, backgroundColor: 'rgba(255,59,48,0.1)' },
-  chipT: { fontSize: 14, fontWeight: '600', color: '#e4e4ea' },
-  chipTSel: { color: '#fff' },
-  chipBadge: { fontSize: 10, fontWeight: '700', color: SEM.muted, backgroundColor: SEM.surface2,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  chipBadgeSel: { color: ACCENT },
+
+  pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: SEM.surface1, borderWidth: 1.5, borderColor: ACCENT,
+    borderRadius: 14, padding: 18, marginBottom: 16 },
+  pickerBtnT: { fontSize: 15, fontWeight: '700', color: ACCENT },
+  pickerBtnArrow: { fontSize: 20, color: ACCENT, fontWeight: '700' },
+  selectedList: { gap: 0 },
+  selectedItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: SEM.line },
+  selectedName: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  selectedEq: { fontSize: 12, color: SEM.muted },
 
   freq: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 30 },
   freqBtn: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: SEM.line,

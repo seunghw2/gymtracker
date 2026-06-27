@@ -21,6 +21,7 @@ import { addMembers } from '../lib/exerciseGroups';
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES, MUSCLE_KO, EQUIP_KO, MUSCLE_COLOR, PART_ORDER } from '../constants/exercises';
 import { GREEN, COLORS } from '../constants/colors';
 import { useWorkoutStore } from '../store/useStore';
+import { useUiStore } from '../store/useUiStore';
 import { buildExerciseEntry } from '../lib/exerciseEntry';
 
 const FAVORITE_BRANDS_KEY = '@gymtracker/favorite_brands';
@@ -31,8 +32,11 @@ function Dot({ group }: { group: string }) {
 
 export default function ExerciseAddScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ target?: string; groupId?: string }>();
+  const params = useLocalSearchParams<{ target?: string; groupId?: string; preselectedIds?: string }>();
   const addExercises = useWorkoutStore(s => s.addExercises);
+  const exercisePickCb = useUiStore(s => s.exercisePickCb);
+  const setExercisePickCb = useUiStore(s => s.setExercisePickCb);
+  const isPick = params.target === 'pick';
 
   const [all, setAll] = useState<Exercise[]>([]);
   const [usage, setUsage] = useState<Record<number, { count: number; last: string | null }>>({});
@@ -79,7 +83,16 @@ export default function ExerciseAddScreen() {
   const [eTime, setETime] = useState(false);
   const pickedIds = useMemo(() => new Set(pickedList.map(e => e.id)), [pickedList]);
 
+  // pick 모드: preselectedIds로 pickedList 초기화(화면 재진입 시 기존 선택 복원)
   useEffect(() => {
+    if (isPick && params.preselectedIds) {
+      const ids = new Set(params.preselectedIds.split(',').map(Number).filter(Boolean));
+      getExercises().then(list => {
+        setAll(list);
+        setPickedList(list.filter(e => ids.has(e.id)));
+      }).catch(() => {});
+      return;
+    }
     getExercises().then(setAll).catch(() => {});
     getExerciseUsage().then(list => {
       const m: Record<number, { count: number; last: string | null }> = {};
@@ -194,6 +207,14 @@ export default function ExerciseAddScreen() {
 
   const handleDone = async () => {
     if (pickedList.length === 0) return;
+    // pick 모드: 콜백으로 선택 결과 반환
+    if (isPick) {
+      exercisePickCb?.(pickedList);
+      setExercisePickCb(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+      return;
+    }
     // 기본 그룹 담기 — 설정(default_group_ids)에 append
     if (params.target === 'default') {
       try {
@@ -362,7 +383,7 @@ export default function ExerciseAddScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={8}><Text style={styles.back}>← 뒤로</Text></Pressable>
-        <Text style={styles.title}>운동 추가</Text>
+        <Text style={styles.title}>{isPick ? '추적 종목 선택' : '운동 추가'}</Text>
         <View style={{ width: 56 }} />
       </View>
 
@@ -535,7 +556,9 @@ export default function ExerciseAddScreen() {
           disabled={pickedCount === 0}
         >
           <Text style={[styles.doneText, pickedCount === 0 && styles.doneTextOff]}>
-            {pickedCount > 0 ? `${pickedCount}개 담기 · 완료` : '운동을 담아주세요'}
+            {pickedCount > 0
+              ? isPick ? `${pickedCount}개 선택 · 완료` : `${pickedCount}개 담기 · 완료`
+              : isPick ? '종목을 선택해주세요' : '운동을 담아주세요'}
           </Text>
         </Pressable>
       </View>
