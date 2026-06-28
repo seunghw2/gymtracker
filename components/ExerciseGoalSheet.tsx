@@ -36,13 +36,13 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
   const [previewSession, setPreviewSession] = useState<SessionSummary | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
 
-  // 지난 기록 탭 → 그 날짜의 세션 찾아 미리보기
-  const openLastSession = async () => {
-    if (!goal?.lastRecordDate || loadingSession) return;
+  // 비교 기록 탭 → 그 날짜의 세션 찾아 미리보기(직전·최고 공용)
+  const openSessionByDate = async (date?: string | null) => {
+    if (!date || loadingSession) return;
     setLoadingSession(true);
     try {
-      const list = await getSessionHistory(90);
-      const found = list.find(s => s.date === goal.lastRecordDate);
+      const list = await getSessionHistory(180);
+      const found = list.find(s => s.date === date);
       if (found) setPreviewSession(found);
     } catch { /* ignore */ }
     setLoadingSession(false);
@@ -67,7 +67,7 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
       <Pressable style={s.backdrop} onPress={onClose}>
         <Pressable style={s.sheet} onPress={() => {}}>
           <View style={s.handle} />
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 12 }} showsVerticalScrollIndicator={false}>
             {/* 헤더 */}
             <Text style={s.name}>{goal.exerciseName ?? '종목'}</Text>
             <View style={s.roleRow}>
@@ -97,7 +97,7 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
               <Section label="비교 기준">
                 {goal.lastRecord && (
                   <Pressable
-                    onPress={openLastSession}
+                    onPress={() => openSessionByDate(goal.lastRecordDate)}
                     disabled={!goal.lastRecordDate || loadingSession}
                     style={({ pressed }) => [s.cmpRow, pressed && { opacity: 0.6 }]}
                   >
@@ -109,12 +109,17 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
                   </Pressable>
                 )}
                 {goal.bestRecord && (
-                  <View style={s.cmpRow}>
+                  <Pressable
+                    onPress={() => openSessionByDate(goal.bestRecordDate)}
+                    disabled={!goal.bestRecordDate || loadingSession}
+                    style={({ pressed }) => [s.cmpRow, pressed && { opacity: 0.6 }]}
+                  >
                     <View style={{ flex: 1 }}>
                       <Text style={s.cmpLabel}>최고 비교 기록</Text>
                       <Text style={s.cmpValue}>{goal.bestRecord}</Text>
                     </View>
-                  </View>
+                    {goal.bestRecordDate && <Text style={s.cmpChevron}>›</Text>}
+                  </Pressable>
                 )}
                 {goal.allTimePr && (
                   <View style={s.cmpRow}>
@@ -202,6 +207,7 @@ const s = StyleSheet.create({
   sheet: { backgroundColor: '#111113', borderTopLeftRadius: 22, borderTopRightRadius: 22,
     padding: 20, paddingBottom: 28, maxHeight: '85%' },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#3a3a3c', alignSelf: 'center', marginBottom: 16 },
+  scroll: { flexShrink: 1 },
 
   name: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 },
