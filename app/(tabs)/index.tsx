@@ -10,11 +10,6 @@ import { getWeeklySummary } from '../../db/api/overload';
 import type { WeeklySummaryDto, ExerciseGoalDto } from '../../db/api/overload';
 import ExerciseGoalSheet from '../../components/ExerciseGoalSheet';
 
-const MG_KOR: Record<string, string> = {
-  Chest: '가슴', Back: '등', Shoulder: '어깨', Legs: '하체',
-  Arms: '팔', Core: '코어', Cardio: '유산소',
-};
-
 function weekdayLabel() {
   return ['일', '월', '화', '수', '목', '금', '토'][new Date().getDay()] + '요일';
 }
@@ -37,6 +32,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<WeeklySummaryDto | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sheetGoal, setSheetGoal] = useState<ExerciseGoalDto | null>(null);
+  const [showMore, setShowMore] = useState(false);
 
   const load = useCallback(async () => {
     await Promise.all([loadGoalSetting(), loadExerciseGoals()]);
@@ -59,14 +55,20 @@ export default function Dashboard() {
   if (!goalSetting?.onboarded) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
   const att = summary?.attendance;
-  const imp = summary?.improvements;
   const gaps = summary?.bodyPartGaps ?? [];
   const volumes = summary?.bodyPartVolumes ?? [];
 
-  // 핵심/보조 분리, 각 그룹 내 증량준비 → 진행중 → hold 순
+  // 블록3용 역할 분리
   const coreGoals = exerciseGoals.filter(g => g.role === 'core');
   const supportGoals = exerciseGoals.filter(g => g.role === 'support');
   const logOnlyGoals = exerciseGoals.filter(g => g.role === 'log_only');
+  const collapsedGoals = [...supportGoals, ...logOnlyGoals];
+
+  // 블록1: 오늘 행동 필요 — 확인 필요(증량 준비 + 정체 점검) / 기준 만들기
+  const needCheck = exerciseGoals.filter(
+    g => g.stage === 'READY_TO_INCREASE' || g.stage === 'STALL_REVIEW' || g.stage === 'DELOAD_OR_RESET'
+  );
+  const needBaseline = exerciseGoals.filter(g => g.stage === 'NEED_BASELINE');
 
   return (
     <SafeAreaView style={s.safe}>
@@ -83,16 +85,27 @@ export default function Dashboard() {
       >
         <Text style={s.greet}>{weekdayLabel()} · 점진적으로 강해지는 중</Text>
 
-        {summary?.comment ? (
-          <View style={s.commentRow}>
-            <Text style={s.commentIcon}>💬</Text>
-            <Text style={s.commentText}>{summary.comment}</Text>
+        {/* 블록1 — 오늘 행동 필요 종목 */}
+        {(needCheck.length > 0 || needBaseline.length > 0) ? (
+          <View style={s.actionWrap}>
+            <Text style={s.actionTitle}>오늘 확인 필요</Text>
+            {needCheck.map(g => (
+              <ActionRow key={g.id} goal={g} kind="check" onPress={() => setSheetGoal(g)} />
+            ))}
+            {needBaseline.map(g => (
+              <ActionRow key={g.id} goal={g} kind="baseline" onPress={() => setSheetGoal(g)} />
+            ))}
+          </View>
+        ) : exerciseGoals.length > 0 ? (
+          <View style={s.actionWrap}>
+            <Text style={s.actionTitle}>오늘 확인 필요</Text>
+            <Text style={s.actionEmpty}>지금 따로 챙길 종목은 없어요. 평소대로 기록만 쌓으면 돼요.</Text>
           </View>
         ) : null}
 
-        {/* 이번 주 목표 */}
+        {/* 블록2 — 이번 주 한 줄 */}
         <View style={s.card}>
-          <Text style={s.cardTitle}>이번 주 목표</Text>
+          <Text style={s.cardTitle}>이번 주</Text>
 
           <View style={s.goalRow}>
             <Text style={s.goalLabel}>출석</Text>
@@ -100,54 +113,37 @@ export default function Dashboard() {
             <Text style={s.goalVal}>{att ? `${att.done}/${att.target}회` : `0/${goalSetting.weeklyFrequency}회`}</Text>
           </View>
 
-          <View style={s.goalRow}>
-            <Text style={s.goalLabel}>개선</Text>
-            {imp?.hasData ? (
-              <>
-                <DotBar done={imp.done} total={Math.max(imp.total, 1)} />
-                <Text style={s.goalVal}>{imp.done}/{imp.total}개</Text>
-              </>
-            ) : (
-              <Text style={s.noDataText}>다음 운동부터 추적 시작</Text>
-            )}
-          </View>
+          {volumes.length > 0 ? (
+            <View style={s.volBlock}>
+              {volumes.map(v => {
+                const pct = Math.min(1, v.targetSets > 0 ? v.currentSets / v.targetSets : 0);
+                const enough = v.currentSets >= v.targetSets;
+                return (
+                  <View key={v.part} style={s.volRow}>
+                    <Text style={s.volName}>{v.korPart}</Text>
+                    <View style={s.volTrack}>
+                      <View style={[s.volFill, {
+                        width: `${Math.round(pct * 100)}%`,
+                        backgroundColor: enough ? SEM.good : ACCENT,
+                      }]} />
+                    </View>
+                    <Text style={[s.volVal, enough && { color: SEM.good }]}>
+                      {v.currentSets}/{v.targetSets}세트
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {gaps.length > 0 ? (
+            <Text style={s.gapLine}>
+              부족한 부위 · {gaps.map(gp => `${gp.korPart} ${gp.missing}세트`).join(', ')}
+            </Text>
+          ) : null}
         </View>
 
-        {/* 부위별 주간 세트 진행도 */}
-        {volumes.length > 0 && (
-          <View style={s.card}>
-            <Text style={s.cardTitle}>목표 부위 주간 세트</Text>
-            {volumes.map(v => {
-              const pct = Math.min(1, v.targetSets > 0 ? v.currentSets / v.targetSets : 0);
-              const enough = v.currentSets >= v.targetSets;
-              return (
-                <View key={v.part} style={s.volRow}>
-                  <Text style={s.volName}>{v.korPart}</Text>
-                  <View style={s.volTrack}>
-                    <View style={[s.volFill, {
-                      width: `${Math.round(pct * 100)}%`,
-                      backgroundColor: enough ? SEM.good : ACCENT,
-                    }]} />
-                  </View>
-                  <Text style={[s.volVal, enough && { color: SEM.good }]}>
-                    {v.currentSets}/{v.targetSets}세트
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* 오늘 운동하면 */}
-        {summary?.todayPlan && (
-          <View style={s.todayCard}>
-            <Text style={s.todayLabel}>오늘 운동하면</Text>
-            <Text style={s.todayPlan}>{summary.todayPlan}</Text>
-            {att && <Text style={s.todayAttend}>출석 {att.done + 1}/{att.target}회 달성</Text>}
-          </View>
-        )}
-
-        {/* 핵심 종목 */}
+        {/* 블록3 — 종목 리스트 (핵심 펼침 / 보조·기록만 접힘) */}
         {coreGoals.length > 0 && (
           <>
             <View style={s.secH}><Text style={s.secHT}>핵심 종목</Text></View>
@@ -155,19 +151,17 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* 보조 종목 */}
-        {supportGoals.length > 0 && (
+        {collapsedGoals.length > 0 && (
           <>
-            <View style={s.secH}><Text style={s.secHT}>보조 종목</Text></View>
-            {supportGoals.map(g => <GoalCard key={g.id} goal={g} onPress={() => setSheetGoal(g)} compact />)}
-          </>
-        )}
-
-        {/* 기록만 */}
-        {logOnlyGoals.length > 0 && (
-          <>
-            <View style={s.secH}><Text style={s.secHT}>기록만</Text></View>
-            {logOnlyGoals.map(g => <GoalCard key={g.id} goal={g} onPress={() => setSheetGoal(g)} compact />)}
+            <Pressable style={s.moreToggle} onPress={() => setShowMore(v => !v)}>
+              <Text style={s.moreToggleT}>
+                보조 · 기록만 {collapsedGoals.length}개
+              </Text>
+              <Text style={s.moreChevron}>{showMore ? '▴' : '▾'}</Text>
+            </Pressable>
+            {showMore && collapsedGoals.map(g => (
+              <GoalCard key={g.id} goal={g} onPress={() => setSheetGoal(g)} compact />
+            ))}
           </>
         )}
 
@@ -184,6 +178,28 @@ export default function Dashboard() {
 
       <ExerciseGoalSheet goal={sheetGoal} onClose={() => setSheetGoal(null)} />
     </SafeAreaView>
+  );
+}
+
+/** 블록1 행: 중립적인 "확인 필요" 묶음 + 기준 만들기 */
+function ActionRow({ goal, kind, onPress }: {
+  goal: ExerciseGoalDto; kind: 'check' | 'baseline'; onPress: () => void;
+}) {
+  const baseline = kind === 'baseline';
+  return (
+    <Pressable style={[s.actionRow, baseline ? s.actionRowBase : s.actionRowCheck]} onPress={onPress}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.actionName}>{goal.exerciseName ?? '—'}</Text>
+        <Text style={s.actionTarget} numberOfLines={2}>
+          {baseline ? '오늘 기준 만들기' : goal.todayTarget}
+        </Text>
+      </View>
+      <View style={[s.actionTag, baseline ? s.actionTagBase : s.actionTagCheck]}>
+        <Text style={[s.actionTagT, { color: baseline ? '#9a9aa1' : ACCENT }]}>
+          {baseline ? '기준' : '확인 필요'}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -256,43 +272,56 @@ const s = StyleSheet.create({
   chatFabIcon: { fontSize: 22 },
   body: { padding: 18, paddingBottom: 90 },
 
-  greet: { fontSize: 13, color: SEM.muted, marginBottom: 8 },
+  greet: { fontSize: 13, color: SEM.muted, marginBottom: 12 },
 
-  commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14,
-    backgroundColor: '#0d0d0f', borderWidth: 1, borderColor: '#1e1e22', borderRadius: 12, padding: 12 },
-  commentIcon: { fontSize: 14, marginTop: 1 },
-  commentText: { flex: 1, fontSize: 13.5, color: '#d0d0d8', lineHeight: 20 },
+  // 블록1
+  actionWrap: { marginBottom: 16 },
+  actionTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff', marginBottom: 10 },
+  actionEmpty: { fontSize: 13, color: SEM.muted, lineHeight: 19,
+    backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line, borderRadius: 12, padding: 14 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 13,
+    padding: 14, marginBottom: 9, backgroundColor: SEM.surface1 },
+  actionRowCheck: { borderColor: 'rgba(43,217,106,0.32)' },
+  actionRowBase: { borderColor: '#2c2c2e' },
+  actionName: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
+  actionTarget: { fontSize: 13.5, fontWeight: '600', color: '#d0d0d8', marginTop: 4, lineHeight: 19 },
+  actionTag: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, marginLeft: 10 },
+  actionTagCheck: { backgroundColor: 'rgba(43,217,106,0.12)', borderColor: 'rgba(43,217,106,0.34)' },
+  actionTagBase: { backgroundColor: '#1f1f23', borderColor: '#2c2c2e' },
+  actionTagT: { fontSize: 11, fontWeight: '800' },
 
+  // 블록2
   card: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 16, padding: 18, marginBottom: 12 },
   cardTitle: { fontSize: 11, fontWeight: '800', color: SEM.muted, letterSpacing: 0.5,
     textTransform: 'uppercase', marginBottom: 14 },
 
-  goalRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  goalRow: { flexDirection: 'row', alignItems: 'center' },
   goalLabel: { fontSize: 13, fontWeight: '700', color: '#fff', width: 40 },
   goalVal: { fontSize: 13, fontWeight: '800', color: '#fff', marginLeft: 12, minWidth: 48, textAlign: 'right' },
   dotRow: { flex: 1, flexDirection: 'row', gap: 5, marginLeft: 8, flexWrap: 'wrap' },
   dot: { width: 10, height: 10, borderRadius: 5 },
   dotOn: { backgroundColor: ACCENT },
   dotOff: { backgroundColor: '#2a2a2f' },
-  noDataText: { flex: 1, fontSize: 12, color: '#555', marginLeft: 8, fontStyle: 'italic' },
 
+  volBlock: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: SEM.line },
   volRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 11 },
   volName: { fontSize: 13, fontWeight: '700', color: '#fff', width: 40 },
   volTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: SEM.surface2, marginLeft: 8, overflow: 'hidden' },
   volFill: { height: '100%', borderRadius: 4 },
   volVal: { fontSize: 12, color: SEM.muted, marginLeft: 10, minWidth: 56, textAlign: 'right', fontWeight: '600' },
+  gapLine: { fontSize: 12.5, color: SEM.muted, marginTop: 4, lineHeight: 18 },
 
-  todayCard: { backgroundColor: '#0a0f0a', borderWidth: 1, borderColor: 'rgba(43,217,106,0.2)',
-    borderRadius: 14, padding: 16, marginBottom: 14 },
-  todayLabel: { fontSize: 11, fontWeight: '800', color: SEM.good, letterSpacing: 0.5,
-    textTransform: 'uppercase', marginBottom: 6 },
-  todayPlan: { fontSize: 14.5, fontWeight: '700', color: '#fff', lineHeight: 21 },
-  todayAttend: { fontSize: 12, color: SEM.muted, marginTop: 6 },
-
+  // 블록3
   secH: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginTop: 18, marginBottom: 10 },
   secHT: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
+
+  moreToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 16, marginBottom: 6, paddingVertical: 10, paddingHorizontal: 14,
+    backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line, borderRadius: 12 },
+  moreToggleT: { fontSize: 13.5, fontWeight: '700', color: '#c4c4cc' },
+  moreChevron: { fontSize: 13, color: SEM.muted },
 
   pcard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 16, marginBottom: 10 },

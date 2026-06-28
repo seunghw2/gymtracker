@@ -40,6 +40,7 @@ import {
   deleteSession,
   updateSession,
   updateWorkoutSet,
+  setSetEffort,
   updateExerciseNote,
   upsertExerciseSessionNote,
   getSessionExerciseNotes,
@@ -70,7 +71,8 @@ import SessionCard from '../components/SessionCard';
 import RulerPicker from '../components/RulerPicker';
 import { useUiStore } from '../store/useUiStore';
 import { useOverloadStore } from '../store/useOverloadStore';
-import { getSessionEval } from '../db/api/overload';
+import { getSessionEval, type ExerciseGoalDto } from '../db/api/overload';
+import type { Effort } from '../db/api/types';
 import { formatDateWithDay, todayStr } from '../lib/date';
 import { logError } from '../lib/log';
 import { toDisplay, fromInput, unitLabel } from '../lib/units';
@@ -246,9 +248,10 @@ export default function WorkoutScreen() {
       : history.filter(h => h.tags?.split(',').includes(historyFilter)),
     [history, historyFilter]);
 
-  // RIR 팝업 — 추적 종목 마지막 작업 세트 후
-  const [rirPending, setRirPending] = useState<{ exerciseName: string } | null>(null);
-  const [rirSession, setRirSession] = useState<Record<string, string>>({});  // exerciseName → rir tag
+  // 노력도 시트 — 핵심 종목 마지막 작업 세트 후 (setId로 effort 저장)
+  const [effortPending, setEffortPending] = useState<{ exerciseName: string; setId: number; exIdx: number; setIdx: number } | null>(null);
+  // 오늘 목표 상세 시트 (배너 탭 → 단계/비교/성공조건)
+  const [goalSheet, setGoalSheet] = useState<ExerciseGoalDto | null>(null);
   const trackedGoals = useOverloadStore(s => s.exerciseGoals);
   const trackedExerciseIds = useMemo(() => new Set(trackedGoals.map(g => g.exerciseId)), [trackedGoals]);
   const goalByExId = useMemo(() => {
@@ -816,6 +819,16 @@ export default function WorkoutScreen() {
       }
     } else {
       const entries = await Promise.all(list.map(buildExerciseEntry));
+      // 증량 준비(READY_TO_INCREASE) 종목은 다음 무게로 프리필(항상 1탭 덮어쓰기 가능)
+      for (const e of entries) {
+        const goal = goalByExId.get(e.exerciseId);
+        if (goal?.stage === 'READY_TO_INCREASE' && !e.timeBased) {
+          const nextW = goal.targetWeight ?? parseFloat(goal.nextTarget ?? '');
+          if (nextW && nextW > 0) {
+            e.sets = e.sets.map(s => s.setType === 'WARMUP' ? s : { ...s, weight_kg: nextW });
+          }
+        }
+      }
       addExercises(entries);
     }
     setSelectedToAdd({});
@@ -914,13 +927,17 @@ export default function WorkoutScreen() {
     setRestTotal(restSec);
     setRestAnchor({ ex: exIdx, set: setIdx });
 
-    // 추적 종목의 마지막 작업 세트 완료 시 RIR 팝업
-    if (trackedExerciseIds.has(ex.exerciseId) && (s.setType ?? 'NORMAL') !== 'WARMUP') {
+    // 핵심(core) 종목의 마지막 작업 세트 완료 시 노력도 시트 (effort를 update API로 저장)
+    const goal = goalByExId.get(ex.exerciseId);
+    if (goal?.role === 'core' && (s.setType ?? 'NORMAL') !== 'WARMUP') {
       const remainingWorkSets = ex.sets.filter((st, j) =>
         j !== setIdx && !st.done && (st.setType ?? 'NORMAL') !== 'WARMUP'
       );
       if (remainingWorkSets.length === 0) {
-        setTimeout(() => setRirPending({ exerciseName: ex.exerciseName ?? ex.exerciseId.toString() }), 800);
+        setTimeout(() => setEffortPending({
+          exerciseName: ex.exerciseName ?? ex.exerciseId.toString(),
+          setId, exIdx, setIdx,
+        }), 800);
       }
     }
   };
@@ -1701,16 +1718,15 @@ export default function WorkoutScreen() {
                 <Text style={styles.timeBadge}>⏱ 시간 기반</Text>
               )}
 
-              {/* 핵심/추적 종목 — 오늘 목표 + 남은 반복수 배너 */}
+              {/* 핵심/추적 종목 — 오늘 목표 1줄 배너 (단계/비교/성공조건은 카드 탭 시트로) */}
               {(() => {
                 const goal = goalByExId.get(ex.exerciseId);
                 if (!goal || goal.role === 'log_only') return null;
                 const isBodyweight = goal.ruleType === 'bodyweight';
-                // 작업 세트(워밍업 제외) 완료 반복수 합
+                // 무게 기반은 대표 무게(최대 완료 무게) 세트만, 맨몸은 전체 작업 세트 합산
                 const doneReps = ex.sets
                   .filter(s => s.done && (s.setType ?? 'NORMAL') !== 'WARMUP')
                   .reduce((sum, s) => sum + (s.reps ?? 0), 0);
-                // 무게 기반은 대표 무게(최대 완료 무게) 세트만 합산
                 const topW = ex.sets.filter(s => s.done && (s.setType ?? 'NORMAL') !== 'WARMUP')
                   .reduce((m, s) => Math.max(m, s.weight_kg), 0);
                 const doneTopReps = isBodyweight ? doneReps : ex.sets
@@ -1720,21 +1736,20 @@ export default function WorkoutScreen() {
                 const remaining = target != null ? Math.max(0, target - doneTopReps) : null;
                 const reached = target != null && doneTopReps >= target;
                 const isAssist = goal.role === 'support';
+                const readyUp = goal.stage === 'READY_TO_INCREASE';
                 return (
-                  <View style={[wgStyles.banner, reached && wgStyles.bannerDone, isAssist && wgStyles.bannerAssist]}>
-                    <View style={wgStyles.bannerRow}>
-                      <Text style={wgStyles.bannerStage}>{goal.stageLabel}</Text>
-                      {goal.comparability === 'low' && <Text style={wgStyles.bannerNote}>· 비교 보류</Text>}
-                    </View>
-                    <Text style={wgStyles.bannerTarget}>{goal.todayTarget}</Text>
-                    {goal.caution ? (
-                      <Text style={wgStyles.bannerCaution}>{goal.caution}</Text>
-                    ) : target != null ? (
+                  <Pressable
+                    style={[wgStyles.banner, isAssist && wgStyles.bannerAssist,
+                      readyUp && wgStyles.bannerReady, reached && !readyUp && wgStyles.bannerDone]}
+                    onPress={() => setGoalSheet(goal)}
+                  >
+                    <Text style={wgStyles.bannerTarget}>오늘 {goal.todayTarget}</Text>
+                    {target != null && (
                       reached
-                        ? <Text style={wgStyles.bannerReached}>✓ 오늘 목표 달성 ({doneTopReps}회)</Text>
-                        : <Text style={wgStyles.bannerRemain}>현재 {doneTopReps}회 · 목표까지 {remaining}회</Text>
-                    ) : null}
-                  </View>
+                        ? <Text style={wgStyles.bannerReached}>✓ 목표 달성 ({doneTopReps}회)</Text>
+                        : <Text style={wgStyles.bannerRemain}>남은 {remaining}회</Text>
+                    )}
+                  </Pressable>
                 );
               })()}
 
@@ -2224,26 +2239,76 @@ export default function WorkoutScreen() {
 
       {renderExerciseModal()}
 
-      {/* RIR 팝업 — 추적 종목 마지막 작업 세트 후 */}
-      <Modal visible={rirPending !== null} transparent animationType="slide">
-        <Pressable style={styles.gymBackdrop} onPress={() => setRirPending(null)}>
+      {/* 노력도 시트 — 핵심 종목 마지막 작업 세트 후 (1탭으로 effort 저장·스킵 가능) */}
+      <Modal visible={effortPending !== null} transparent animationType="slide">
+        <Pressable style={styles.gymBackdrop} onPress={() => setEffortPending(null)}>
           <Pressable style={rirStyles.sheet} onPress={() => {}}>
             <View style={rirStyles.handle} />
             <Text style={rirStyles.title}>마지막 세트 어땠나요?</Text>
-            <Text style={rirStyles.sub}>{rirPending?.exerciseName}</Text>
+            <Text style={rirStyles.sub}>{effortPending?.exerciseName}</Text>
             <View style={rirStyles.btnRow}>
-              {RIR_OPTIONS.map(opt => (
+              {EFFORT_OPTIONS.map(opt => (
                 <Pressable key={opt.key} style={rirStyles.btn} onPress={() => {
-                  if (rirPending) {
-                    setRirSession(prev => ({ ...prev, [rirPending.exerciseName]: opt.key }));
+                  const p = effortPending;
+                  setEffortPending(null);
+                  if (p?.setId) {
+                    setSetEffort(p.setId, opt.key).catch(e => logError('setSetEffort', e));
                   }
-                  setRirPending(null);
+                  Haptics.selectionAsync();
                 }}>
                   <Text style={rirStyles.btnEmoji}>{opt.emoji}</Text>
                   <Text style={rirStyles.btnLabel}>{opt.label}</Text>
                 </Pressable>
               ))}
             </View>
+            <Pressable style={rirStyles.skip} onPress={() => setEffortPending(null)}>
+              <Text style={rirStyles.skipText}>건너뛰기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 오늘 목표 상세 시트 — 배너 탭 시 단계/비교/성공조건 표시 */}
+      <Modal visible={goalSheet !== null} transparent animationType="slide">
+        <Pressable style={styles.gymBackdrop} onPress={() => setGoalSheet(null)}>
+          <Pressable style={rirStyles.sheet} onPress={() => {}}>
+            <View style={rirStyles.handle} />
+            {goalSheet && (() => {
+              const lowComp = goalSheet.comparability === 'low';
+              return (
+                <>
+                  <Text style={rirStyles.title}>{goalSheet.exerciseName ?? '오늘 목표'}</Text>
+                  <Text style={[rirStyles.sub, { marginBottom: 14 }]}>{goalSheet.stageLabel}</Text>
+                  <View style={goalSheetStyles.row}>
+                    <Text style={goalSheetStyles.label}>오늘 목표</Text>
+                    <Text style={goalSheetStyles.value}>{goalSheet.todayTarget}</Text>
+                  </View>
+                  {!!goalSheet.successCondition && !lowComp && (
+                    <View style={goalSheetStyles.row}>
+                      <Text style={goalSheetStyles.label}>성공 조건</Text>
+                      <Text style={goalSheetStyles.value}>{goalSheet.successCondition}</Text>
+                    </View>
+                  )}
+                  {!!goalSheet.nextStep && (
+                    <View style={goalSheetStyles.row}>
+                      <Text style={goalSheetStyles.label}>다음 단계</Text>
+                      <Text style={goalSheetStyles.value}>{goalSheet.nextStep}</Text>
+                    </View>
+                  )}
+                  {!!goalSheet.lastRecord && (
+                    <View style={goalSheetStyles.row}>
+                      <Text style={goalSheetStyles.label}>직전 기록</Text>
+                      <Text style={goalSheetStyles.value}>{goalSheet.lastRecord}</Text>
+                    </View>
+                  )}
+                  {lowComp && (
+                    <Text style={goalSheetStyles.note}>
+                      {goalSheet.comparisonReason ?? '비교할 기준 기록이 부족해 보류 중입니다.'}
+                    </Text>
+                  )}
+                </>
+              );
+            })()}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2253,12 +2318,12 @@ export default function WorkoutScreen() {
   );
 }
 
-const RIR_OPTIONS = [
-  { key: 'easy',        emoji: '😌', label: '여유 많음' },
-  { key: 'rpe_2_3',    emoji: '💪', label: '2~3개 남음' },
-  { key: 'near_fail',  emoji: '🔥', label: '거의 한계' },
-  { key: 'failed',     emoji: '❌', label: '실패' },
-] as const;
+const EFFORT_OPTIONS: { key: Effort; emoji: string; label: string }[] = [
+  { key: 'EASY',     emoji: '😌', label: '여유 많음' },
+  { key: 'MODERATE', emoji: '💪', label: '2~3개 남음' },
+  { key: 'HARD',     emoji: '🔥', label: '거의 한계' },
+  { key: 'FAILURE',  emoji: '❌', label: '실패' },
+];
 
 const rirStyles = RNStyleSheet.create({
   sheet: { backgroundColor: '#111113', borderTopLeftRadius: 22, borderTopRightRadius: 22,
@@ -2272,6 +2337,16 @@ const rirStyles = RNStyleSheet.create({
     alignItems: 'center', gap: 6 },
   btnEmoji: { fontSize: 22 },
   btnLabel: { fontSize: 12, fontWeight: '700', color: '#fff', textAlign: 'center' },
+  skip: { alignSelf: 'center', marginTop: 16, paddingVertical: 6, paddingHorizontal: 18 },
+  skipText: { fontSize: 13, color: '#6a6a6e', fontWeight: '600' },
+});
+
+const goalSheetStyles = RNStyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    gap: 12, paddingVertical: 9, borderTopWidth: 1, borderTopColor: '#1c1c1e' },
+  label: { fontSize: 13, color: '#8a8a8e', fontWeight: '600' },
+  value: { flex: 1, fontSize: 13.5, color: '#fff', fontWeight: '700', textAlign: 'right' },
+  note: { fontSize: 12.5, color: '#8a8a8e', marginTop: 12, lineHeight: 18 },
 });
 
 const histFilterChip = RNStyleSheet.create({
@@ -2318,6 +2393,7 @@ const wgStyles = RNStyleSheet.create({
     borderRadius: 10, padding: 11, marginTop: 8, marginBottom: 2 },
   bannerAssist: { backgroundColor: '#161618', borderColor: '#2c2c2e' },
   bannerDone: { backgroundColor: 'rgba(43,217,106,0.1)', borderColor: 'rgba(43,217,106,0.4)' },
+  bannerReady: { backgroundColor: 'rgba(48,209,88,0.14)', borderColor: 'rgba(48,209,88,0.55)' },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   bannerStage: { fontSize: 11, fontWeight: '800', color: '#FF6A5E', letterSpacing: 0.2 },
   bannerNote: { fontSize: 11, color: '#8a8a8e' },

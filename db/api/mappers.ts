@@ -1,5 +1,5 @@
 import type { SetType } from '../../store/useStore';
-import type { Exercise, WorkoutSet, SessionSetRow, BodyLog } from './types';
+import type { Exercise, WorkoutSet, SessionSetRow, BodyLog, Effort } from './types';
 
 // ─── API 응답 형식 (백엔드 camelCase) ───────────────────────────────────
 
@@ -19,6 +19,7 @@ export type ApiSetDto = {
   setType: string | null;
   supersetGroup: number | null;
   durationSec: number | null;
+  effort: string | null;
 };
 
 export type ApiSessionSummary = {
@@ -57,12 +58,18 @@ export function normSetType(raw: string | null | undefined): SetType {
   return v === 'WARMUP' || v === 'DROP' || v === 'FAILURE' ? v : 'NORMAL';
 }
 
+export function normEffort(raw: string | null | undefined): Effort | null {
+  const v = (raw ?? '').toUpperCase();
+  return v === 'EASY' || v === 'MODERATE' || v === 'HARD' || v === 'FAILURE' ? v : null;
+}
+
 export function mapSetDtoToWorkoutSet(s: ApiSetDto): WorkoutSet {
   return {
     id: s.id, session_id: 0, exercise_id: s.exerciseId,
     set_order: s.setOrder, weight_kg: s.weightKg, reps: s.reps,
     estimated_1rm: s.estimated1rm, set_type: normSetType(s.setType),
     duration_sec: s.durationSec ?? null, created_at: '',
+    effort: normEffort(s.effort),
   };
 }
 

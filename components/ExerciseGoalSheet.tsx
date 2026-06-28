@@ -79,7 +79,15 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
               </Text>
             </View>
 
-            {/* 현재 단계 */}
+            {/* 오늘 목표 — 헤더 바로 아래, 가장 먼저 보이게 */}
+            <View style={s.todayBox}>
+              <Text style={s.todayLabel}>오늘 목표</Text>
+              <Text style={s.todayTarget}>{goal.todayTarget}</Text>
+              {goal.successCondition && <Text style={s.successText}>{goal.successCondition}</Text>}
+              {goal.caution && <Text style={s.cautionText}>⚠ {goal.caution}</Text>}
+            </View>
+
+            {/* 근거 ↓ — 현재 단계 */}
             <Section label="현재 단계">
               <Text style={s.stageText}>{goal.stageLabel}</Text>
             </Section>
@@ -124,26 +132,18 @@ export default function ExerciseGoalSheet({ goal, onClose }: {
               </Section>
             )}
 
-            {/* 오늘 목표 — 가장 크게 */}
-            <View style={s.todayBox}>
-              <Text style={s.todayLabel}>오늘 목표</Text>
-              <Text style={s.todayTarget}>{goal.todayTarget}</Text>
-              {goal.successCondition && <Text style={s.successText}>{goal.successCondition}</Text>}
-              {goal.caution && <Text style={s.cautionText}>⚠ {goal.caution}</Text>}
-            </View>
+            {/* 다음 단계 — 성공/여유/실패 분기 */}
+            <Section label="다음 단계">
+              <Text style={s.bodyText}>{goal.nextStep ?? goal.nextCondition}</Text>
+            </Section>
 
-            {/* 단기/장기 목표(맨몸 등) */}
+            {/* 단기/장기 목표(맨몸 등) — 있을 때만 */}
             {(goal.shortTermTarget || goal.longTermTarget) && (
               <Section label="목표">
                 {goal.shortTermTarget && <Text style={s.bodyText}>단기: {goal.shortTermTarget}</Text>}
                 {goal.longTermTarget && <Text style={[s.bodyText, { marginTop: 4 }]}>장기: {goal.longTermTarget}</Text>}
               </Section>
             )}
-
-            {/* 다음 단계 — 성공/여유/실패 분기 */}
-            <Section label="다음 단계">
-              <Text style={s.bodyText}>{goal.nextStep ?? goal.nextCondition}</Text>
-            </Section>
 
             {/* 역할 수정 */}
             <Section label="역할">

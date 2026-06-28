@@ -21,6 +21,8 @@ export type WorkoutSession = {
   note: string | null;
 };
 
+export type Effort = 'EASY' | 'MODERATE' | 'HARD' | 'FAILURE';
+
 export type WorkoutSet = {
   id: number;
   session_id: number;
@@ -32,6 +34,7 @@ export type WorkoutSet = {
   set_type: SetType;
   duration_sec: number | null;
   created_at: string;
+  effort?: Effort | null;
 };
 
 export type BodyLog = {
