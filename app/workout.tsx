@@ -31,9 +31,7 @@ import {
   getSessionHistory,
   getSessionSets,
   getExerciseRest,
-  setExerciseRest,
   getExerciseWarmupRest,
-  setExerciseWarmupRest,
   deleteWorkoutSet,
   deleteSession,
   updateSession,
@@ -63,7 +61,6 @@ import {
 } from '../db/queries';
 import DatePickerSheet from '../components/DatePickerSheet';
 import SessionCard from '../components/SessionCard';
-import RulerPicker from '../components/RulerPicker';
 import { useUiStore } from '../store/useUiStore';
 import { useOverloadStore } from '../store/useOverloadStore';
 import { getSessionEval, type ExerciseGoalDto } from '../db/api/overload';
@@ -77,6 +74,8 @@ import { BRIEFING_DIRTY_KEY } from '../lib/briefingRefresh';
 
 
 import ExerciseSelectModal, { SelectableExercise } from '../components/ExerciseSelectModal';
+import RestPickerSheet from '../components/RestPickerSheet';
+import WarmupSheet from '../components/WarmupSheet';
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../store/useStore';
 import RmBasisSheet, { RmMode } from '../components/RmBasisSheet';
 import NumPad from '../components/NumPad';
@@ -110,11 +109,6 @@ function formatDate(dateStr: string) {
 const KB_ACCESSORY_ID = 'setInputDone';
 
 // 휴식 시간 표기: 60초 미만은 "Ns", 이상은 "m:ss"
-function fmtRest(sec: number): string {
-  if (sec < 60) return `${sec}초`;
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-}
-
 function useElapsedTime(startTime: number | null) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -226,7 +220,6 @@ export default function WorkoutScreen() {
     return m;
   }, [trackedGoals]);
   const [warmupExIdx, setWarmupExIdx] = useState<number | null>(null);
-  const [warmupRows, setWarmupRows] = useState<{ percent: string; reps: string }[]>([]);
   const [warmupBase, setWarmupBase] = useState(0); // 기준 무게(kg)
   // 운동 카드 액션 메뉴 + 휴식 시간 다이얼 시트
   const [cardMenuIdx, setCardMenuIdx] = useState<number | null>(null);
@@ -234,9 +227,6 @@ export default function WorkoutScreen() {
   const setExerciseInfo = useWorkoutStore(s => s.setExerciseInfo);
   const [rmPickerIdx, setRmPickerIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
-  const [restMain, setRestMain] = useState<number>(90);
-  const [restWarm, setRestWarm] = useState<number>(30);
-  const [restTab, setRestTab] = useState<'main' | 'warm'>('main');
   const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
   const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
@@ -513,33 +503,12 @@ export default function WorkoutScreen() {
   };
 
   // 휴식 시간 다이얼 시트 열기 (본세트·워밍업 현재값 로드)
-  const openRestPicker = async (exIdx: number) => {
-    const ex = exercises[exIdx];
-    if (!ex) return;
-    const [main, warm] = await Promise.all([
-      getExerciseRest(ex.exerciseId, restDurationSec).catch(() => restDurationSec),
-      getExerciseWarmupRest(ex.exerciseId, 30).catch(() => 30),
-    ]);
-    setRestMain(main);
-    setRestWarm(warm);
-    setRestTab('main');
+  const openRestPicker = (exIdx: number) => {
+    if (!exercises[exIdx]) return;
     setRestPickerIdx(exIdx);
   };
 
-  // 휴식 시간 저장 후 닫기 (네트워크 저장은 닫을 때 한 번)
-  const closeRestPicker = async () => {
-    const idx = restPickerIdx;
-    setRestPickerIdx(null);
-    if (idx == null) return;
-    const ex = exercises[idx];
-    if (!ex) return;
-    await Promise.all([
-      setExerciseRest(ex.exerciseId, restMain).catch(() => {}),
-      setExerciseWarmupRest(ex.exerciseId, restWarm).catch(() => {}),
-    ]);
-  };
-
-  // 워밍업 설정 모달 열기 (기준 무게 + 단계별 %/횟수)
+  // 워밍업 설정 모달 열기 (기준 무게는 현재 작업 세트에서 산출)
   const handleAddWarmup = (exIdx: number) => {
     const ex = exercises[exIdx];
     if (!ex) return;
@@ -547,24 +516,6 @@ export default function WorkoutScreen() {
     const base = working?.weight_kg ?? ex.sets.find(s => s.weight_kg > 0)?.weight_kg ?? 0;
     setWarmupBase(base);
     setWarmupExIdx(exIdx);
-    setWarmupRows([
-      { percent: '40', reps: '10' },
-      { percent: '60', reps: '6' },
-      { percent: '80', reps: '3' },
-    ]);
-  };
-
-  const warmupRound = (kg: number) => Math.max(0, Math.round(kg / 2.5) * 2.5);
-
-  const applyWarmup = () => {
-    if (warmupExIdx == null) return;
-    const warmups = warmupRows
-      .map(r => ({ pct: parseFloat(r.percent) || 0, reps: parseInt(r.reps) || 0 }))
-      .filter(r => r.pct > 0 && r.reps > 0)
-      .map(r => ({ weight_kg: warmupRound(warmupBase * r.pct / 100), reps: r.reps }));
-    if (warmups.length > 0) prependWarmupSets(warmupExIdx, warmups);
-    setWarmupExIdx(null);
-    Haptics.selectionAsync();
   };
 
   // 무게 ±버튼 (표시단위 기준 kg=2.5 / lb=5)
@@ -1705,59 +1656,13 @@ export default function WorkoutScreen() {
       />
 
       {/* 휴식 시간 다이얼 시트 */}
-      <Modal visible={restPickerIdx != null} transparent animationType="fade" onRequestClose={closeRestPicker}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable style={styles.menuOverlay} onPress={closeRestPicker}>
-          <Pressable style={styles.menuSheet} onPress={() => {}}>
-            <Text style={styles.menuHeader} numberOfLines={1}>
-              휴식 시간 · {restPickerIdx != null ? exercises[restPickerIdx]?.exerciseName : ''}
-            </Text>
-
-            <View style={styles.restSeg}>
-              {(['main', 'warm'] as const).map(t => (
-                <Pressable key={t} style={[styles.restSegBtn, restTab === t && styles.restSegBtnOn]} onPress={() => setRestTab(t)}>
-                  <Text style={[styles.restSegText, restTab === t && styles.restSegTextOn]}>{t === 'main' ? '본세트' : '워밍업'}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.restReadout}>{fmtRest(restTab === 'main' ? restMain : restWarm)}</Text>
-
-            <RulerPicker
-              initial={restTab === 'main' ? restMain : restWarm}
-              onChange={v => (restTab === 'main' ? setRestMain(v) : setRestWarm(v))}
-              min={0}
-              max={600}
-              step={5}
-              majorEvery={30}
-              midEvery={15}
-              format={fmtRest}
-            />
-
-            <View style={styles.restAdjRow}>
-              {[-30, -10, 10, 30].map(d => (
-                <Pressable
-                  key={d}
-                  style={styles.restAdjBtn}
-                  onPress={() => {
-                    const cur = restTab === 'main' ? restMain : restWarm;
-                    const next = Math.max(0, Math.min(600, cur + d));
-                    (restTab === 'main' ? setRestMain : setRestWarm)(next);
-                    Haptics.selectionAsync();
-                  }}
-                >
-                  <Text style={styles.restAdjText}>{d > 0 ? `+${d}` : `${d}`}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Pressable style={styles.menuCancel} onPress={closeRestPicker}>
-              <Text style={styles.menuCancelText}>완료</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-        </GestureHandlerRootView>
-      </Modal>
+      <RestPickerSheet
+        visible={restPickerIdx != null}
+        exerciseId={restPickerIdx != null ? (exercises[restPickerIdx]?.exerciseId ?? null) : null}
+        exerciseName={restPickerIdx != null ? (exercises[restPickerIdx]?.exerciseName ?? '') : ''}
+        defaultMain={restDurationSec}
+        onClose={() => setRestPickerIdx(null)}
+      />
 
       {/* 휴식 타이머는 탭 레이아웃(전역)에서 렌더 — 모든 탭에서 보임 */}
 
@@ -1859,61 +1764,16 @@ export default function WorkoutScreen() {
       </Modal>
 
       {/* 워밍업 설정 모달 */}
-      <Modal visible={warmupExIdx !== null} transparent animationType="slide" onRequestClose={() => setWarmupExIdx(null)}>
-        <Pressable style={styles.gymBackdrop} onPress={() => setWarmupExIdx(null)}>
-          <Pressable style={styles.warmupSheet} onPress={() => {}}>
-            <Text style={styles.warmupTitle}>워밍업 설정</Text>
-            <View style={styles.warmupBaseRow}>
-              <Text style={styles.warmupBaseLabel}>기준 무게</Text>
-              <View style={styles.warmupStepper}>
-                <Pressable style={styles.stepBtn} onPress={() => setWarmupBase(b => Math.max(0, fromInput(toDisplay(b, unitKg) - weightStep, unitKg)))} hitSlop={4}><Text style={styles.stepText}>−</Text></Pressable>
-                <Text style={styles.warmupValue}>{toDisplay(warmupBase, unitKg)}{u}</Text>
-                <Pressable style={styles.stepBtn} onPress={() => setWarmupBase(b => fromInput(toDisplay(b, unitKg) + weightStep, unitKg))} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
-              </View>
-            </View>
-            <Text style={styles.warmupHint}>기준 무게 대비 % · 횟수 (아래 미리보기 적용 무게)</Text>
-            {warmupRows.map((row, i) => {
-              const pct = parseFloat(row.percent) || 0;
-              const applied = toDisplay(warmupRound(warmupBase * pct / 100), unitKg);
-              const adj = (field: 'percent' | 'reps', delta: number, min: number, max: number) =>
-                setWarmupRows(rows => rows.map((r, j) => {
-                  if (j !== i) return r;
-                  const cur = parseInt(r[field]) || 0;
-                  return { ...r, [field]: String(Math.min(max, Math.max(min, cur + delta))) };
-                }));
-              return (
-                <View key={i} style={styles.warmupRow}>
-                  <View style={styles.warmupStepper}>
-                    <Pressable style={styles.stepBtn} onPress={() => adj('percent', -5, 5, 100)} hitSlop={4}><Text style={styles.stepText}>−</Text></Pressable>
-                    <Text style={styles.warmupValue}>{row.percent}%</Text>
-                    <Pressable style={styles.stepBtn} onPress={() => adj('percent', 5, 5, 100)} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
-                  </View>
-                  <View style={styles.warmupStepper}>
-                    <Pressable style={styles.stepBtn} onPress={() => adj('reps', -1, 1, 30)} hitSlop={4}><Text style={styles.stepText}>−</Text></Pressable>
-                    <Text style={styles.warmupValue}>{row.reps}회</Text>
-                    <Pressable style={styles.stepBtn} onPress={() => adj('reps', 1, 1, 30)} hitSlop={4}><Text style={styles.stepText}>+</Text></Pressable>
-                  </View>
-                  <Text style={styles.warmupApplied}>≈{applied}{u}</Text>
-                  <Pressable onPress={() => setWarmupRows(rows => rows.filter((_, j) => j !== i))} hitSlop={8} style={styles.warmupDel}>
-                    <Text style={styles.warmupDelText}>✕</Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-            <Pressable style={styles.warmupAddRow} onPress={() => setWarmupRows(rows => [...rows, { percent: '50', reps: '8' }])}>
-              <Text style={styles.warmupAddRowText}>+ 단계 추가</Text>
-            </Pressable>
-            <View style={styles.warmupActions}>
-              <Pressable style={styles.warmupCancel} onPress={() => setWarmupExIdx(null)}>
-                <Text style={styles.warmupCancelText}>취소</Text>
-              </Pressable>
-              <Pressable style={styles.warmupApply} onPress={applyWarmup}>
-                <Text style={styles.warmupApplyText}>추가</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <WarmupSheet
+        visible={warmupExIdx !== null}
+        baseWeight={warmupBase}
+        unitKg={unitKg}
+        onClose={() => setWarmupExIdx(null)}
+        onApply={(warmups) => {
+          if (warmupExIdx != null) prependWarmupSets(warmupExIdx, warmups);
+          setWarmupExIdx(null);
+        }}
+      />
 
       <ExerciseSelectModal
         visible={showExerciseModal}
