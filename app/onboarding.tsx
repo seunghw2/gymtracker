@@ -9,7 +9,7 @@ import type { Exercise } from '../db/api/types';
 import { classifyRuleType } from '../lib/overload';
 import { useOverloadStore } from '../store/useOverloadStore';
 import { useUiStore } from '../store/useUiStore';
-import type { GoalType, ProgressionTrigger } from '../db/api/overload';
+import type { GoalType } from '../db/api/overload';
 
 const TOTAL_STEPS = 5;
 
@@ -26,12 +26,6 @@ const RULE_META: Record<string, { label: string; desc: string }> = {
   bodyweight: { label: '맨몸', desc: '총 반복수 증가' },
   isolation: { label: '고립', desc: '반복 범위 유지' },
 };
-
-const TRIGGER_META: { key: ProgressionTrigger; label: string; hint: string }[] = [
-  { key: 'single', label: '한 세션 달성', hint: '목표 반복수×세트를 한 번이라도 채우면 증량 신호' },
-  { key: 'two_sessions', label: '2세션 연속', hint: '두 세션 연속 달성해야 신호 — 더 안전하게' },
-  { key: 'rpe', label: '+RPE 여유', hint: '목표 달성 + 마지막 세트에 힘이 남았을 때만' },
-];
 
 const EQ_LABEL: Record<string, string> = {
   Barbell: '바벨', Dumbbell: '덤벨', Machine: '머신', Cable: '케이블', Bodyweight: '맨몸',
@@ -51,7 +45,6 @@ export default function Onboarding() {
   const [goalType, setGoalType] = useState<GoalType | null>(null);
   const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
   const [frequency, setFrequency] = useState(4);
-  const [trigger, setTrigger] = useState<ProgressionTrigger>('single');
   const [incUpper, setIncUpper] = useState(1.25);
   const [incLower, setIncLower] = useState(2.5);
   const [saving, setSaving] = useState(false);
@@ -78,8 +71,6 @@ export default function Onboarding() {
     return map;
   }, [selectedExercises]);
 
-  const triggerHint = TRIGGER_META.find(t => t.key === trigger)?.hint ?? '';
-
   const freqHint = frequency >= 5
     ? '고빈도 — 부위 분할을 추천해요'
     : frequency <= 2 ? '저빈도 — 전신 위주가 좋아요'
@@ -95,7 +86,7 @@ export default function Onboarding() {
       weeklyFrequency: frequency,
       incUpper,
       incLower,
-      progressionTrigger: trigger,
+      progressionTrigger: 'two_sessions',
       complete: true,
     });
     if (gs) {
@@ -196,16 +187,6 @@ export default function Onboarding() {
                   </View>
                 </View>
               ))}
-            <Text style={s.grpLabel}>증량 판정 시점</Text>
-            <View style={s.seg}>
-              {TRIGGER_META.map(t => (
-                <Pressable key={t.key} style={[s.segBtn, trigger === t.key && s.segBtnOn]}
-                  onPress={() => setTrigger(t.key)}>
-                  <Text style={[s.segBtnT, trigger === t.key && s.segBtnTOn]}>{t.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={s.segHint}>{triggerHint}</Text>
           </>
         )}
 
@@ -268,23 +249,20 @@ const s = StyleSheet.create({
   progRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 },
   progSeg: { flex: 1, height: 3, borderRadius: 2, backgroundColor: SEM.surface3 },
   progDone: { backgroundColor: ACCENT },
-  body: { padding: 22, paddingBottom: 20 },
+  body: { flexGrow: 1, paddingHorizontal: 22, paddingTop: 28, paddingBottom: 20 },
 
   stepNo: { fontSize: 12, fontWeight: '700', color: ACCENT, letterSpacing: 0.5, marginBottom: 10 },
-  q: { fontSize: 25, fontWeight: '800', lineHeight: 33, letterSpacing: -0.6, marginBottom: 8 },
-  sub: { fontSize: 13.5, color: SEM.muted, lineHeight: 20, marginBottom: 16 },
+  q: { fontSize: 27, fontWeight: '800', lineHeight: 35, letterSpacing: -0.6, marginBottom: 8, color: '#fff' },
+  sub: { fontSize: 13.5, color: SEM.ink3, lineHeight: 20, marginBottom: 16 },
 
   opt: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SEM.surface1, borderWidth: 1.5, borderColor: SEM.line,
     borderRadius: 14, padding: 17, marginBottom: 11 },
   optSel: { borderColor: ACCENT, backgroundColor: 'rgba(255,59,48,0.08)' },
   optT: { fontSize: 15, fontWeight: '700', letterSpacing: -0.3, color: '#fff' },
-  optD: { fontSize: 12.5, color: SEM.muted, marginTop: 3 },
-  tick: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#555' },
+  optD: { fontSize: 12.5, color: SEM.ink3, marginTop: 3 },
+  tick: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: SEM.ink3 },
   tickSel: { borderColor: ACCENT, backgroundColor: ACCENT },
-
-  grpLabel: { fontSize: 11.5, fontWeight: '800', color: SEM.muted, letterSpacing: 0.3,
-    marginTop: 18, marginBottom: 10 },
 
   pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SEM.surface1, borderWidth: 1.5, borderColor: ACCENT,
@@ -295,44 +273,36 @@ const s = StyleSheet.create({
   selectedItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: SEM.line },
   selectedName: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  selectedEq: { fontSize: 12, color: SEM.muted },
+  selectedEq: { fontSize: 12, color: SEM.ink3 },
 
   freq: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 30 },
   freqBtn: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: SEM.line,
     backgroundColor: SEM.surface1, alignItems: 'center', justifyContent: 'center' },
   freqBtnT: { fontSize: 26, fontWeight: '300', color: '#fff' },
   freqNum: { fontSize: 70, fontWeight: '800', letterSpacing: -2, minWidth: 90, textAlign: 'center', color: '#fff' },
-  freqUnit: { textAlign: 'center', color: SEM.muted, fontSize: 14, marginTop: 16 },
-  freqHint: { textAlign: 'center', color: '#555', fontSize: 13, marginTop: 8 },
+  freqUnit: { textAlign: 'center', color: SEM.ink3, fontSize: 14, marginTop: 16 },
+  freqHint: { textAlign: 'center', color: SEM.ink3, fontSize: 13, marginTop: 8 },
 
   ruleCard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 15, marginBottom: 12 },
   ruleHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
   ruleTtl: { fontSize: 14.5, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
-  ruleDesc: { fontSize: 13, color: SEM.muted, lineHeight: 19 },
+  ruleDesc: { fontSize: 13, color: SEM.ink3, lineHeight: 19 },
   ruleEx: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 11 },
   ruleExItem: { fontSize: 12, color: '#fff', backgroundColor: SEM.surface2,
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, overflow: 'hidden' },
-
-  seg: { flexDirection: 'row', gap: 5, backgroundColor: SEM.surface1, borderWidth: 1,
-    borderColor: SEM.line, borderRadius: 13, padding: 5 },
-  segBtn: { flex: 1, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-  segBtnOn: { backgroundColor: ACCENT },
-  segBtnT: { fontSize: 12.5, fontWeight: '700', color: SEM.muted, letterSpacing: -0.3 },
-  segBtnTOn: { color: '#fff' },
-  segHint: { fontSize: 12.5, color: '#555', marginTop: 10, lineHeight: 18 },
 
   incRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 16, marginBottom: 12 },
   incL: { fontSize: 15.5, fontWeight: '700', color: '#fff' },
-  incD: { fontSize: 12.5, color: SEM.muted, marginTop: 3 },
+  incD: { fontSize: 12.5, color: SEM.ink3, marginTop: 3 },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 13 },
   stepBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1.5, borderColor: SEM.line,
     backgroundColor: SEM.surface2, alignItems: 'center', justifyContent: 'center' },
   stepBtnT: { fontSize: 20, fontWeight: '300', color: '#fff' },
   stepVal: { fontSize: 17, fontWeight: '800', minWidth: 64, textAlign: 'center', color: '#fff' },
-  incNote: { fontSize: 12.5, color: '#555', marginTop: 6, lineHeight: 18 },
+  incNote: { fontSize: 12.5, color: SEM.ink3, marginTop: 6, lineHeight: 18 },
 
   footer: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 8 },
   backBtn: { height: 54, borderRadius: 14, borderWidth: 1, borderColor: SEM.line,

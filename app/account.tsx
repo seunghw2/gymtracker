@@ -124,5 +124,5 @@ const s = StyleSheet.create({
 
   danger: { alignItems: 'center', marginTop: 26 },
   dangerT: { color: SEM.danger, fontSize: 13, fontWeight: '700', paddingVertical: 6 },
-  dangerHint: { color: SEM.ink3, fontSize: 11, marginTop: 2 },
+  dangerHint: { color: SEM.ink2, fontSize: 12.5, marginTop: 2, textAlign: 'center' },
 });

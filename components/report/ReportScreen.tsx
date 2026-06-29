@@ -18,8 +18,9 @@ import {
   type WeeklyProgressionDto,
   type ExerciseGoalDto,
 } from '../../db/api/overload';
-import { RT, toneColor } from './theme';
+import { RT, toneColor, toneBg } from './theme';
 import { Ring, BandRow, Card } from './charts';
+import { SEM } from '../../constants/colors';
 
 // 이번 주 리포트 = 결정론(엔진/통계) 단일 소스. LLM 브리핑 없음(§0-2, §15).
 // 정체는 엔진 stalling(weeklyProgression.stallReview) 한 곳만 사용 — 홈·시트·리포트 동일.
@@ -113,10 +114,10 @@ function ReportBody({ data, onGoWorkout }: { data: ReportData | null; onGoWorkou
   if (!hasAnything) {
     return (
       <View style={styles.center}>
-        <Text style={{ fontSize: 44, marginBottom: 12 }}>📭</Text>
-        <Text style={styles.emptyTitle}>아직 보여줄 게 없어요</Text>
-        <Text style={styles.dim}>운동을 기록하면 이번 주 진행 상황이 여기에 정리돼요.</Text>
-        <Pressable style={styles.cta} onPress={onGoWorkout}><Text style={styles.ctaText}>운동하러 가기</Text></Pressable>
+        <Text style={{ fontSize: 44, marginBottom: 12 }}>🗓️</Text>
+        <Text style={styles.emptyTitle}>이번 주 리포트는 기록과 함께 채워져요</Text>
+        <Text style={styles.dim}>운동을 한 번 기록하면 진행 단계와 다음 주 액션이 여기에 정리돼요.</Text>
+        <Pressable style={styles.cta} onPress={onGoWorkout}><Text style={styles.ctaText}>첫 운동 기록하기</Text></Pressable>
       </View>
     );
   }
@@ -144,12 +145,12 @@ function ReportBody({ data, onGoWorkout }: { data: ReportData | null; onGoWorkou
         </Pressable>
       </View>
 
-      {/* ── 핵심 종목 변화(엔진 stage·evaluate) ── */}
+      {/* ── 핵심 종목 변화(엔진 stage·evaluate) — 카드/행 그리드로 스캔 ── */}
       {(baseline.length > 0 || improved.length > 0 || ready.length > 0) && (
         <Card title="핵심 종목 변화" caption="이번 주 점진적 과부하 단계">
-          <ChangeRow label="증량 준비" items={ready} tone="good" badge="↑" />
-          <ChangeRow label="반복수 개선" items={improved} tone="good" badge="＋" />
-          <ChangeRow label="기준 생성" items={baseline} tone="info" badge="●" />
+          {buildChangeRows(ready, improved, baseline).map((r, i) => (
+            <ChangeItem key={i} row={r} first={i === 0} />
+          ))}
         </Card>
       )}
 
@@ -195,14 +196,46 @@ function ReportBody({ data, onGoWorkout }: { data: ReportData | null; onGoWorkou
   );
 }
 
-/** 핵심 종목 변화 한 줄(빈 항목이면 숨김). */
-function ChangeRow({ label, items, tone, badge }: { label: string; items: string[]; tone: string; badge: string }) {
-  if (items.length === 0) return null;
-  const color = tone === 'info' ? '#5AB0FF' : toneColor(tone);
+/** 핵심 종목 변화 한 행 — 종목명 + 상태 칩 + (있으면) 변화 값. */
+type ChangeKind = 'ready' | 'improved' | 'baseline';
+type ChangeRowData = { name: string; kind: ChangeKind; to?: string };
+
+const CHANGE_META: Record<ChangeKind, { label: string; color: string; chipBg: string }> = {
+  ready:    { label: '증량 준비',  color: toneColor('good'), chipBg: toneBg('good') },
+  improved: { label: '반복수 개선', color: toneColor('good'), chipBg: toneBg('good') },
+  baseline: { label: '기준 생성',  color: '#5AB0FF', chipBg: 'rgba(90,176,255,0.14)' },
+};
+
+/** 엔진 문자열을 카드 행으로 변환(데이터 소스 그대로, 표현만 분해).
+ *  improved 항목은 "이름 직전기록 → 목표" 형식 → 직전(from)/목표(to)로만 분리.
+ *  (이름/기록 모두 공백을 포함할 수 있어 종목명만 떼어내지 않고 좌측을 그대로 둔다.) */
+function buildChangeRows(ready: string[], improved: string[], baseline: string[]): ChangeRowData[] {
+  const rows: ChangeRowData[] = [];
+  ready.forEach((name) => rows.push({ name, kind: 'ready' }));
+  improved.forEach((it) => {
+    const idx = it.indexOf('→');
+    if (idx < 0) { rows.push({ name: it.trim(), kind: 'improved' }); return; }
+    rows.push({ name: it.slice(0, idx).trim(), kind: 'improved', to: it.slice(idx + 1).trim() });
+  });
+  baseline.forEach((name) => rows.push({ name, kind: 'baseline' }));
+  return rows;
+}
+
+function ChangeItem({ row, first }: { row: ChangeRowData; first?: boolean }) {
+  const meta = CHANGE_META[row.kind];
   return (
-    <View style={styles.changeRow}>
-      <Text style={[styles.changeLabel, { color }]}>{badge} {label}</Text>
-      {items.map((it, i) => <Text key={i} style={styles.changeItem}>{it}</Text>)}
+    <View style={[styles.changeRow, first && { borderTopWidth: 0, paddingTop: 2 }]}>
+      <View style={styles.changeMain}>
+        <Text style={styles.changeName} numberOfLines={1}>{row.name}</Text>
+        {row.kind === 'improved' && !!row.to && (
+          <Text style={styles.changeDelta} numberOfLines={1}>
+            → <Text style={[styles.changeTo, { color: meta.color }]}>{row.to}</Text>
+          </Text>
+        )}
+      </View>
+      <Text style={[styles.changeChip, { color: meta.color, backgroundColor: meta.chipBg }]}>
+        {meta.label}
+      </Text>
     </View>
   );
 }
@@ -231,10 +264,13 @@ const styles = StyleSheet.create({
   actionCta: { marginTop: 2, backgroundColor: RT.action, borderRadius: 13, paddingVertical: 13, alignItems: 'center' },
   actionCtaT: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
 
-  // 핵심 종목 변화
-  changeRow: { marginBottom: 12 },
-  changeLabel: { fontSize: 11.5, fontWeight: '800', marginBottom: 4 },
-  changeItem: { color: RT.ink2, fontSize: 14, lineHeight: 21 },
+  // 핵심 종목 변화(카드 행 — 종목 + 변화 + 상태 칩)
+  changeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: RT.hair },
+  changeMain: { flex: 1 },
+  changeName: { color: RT.ink, fontSize: 14.5, fontWeight: '700', letterSpacing: -0.2 },
+  changeDelta: { color: RT.ink2, fontSize: 12.5, marginTop: 2, fontVariant: ['tabular-nums'] },
+  changeTo: { fontWeight: '800' },
+  changeChip: { fontSize: 11.5, fontWeight: '700', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
 
   // 정체
   stallRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
@@ -249,5 +285,5 @@ const styles = StyleSheet.create({
   attSub: { color: RT.ink2, fontSize: 13, marginTop: 6, lineHeight: 19 },
 
   // 부위 세트
-  bandHint: { color: RT.ink3, fontSize: 11, marginTop: 6 },
+  bandHint: { color: SEM.ink3, fontSize: 11, marginTop: 6 },
 });

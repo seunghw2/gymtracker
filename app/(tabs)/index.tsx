@@ -90,6 +90,10 @@ export default function Dashboard() {
   const gaps = summary?.bodyPartGaps ?? [];
   const volumes = summary?.bodyPartVolumes ?? [];
 
+  // 이번 주 활동 유무 — 출석 0회 + 누적 세트 0이면 "아직 시작 안 함"으로 본다.
+  const totalSets = volumes.reduce((sum, v) => sum + v.currentSets, 0);
+  const weekStarted = (att?.done ?? 0) > 0 || totalSets > 0;
+
   // 블록3용 역할 분리
   const coreGoals = exerciseGoals.filter(g => g.role === 'core');
   const supportGoals = exerciseGoals.filter(g => g.role === 'support');
@@ -149,34 +153,43 @@ export default function Dashboard() {
             <Text style={s.goalVal}>{att ? `${att.done}/${att.target}회` : `0/${goalSetting.weeklyFrequency}회`}</Text>
           </View>
 
-          {volumes.length > 0 ? (
-            <View style={s.volBlock}>
-              {volumes.map(v => {
-                const pct = Math.min(1, v.targetSets > 0 ? v.currentSets / v.targetSets : 0);
-                const enough = v.currentSets >= v.targetSets;
-                return (
-                  <View key={v.part} style={s.volRow}>
-                    <Text style={s.volName}>{v.korPart}</Text>
-                    <View style={s.volTrack}>
-                      <View style={[s.volFill, {
-                        width: `${Math.round(pct * 100)}%`,
-                        backgroundColor: enough ? SEM.good : ACCENT,
-                      }]} />
-                    </View>
-                    <Text style={[s.volVal, enough && { color: SEM.good }]}>
-                      {v.currentSets}/{v.targetSets}세트
-                    </Text>
-                  </View>
-                );
-              })}
+          {!weekStarted ? (
+            <View style={s.weekStartBlock}>
+              <Text style={s.weekStartTitle}>이번 주 아직 시작 안 했어요</Text>
+              <Text style={s.weekStartSub}>오늘 첫 운동을 기록하면 부위별 진행이 여기 채워져요.</Text>
             </View>
-          ) : null}
+          ) : (
+            <>
+              {volumes.length > 0 ? (
+                <View style={s.volBlock}>
+                  {volumes.map(v => {
+                    const pct = Math.min(1, v.targetSets > 0 ? v.currentSets / v.targetSets : 0);
+                    const enough = v.currentSets >= v.targetSets;
+                    return (
+                      <View key={v.part} style={s.volRow}>
+                        <Text style={s.volName}>{v.korPart}</Text>
+                        <View style={s.volTrack}>
+                          <View style={[s.volFill, {
+                            width: `${Math.round(pct * 100)}%`,
+                            backgroundColor: enough ? SEM.good : ACCENT,
+                          }]} />
+                        </View>
+                        <Text style={[s.volVal, enough && { color: SEM.good }]}>
+                          {v.currentSets}/{v.targetSets}세트
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
 
-          {gaps.length > 0 ? (
-            <Text style={s.gapLine}>
-              부족한 부위 · {gaps.map(gp => `${gp.korPart} ${gp.missing}세트`).join(', ')}
-            </Text>
-          ) : null}
+              {gaps.length > 0 ? (
+                <Text style={s.gapLine}>
+                  부족한 부위 · {gaps.map(gp => `${gp.korPart} ${gp.missing}세트`).join(', ')}
+                </Text>
+              ) : null}
+            </>
+          )}
         </View>
 
         {/* 블록3 — 종목 리스트 (핵심 펼침 / 보조·기록만 접힘) */}
@@ -307,12 +320,12 @@ const s = StyleSheet.create({
   chatFabIcon: { fontSize: 22 },
   body: { padding: 18, paddingBottom: 90 },
 
-  greet: { fontSize: 13, color: SEM.muted, marginBottom: 12 },
+  greet: { fontSize: 13, color: SEM.ink3, marginBottom: 12 },
 
   // 블록1
   actionWrap: { marginBottom: 16 },
   actionTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff', marginBottom: 10 },
-  actionEmpty: { fontSize: 13, color: SEM.muted, lineHeight: 19,
+  actionEmpty: { fontSize: 13, color: SEM.ink3, lineHeight: 19,
     backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line, borderRadius: 12, padding: 14 },
   actionRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 13,
     padding: 14, marginBottom: 9, backgroundColor: SEM.surface1 },
@@ -328,7 +341,7 @@ const s = StyleSheet.create({
   // 블록2
   card: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 16, padding: 18, marginBottom: 12 },
-  cardTitle: { fontSize: 11, fontWeight: '800', color: SEM.muted, letterSpacing: 0.5,
+  cardTitle: { fontSize: 11, fontWeight: '800', color: SEM.ink3, letterSpacing: 0.5,
     textTransform: 'uppercase', marginBottom: 14 },
 
   goalRow: { flexDirection: 'row', alignItems: 'center' },
@@ -344,8 +357,13 @@ const s = StyleSheet.create({
   volName: { fontSize: 13, fontWeight: '700', color: '#fff', width: 40 },
   volTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: SEM.surface2, marginLeft: 8, overflow: 'hidden' },
   volFill: { height: '100%', borderRadius: 4 },
-  volVal: { fontSize: 12, color: SEM.muted, marginLeft: 10, minWidth: 56, textAlign: 'right', fontWeight: '600' },
-  gapLine: { fontSize: 12.5, color: SEM.muted, marginTop: 4, lineHeight: 18 },
+  volVal: { fontSize: 12, color: SEM.ink3, marginLeft: 10, minWidth: 56, textAlign: 'right', fontWeight: '600' },
+  gapLine: { fontSize: 12.5, color: SEM.ink3, marginTop: 4, lineHeight: 18 },
+
+  // 블록2 빈 상태(이번 주 미시작) — 빈 막대 대신 격려·중립 안내
+  weekStartBlock: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: SEM.line },
+  weekStartTitle: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  weekStartSub: { fontSize: 13, color: SEM.ink3, marginTop: 5, lineHeight: 19 },
 
   // 블록3
   secH: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -356,7 +374,7 @@ const s = StyleSheet.create({
     marginTop: 16, marginBottom: 6, paddingVertical: 10, paddingHorizontal: 14,
     backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line, borderRadius: 12 },
   moreToggleT: { fontSize: 13.5, fontWeight: '700', color: '#c4c4cc' },
-  moreChevron: { fontSize: 13, color: SEM.muted },
+  moreChevron: { fontSize: 13, color: SEM.ink3 },
 
   pcard: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 16, marginBottom: 10 },
@@ -364,13 +382,13 @@ const s = StyleSheet.create({
   pcardStall: { borderColor: 'rgba(255,138,0,0.35)' },
   pcardTop: { flexDirection: 'row', alignItems: 'flex-start' },
   pcardName: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
-  pcardType: { fontSize: 11, fontWeight: '700', color: '#555', marginTop: 3 },
+  pcardType: { fontSize: 11, fontWeight: '700', color: SEM.ink3, marginTop: 3 },
   stageBadge: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3 },
   stageBadgeT: { fontSize: 11, fontWeight: '800' },
   pcardGoalRow: { marginTop: 12 },
-  pcardLast: { fontSize: 12, color: '#6a6a6e', marginBottom: 3 },
+  pcardLast: { fontSize: 12, color: SEM.ink3, marginBottom: 3 },
   pcardToday: { fontSize: 14.5, fontWeight: '800', color: '#fff', lineHeight: 20 },
-  pcardCond: { fontSize: 12, color: SEM.muted, marginTop: 8, lineHeight: 17 },
+  pcardCond: { fontSize: 12, color: SEM.ink3, marginTop: 8, lineHeight: 17 },
 
   setupCta: { marginTop: 20, height: 52, borderRadius: 14, backgroundColor: ACCENT,
     alignItems: 'center', justifyContent: 'center' },
