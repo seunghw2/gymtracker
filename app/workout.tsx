@@ -16,7 +16,6 @@ import {
   InputAccessoryView,
   ActivityIndicator,
   findNodeHandle,
-  Dimensions,
   StyleSheet as RNStyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -77,6 +76,7 @@ import HeaderTimerButton from '../components/HeaderTimerButton';
 import ExerciseEditSheet from '../components/ExerciseEditSheet';
 import WorkoutCoachBanner from '../components/WorkoutCoachBanner';
 import { useRestRemaining, fmtClock } from '../hooks/useRestRemaining';
+import { useSetEditor } from '../hooks/useSetEditor';
 import { playSetDoneSound } from '../lib/sound';
 import { epley, formatDuration } from '../lib/format';
 import { refreshWorkoutReminder } from '../lib/reminders';
@@ -216,9 +216,6 @@ export default function WorkoutScreen() {
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
   const [sessionEval, setSessionEval] = useState<import('../db/api/overload').SessionEvalDto | null>(null);
   // 앱 자체 숫자패드 편집 상태
-  const [edit, setEdit] = useState<{ exIdx: number; setIdx: number; kind: 'weight' | 'reps' | 'duration' } | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const replaceOnNextRef = useRef(true); // 숫자패드 첫 입력 시 기존 값 교체
   const listRef = useRef<any>(null);
   const noteDraftRef = useRef(''); // 종목 메모 입력 중 임시값(타이핑마다 스토어 갱신 방지)
   const rowRefs = useRef<Map<string, View>>(new Map());
@@ -248,12 +245,6 @@ export default function WorkoutScreen() {
     }
   }, [editTarget, activeSessionId]);
 
-  // 숫자패드 열림 상태를 전역에 알려 전역 휴식 타이머가 위로 비켜서게 함
-  const setNumPadOpen = useUiStore(s => s.setNumPadOpen);
-  useEffect(() => {
-    setNumPadOpen(edit != null);
-    return () => setNumPadOpen(false);
-  }, [edit, setNumPadOpen]);
 
   useEffect(() => {
     getSetting('show_session_note', '1').then(v => setShowNote(v !== '0')).catch(() => {});
@@ -480,103 +471,8 @@ export default function WorkoutScreen() {
   };
 
   // ── 앱 자체 숫자패드 ──────────────────────────────────────────
-  const fieldValueStr = (s: SetEntry, kind: 'weight' | 'reps' | 'duration') => {
-    if (kind === 'weight') return String(toDisplay(s.weight_kg, unitKg));
-    if (kind === 'duration') return String(s.durationSec ?? 0);
-    return String(s.reps);
-  };
-
-  const beginEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration') => {
-    const s = exercises[exIdx]?.sets[setIdx];
-    if (!s) return;
-    Keyboard.dismiss(); // 메모 등 시스템 키보드 닫고 앱 내 숫자패드 표시
-    setEdit({ exIdx, setIdx, kind });
-    setEditValue(fieldValueStr(s, kind));
-    replaceOnNextRef.current = true; // 첫 키 입력 시 기존 값 비우고 새로 입력
-    Haptics.selectionAsync();
-    // 편집하는 세트 행이 숫자패드 위에 보이도록 스크롤(행 기준 정밀)
-    setTimeout(() => {
-      const node = rowRefs.current.get(`${exIdx}-${setIdx}`);
-      node?.measure((_x, _y, _w, h, _px, py) => {
-        const winH = Dimensions.get('window').height;
-        const padTop = winH - 320; // 숫자패드 상단 추정선
-        const overflow = (py + h + 12) - padTop;
-        if (overflow > 0) listRef.current?.scrollToOffset({ offset: scrollY.current + overflow, animated: true });
-      });
-    }, 80);
-  };
-
-  const commitEdit = (exIdx: number, setIdx: number, kind: 'weight' | 'reps' | 'duration', valStr: string) => {
-    const s = exercises[exIdx]?.sets[setIdx];
-    if (!s) return;
-    if (kind === 'weight') {
-      const kg = fromInput(parseFloat(valStr) || 0, unitKg);
-      updateSet(exIdx, setIdx, { weight_kg: kg, estimated_1rm: epley(kg, s.reps) });
-      if (s.done && s.setId) updateWorkoutSet(s.setId, kg, s.reps, s.setType ?? 'NORMAL').catch(() => {});
-    } else if (kind === 'reps') {
-      const reps = parseInt(valStr) || 0;
-      updateSet(exIdx, setIdx, { reps, estimated_1rm: epley(s.weight_kg, reps) });
-      if (s.done && s.setId) updateWorkoutSet(s.setId, s.weight_kg, reps, s.setType ?? 'NORMAL').catch(() => {});
-    } else {
-      updateSet(exIdx, setIdx, { durationSec: parseInt(valStr) || 0 });
-    }
-  };
-
-  const handleNumKey = (d: string) => {
-    if (!edit) return;
-    const allowDecimal = edit.kind === 'weight';
-    let next = editValue;
-    if (replaceOnNextRef.current) { next = ''; replaceOnNextRef.current = false; }
-    if (d === '.') {
-      if (!allowDecimal || next.includes('.')) return;
-      next = next === '' ? '0.' : next + '.';
-    } else {
-      next = (next === '0' ? '' : next) + d;
-    }
-    if (next.replace('.', '').length > 5) return;
-    setEditValue(next);
-    commitEdit(edit.exIdx, edit.setIdx, edit.kind, next);
-  };
-
-  const handleNumBackspace = () => {
-    if (!edit) return;
-    replaceOnNextRef.current = false;
-    const next = editValue.slice(0, -1);
-    setEditValue(next);
-    commitEdit(edit.exIdx, edit.setIdx, edit.kind, next);
-  };
-
-  const handleNumStep = (delta: 1 | -1) => {
-    if (!edit) return;
-    replaceOnNextRef.current = false;
-    const s = exercises[edit.exIdx]?.sets[edit.setIdx];
-    if (!s) return;
-    let nv: string;
-    if (edit.kind === 'weight') {
-      const cur = parseFloat(editValue);
-      const base = Number.isFinite(cur) ? cur : toDisplay(s.weight_kg, unitKg);
-      nv = String(Math.max(0, Math.round((base + delta * weightStep) * 100) / 100));
-    } else {
-      const cur = parseInt(editValue);
-      const base = Number.isFinite(cur) ? cur : (edit.kind === 'duration' ? (s.durationSec ?? 0) : s.reps);
-      nv = String(Math.max(0, base + delta));
-    }
-    setEditValue(nv);
-    commitEdit(edit.exIdx, edit.setIdx, edit.kind, nv);
-  };
-
-  const handleNumNext = () => {
-    if (!edit) return;
-    const ex = exercises[edit.exIdx];
-    const repsKind: 'reps' | 'duration' = ex?.timeBased ? 'duration' : 'reps';
-    if (edit.kind === 'weight') {
-      beginEdit(edit.exIdx, edit.setIdx, repsKind);
-    } else {
-      // 다음 세트의 무게로
-      if (ex && edit.setIdx + 1 < ex.sets.length) beginEdit(edit.exIdx, edit.setIdx + 1, 'weight');
-      else setEdit(null);
-    }
-  };
+  const { edit, editValue, beginEdit, handleNumKey, handleNumBackspace, handleNumStep, handleNumNext, closeEdit } =
+    useSetEditor({ unitKg, weightStep, rowRefs, listRef, scrollY });
 
   // 세트번호 길게눌러 타입 직접 선택
   const handleSetTypeLongPress = (exIdx: number, setIdx: number) => {
@@ -1000,7 +896,7 @@ export default function WorkoutScreen() {
                 placeholderTextColor="#48484A"
                 defaultValue={ex.note ?? ''}
                 inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                onFocus={() => { setEdit(null); noteDraftRef.current = ex.note ?? ''; }}
+                onFocus={() => { closeEdit(); noteDraftRef.current = ex.note ?? ''; }}
                 onChangeText={t => { noteDraftRef.current = t; }}
                 onEndEditing={() => {
                   const t = noteDraftRef.current;
@@ -1310,7 +1206,7 @@ export default function WorkoutScreen() {
           onBackspace={handleNumBackspace}
           onStep={handleNumStep}
           onNext={handleNumNext}
-          onDone={() => setEdit(null)}
+          onDone={() => closeEdit()}
         />
       )}
 
