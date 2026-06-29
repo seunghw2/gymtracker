@@ -1,13 +1,18 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, RefreshControl,
+  View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ACCENT, SEM } from '../../constants/colors';
+import * as Haptics from 'expo-haptics';
+import { ACCENT, ACCENT_INK, SEM } from '../../constants/colors';
 import { useOverloadStore } from '../../store/useOverloadStore';
+import { useWorkoutStore } from '../../store/useStore';
 import { getWeeklySummary } from '../../db/api/overload';
 import type { WeeklySummaryDto, ExerciseGoalDto } from '../../db/api/overload';
+import { buildExerciseEntry } from '../../lib/exerciseEntry';
+import { createWorkoutSession } from '../../db/queries';
+import { todayStr } from '../../lib/date';
 import ExerciseGoalSheet from '../../components/ExerciseGoalSheet';
 
 function weekdayLabel() {
@@ -33,6 +38,33 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [sheetGoal, setSheetGoal] = useState<ExerciseGoalDto | null>(null);
   const [showMore, setShowMore] = useState(false);
+  const [adding, setAdding] = useState<number | null>(null);
+
+  // 블록1 종목을 오늘 운동에 바로 담기 — 진행 중 세션이 있으면 추가, 없으면 새로 시작
+  const addGoalToWorkout = useCallback(async (goal: ExerciseGoalDto) => {
+    if (adding !== null) return;
+    setAdding(goal.id);
+    try {
+      const entry = await buildExerciseEntry({
+        id: goal.exerciseId,
+        name: goal.exerciseName ?? '종목',
+        brand: null,
+      });
+      const ws = useWorkoutStore.getState();
+      if (!ws.activeSessionId) {
+        const date = todayStr();
+        const newId = await createWorkoutSession(date);
+        ws.startSession(newId, date, null);
+      }
+      useWorkoutStore.getState().addExercise(entry);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push('/workout');
+    } catch {
+      Alert.alert('추가 실패', '운동에 담지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setAdding(null);
+    }
+  }, [adding, router]);
 
   const load = useCallback(async () => {
     await Promise.all([loadGoalSetting(), loadExerciseGoals()]);
@@ -90,10 +122,14 @@ export default function Dashboard() {
           <View style={s.actionWrap}>
             <Text style={s.actionTitle}>오늘 확인 필요</Text>
             {needCheck.map(g => (
-              <ActionRow key={g.id} goal={g} kind="check" onPress={() => setSheetGoal(g)} />
+              <ActionRow key={g.id} goal={g} kind="check"
+                onPress={() => setSheetGoal(g)}
+                onAdd={() => addGoalToWorkout(g)} adding={adding === g.id} />
             ))}
             {needBaseline.map(g => (
-              <ActionRow key={g.id} goal={g} kind="baseline" onPress={() => setSheetGoal(g)} />
+              <ActionRow key={g.id} goal={g} kind="baseline"
+                onPress={() => setSheetGoal(g)}
+                onAdd={() => addGoalToWorkout(g)} adding={adding === g.id} />
             ))}
           </View>
         ) : exerciseGoals.length > 0 ? (
@@ -181,25 +217,24 @@ export default function Dashboard() {
   );
 }
 
-/** 블록1 행: 중립적인 "확인 필요" 묶음 + 기준 만들기 */
-function ActionRow({ goal, kind, onPress }: {
-  goal: ExerciseGoalDto; kind: 'check' | 'baseline'; onPress: () => void;
+/** 블록1 행: 중립적인 "확인 필요" 묶음 + 기준 만들기. 행 탭=상세 시트, 우측 버튼=오늘 운동에 추가 */
+function ActionRow({ goal, kind, onPress, onAdd, adding }: {
+  goal: ExerciseGoalDto; kind: 'check' | 'baseline';
+  onPress: () => void; onAdd: () => void; adding: boolean;
 }) {
   const baseline = kind === 'baseline';
   return (
-    <Pressable style={[s.actionRow, baseline ? s.actionRowBase : s.actionRowCheck]} onPress={onPress}>
-      <View style={{ flex: 1 }}>
+    <View style={[s.actionRow, baseline ? s.actionRowBase : s.actionRowCheck]}>
+      <Pressable style={s.actionInfo} onPress={onPress}>
         <Text style={s.actionName}>{goal.exerciseName ?? '—'}</Text>
         <Text style={s.actionTarget} numberOfLines={2}>
           {baseline ? '오늘 기준 만들기' : goal.todayTarget}
         </Text>
-      </View>
-      <View style={[s.actionTag, baseline ? s.actionTagBase : s.actionTagCheck]}>
-        <Text style={[s.actionTagT, { color: baseline ? '#9a9aa1' : ACCENT }]}>
-          {baseline ? '기준' : '확인 필요'}
-        </Text>
-      </View>
-    </Pressable>
+      </Pressable>
+      <Pressable style={[s.actionAddBtn, adding && s.actionAddBtnBusy]} onPress={onAdd} disabled={adding}>
+        <Text style={s.actionAddT}>{adding ? '추가 중…' : '운동에 추가'}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -283,12 +318,12 @@ const s = StyleSheet.create({
     padding: 14, marginBottom: 9, backgroundColor: SEM.surface1 },
   actionRowCheck: { borderColor: 'rgba(43,217,106,0.32)' },
   actionRowBase: { borderColor: '#2c2c2e' },
+  actionInfo: { flex: 1, paddingRight: 10 },
   actionName: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: '#fff' },
   actionTarget: { fontSize: 13.5, fontWeight: '600', color: '#d0d0d8', marginTop: 4, lineHeight: 19 },
-  actionTag: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, marginLeft: 10 },
-  actionTagCheck: { backgroundColor: 'rgba(43,217,106,0.12)', borderColor: 'rgba(43,217,106,0.34)' },
-  actionTagBase: { backgroundColor: '#1f1f23', borderColor: '#2c2c2e' },
-  actionTagT: { fontSize: 11, fontWeight: '800' },
+  actionAddBtn: { backgroundColor: ACCENT, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 9 },
+  actionAddBtnBusy: { opacity: 0.6 },
+  actionAddT: { color: ACCENT_INK, fontSize: 13, fontWeight: '800' },
 
   // 블록2
   card: { backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,

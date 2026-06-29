@@ -146,7 +146,7 @@ export const styles = StyleSheet.create({
   sessionElapsed: { color: '#FF3B30', fontSize: 14, fontWeight: '600', marginTop: 2, fontVariant: ['tabular-nums'] },
   sessionDateSub: { color: '#8E8E93', fontSize: 13, marginTop: 3 },
   finishBtn: { backgroundColor: '#FF3B30', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 8 },
-  finishBtnText: { color: '#000000', fontSize: 15, fontWeight: '700' },
+  finishBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 
   // 상단 고정 바
   stickyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#1C1C1E' },
@@ -154,7 +154,7 @@ export const styles = StyleSheet.create({
   stickyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
   stickyElapsedText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
   stickyFinish: { backgroundColor: '#FF3B30', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 8 },
-  stickyFinishText: { color: '#06210F', fontSize: 15, fontWeight: '800' },
+  stickyFinishText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 
   scrollContent: { padding: 16, paddingBottom: 60 },
   scrollContentRest: { paddingTop: 56, paddingBottom: 60 },

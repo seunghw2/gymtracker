@@ -5,7 +5,7 @@ import {
   GoalSettingDto, ExerciseGoalDto,
   GoalSettingRequest, ExerciseGoalBulkRequest, ExerciseGoalUpdateRequest,
   getGoalSetting, upsertGoalSetting, getExerciseGoals,
-  bulkCreateExerciseGoals, updateExerciseGoal,
+  bulkCreateExerciseGoals, updateExerciseGoal, resetOnboarding,
 } from '../db/api/overload';
 
 type OverloadState = {
@@ -17,6 +17,7 @@ type OverloadState = {
   saveGoalSetting: (req: GoalSettingRequest) => Promise<GoalSettingDto | null>;
   bulkCreateGoals: (req: ExerciseGoalBulkRequest) => Promise<ExerciseGoalDto[]>;
   updateGoal: (id: number, req: ExerciseGoalUpdateRequest) => Promise<void>;
+  resetOnboarding: () => Promise<void>;
 };
 
 export const useOverloadStore = create<OverloadState>()(
@@ -57,6 +58,14 @@ export const useOverloadStore = create<OverloadState>()(
         } catch {
           return [];
         }
+      },
+
+      resetOnboarding: async () => {
+        await resetOnboarding();
+        // 게이트가 다시 닫히도록 로컬 onboarded 플래그도 즉시 내림
+        set(s => ({
+          goalSetting: s.goalSetting ? { ...s.goalSetting, onboarded: false } : null,
+        }));
       },
 
       updateGoal: async (id, req) => {

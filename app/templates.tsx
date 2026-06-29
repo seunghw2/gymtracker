@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { ACCENT, SEM } from '../constants/colors';
+import { ACCENT, ACCENT_INK, SEM } from '../constants/colors';
 import {
   getTemplates, deleteTemplate, getSuggestedTemplates, createTemplate,
   type SuggestedTemplate,
@@ -202,9 +202,9 @@ const s = StyleSheet.create({
   suggBadge: { backgroundColor: 'rgba(43,217,106,0.15)', borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3 },
   suggBadgeT: { fontSize: 11, fontWeight: '800', color: SEM.good },
   suggExercises: { fontSize: 13, color: '#9a9aa1', lineHeight: 19, marginBottom: 12 },
-  suggStartBtn: { height: 42, borderRadius: 11, backgroundColor: SEM.good,
+  suggStartBtn: { height: 42, borderRadius: 11, backgroundColor: ACCENT,
     alignItems: 'center', justifyContent: 'center' },
-  suggStartT: { color: '#04210f', fontSize: 14, fontWeight: '800' },
+  suggStartT: { color: ACCENT_INK, fontSize: 14, fontWeight: '800' },
 
   tplCard: { flexDirection: 'row', backgroundColor: SEM.surface1, borderWidth: 1, borderColor: SEM.line,
     borderRadius: 14, padding: 16, marginBottom: 10, gap: 12 },

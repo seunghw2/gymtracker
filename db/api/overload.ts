@@ -100,6 +100,10 @@ export async function upsertGoalSetting(req: GoalSettingRequest): Promise<GoalSe
   return apiRequest<GoalSettingDto>('/api/v1/goal-setting', { method: 'POST', body: req });
 }
 
+export async function resetOnboarding(): Promise<void> {
+  await apiRequest<void>('/api/v1/goal-setting/reset-onboarding', { method: 'POST' });
+}
+
 export async function getExerciseGoals(): Promise<ExerciseGoalDto[]> {
   return apiRequest<ExerciseGoalDto[]>('/api/v1/exercise-goals');
 }

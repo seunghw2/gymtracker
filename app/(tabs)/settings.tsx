@@ -15,6 +15,7 @@ import { SEM } from '../../constants/colors';
 import { SettingIcon, IconName } from '../../components/SettingIcon';
 import { getSetting, setSetting, deleteAiProfile } from '../../db/queries';
 import { useSettingsStore, useWorkoutStore } from '../../store/useStore';
+import { useOverloadStore } from '../../store/useOverloadStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { exportWorkoutsCsv } from '../../lib/export';
 
@@ -28,6 +29,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { soundOnSilent, setSoundOnSilent } = useSettingsStore();
+  const resetOnboarding = useOverloadStore(s => s.resetOnboarding);
   const bannerActive = useWorkoutStore(s => s.activeSessionId != null);
 
   const [showSessionNote, setShowSessionNote] = useState(true);
@@ -55,11 +57,14 @@ export default function SettingsScreen() {
     try { await exportWorkoutsCsv(); } catch { Alert.alert('내보내기 실패', '잠시 후 다시 시도해주세요.'); } finally { setExporting(false); }
   };
   const handleResetOnboarding = () => {
-    Alert.alert('온보딩 초기화', 'AI 인테이크 프로필을 삭제할까요?\nAI 탭에 다시 들어가면 온보딩이 처음부터 시작됩니다.', [
+    Alert.alert('온보딩 초기화', '목표 설정과 AI 프로필을 초기화하고 온보딩을 처음부터 다시 진행할까요?', [
       { text: '취소', style: 'cancel' },
       { text: '초기화', style: 'destructive', onPress: async () => {
-        try { await deleteAiProfile(); Alert.alert('완료', '온보딩이 초기화됐어요.'); }
-        catch { Alert.alert('초기화 실패', '잠시 후 다시 시도해 주세요.'); }
+        try {
+          await resetOnboarding();
+          await deleteAiProfile().catch(() => {});
+          router.replace('/onboarding');
+        } catch { Alert.alert('초기화 실패', '잠시 후 다시 시도해 주세요.'); }
       } },
     ]);
   };
@@ -112,8 +117,9 @@ export default function SettingsScreen() {
         <Section title="정보">
           <Row first icon="info" label="버전" value={version} />
           <Row icon="download" label="운동 기록 내보내기" value={exporting ? '내보내는 중…' : undefined} onPress={handleExport} />
-          <Row icon="shield" label="개인정보처리방침" onPress={() => Alert.alert('개인정보처리방침', '준비 중이에요.')} />
-          <Row icon="tool" label="개발자 도구 (온보딩 초기화)" onPress={handleResetOnboarding} />
+          {__DEV__ && (
+            <Row icon="tool" label="온보딩 초기화 (개발용)" onPress={handleResetOnboarding} />
+          )}
         </Section>
       </ScrollView>
     </SafeAreaView>

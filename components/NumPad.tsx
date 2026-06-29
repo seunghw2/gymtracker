@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { ACCENT, ACCENT_INK } from '../constants/colors';
 
 type Props = {
   onKey: (digit: string) => void;
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
   doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   stepRow: { flexDirection: 'row' },
   stepBtn: { flex: 1, backgroundColor: '#2C2C2E' },
-  nextBtn: { backgroundColor: '#FF3B30' },
+  nextBtn: { backgroundColor: ACCENT },
   nextDisabled: { backgroundColor: '#2C2C2E' },
-  nextText: { color: '#000000', fontSize: 16, fontWeight: '700' },
+  nextText: { color: ACCENT_INK, fontSize: 16, fontWeight: '700' },   // 빨강 위 흰글자(검정→흰, 대비 확보)
 });
