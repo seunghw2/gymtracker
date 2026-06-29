@@ -26,10 +26,8 @@ import * as Haptics from 'expo-haptics';
 import {
   createWorkoutSession,
   addWorkoutSet,
-  getLastSessionSets,
   completeSession,
   getSessionHistory,
-  getSessionSets,
   getExerciseRest,
   getExerciseWarmupRest,
   deleteWorkoutSet,
@@ -39,12 +37,10 @@ import {
   setSetEffort,
   updateExerciseNote,
   upsertExerciseSessionNote,
-  getSessionExerciseNotes,
   getTrainedExercises,
   get1RMHistory,
   getTemplates,
   getTemplate,
-  createTemplate,
   deleteTemplate,
   getSetting,
   getBodyTags,
@@ -55,11 +51,9 @@ import {
   setExerciseRmMode,
   convertRm,
   SessionSummary,
-  SessionSetRow,
   TrainedExercise,
   TemplateSummary,
 } from '../db/queries';
-import DatePickerSheet from '../components/DatePickerSheet';
 import SessionCard from '../components/SessionCard';
 import { useUiStore } from '../store/useUiStore';
 import { useOverloadStore } from '../store/useOverloadStore';
@@ -73,7 +67,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BRIEFING_DIRTY_KEY } from '../lib/briefingRefresh';
 
 
-import ExerciseSelectModal, { SelectableExercise } from '../components/ExerciseSelectModal';
+import SessionDetailModal from '../components/SessionDetailModal';
 import RestPickerSheet from '../components/RestPickerSheet';
 import WarmupSheet from '../components/WarmupSheet';
 import { useWorkoutStore, useSettingsStore, ExerciseEntry, SetEntry, SetType, nextSetType } from '../store/useStore';
@@ -84,7 +78,6 @@ import ExerciseEditSheet from '../components/ExerciseEditSheet';
 import WorkoutCoachBanner from '../components/WorkoutCoachBanner';
 import { useRestRemaining, fmtClock } from '../hooks/useRestRemaining';
 import { playSetDoneSound } from '../lib/sound';
-import { buildExerciseEntry } from '../lib/exerciseEntry';
 import { epley, formatDuration } from '../lib/format';
 import { refreshWorkoutReminder } from '../lib/reminders';
 import { styles } from './workout.styles';
@@ -171,15 +164,11 @@ export default function WorkoutScreen() {
   const [restControlOpen, setRestControlOpen] = useState(false);
   useEffect(() => { if (!restTimerActive) { setRestAnchor(null); setRestControlOpen(false); } }, [restTimerActive]);
 
-  const [showExerciseModal, setShowExerciseModal] = useState(false);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [detailSession, setDetailSession] = useState<SessionSummary | null>(null);
-  const [detailSets, setDetailSets] = useState<SessionSetRow[]>([]);
   const [startDate, setStartDate] = useState(getTodayStr());
   const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showDetailPicker, setShowDetailPicker] = useState(false);
-  const detailSwipeRefs = useRef<Map<number, Swipeable>>(new Map());
   const [showTags, setShowTags] = useState(false);
   const [showNote, setShowNote] = useState(true);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -189,9 +178,6 @@ export default function WorkoutScreen() {
   const [tagEdit, setTagEdit] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [sessionNote, setSessionNote] = useState('');
-  const [detailTitle, setDetailTitle] = useState('');
-  const [detailNote, setDetailNote] = useState('');
-  const [detailExNotes, setDetailExNotes] = useState<Record<number, string>>({});
   const [repeatLoading, setRepeatLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
 
@@ -227,8 +213,6 @@ export default function WorkoutScreen() {
   const setExerciseInfo = useWorkoutStore(s => s.setExerciseInfo);
   const [rmPickerIdx, setRmPickerIdx] = useState<number | null>(null);
   const [restPickerIdx, setRestPickerIdx] = useState<number | null>(null);
-  const [selectTarget, setSelectTarget] = useState<'active' | 'detail'>('active');
-  const [detailSaving, setDetailSaving] = useState(false);
   const [summary, setSummary] = useState<{ volume: number; sets: number; exercises: number; prs: number; durationSec: number } | null>(null);
   const [sessionEval, setSessionEval] = useState<import('../db/api/overload').SessionEvalDto | null>(null);
   // 앱 자체 숫자패드 편집 상태
@@ -259,7 +243,7 @@ export default function WorkoutScreen() {
   const clearEditTarget = useUiStore(s => s.clearEditTarget);
   useEffect(() => {
     if (editTarget && !activeSessionId) {
-      openDetail(editTarget);
+      setDetailSession(editTarget);
       clearEditTarget();
     }
   }, [editTarget, activeSessionId]);
@@ -369,41 +353,6 @@ export default function WorkoutScreen() {
   };
 
   // 과거 세션을 루틴(템플릿)으로 저장
-  const handleSaveDetailAsTemplate = () => {
-    if (!detailSession || detailSets.length === 0) {
-      Alert.alert('루틴 저장', '세트가 없는 운동입니다.');
-      return;
-    }
-    const order: number[] = [];
-    const groups: Record<number, { reps: number; weight: number; count: number }> = {};
-    for (const s of detailSets) {
-      if (!groups[s.exercise_id]) { order.push(s.exercise_id); groups[s.exercise_id] = { reps: s.reps, weight: s.weight_kg, count: 0 }; }
-      if ((s.set_type ?? 'NORMAL') !== 'WARMUP') groups[s.exercise_id].count += 1;
-    }
-    const payload = order.map(id => ({
-      exerciseId: id,
-      sets: Math.max(1, groups[id].count),
-      reps: groups[id].reps,
-      weightKg: groups[id].weight,
-    }));
-    const doSave = async (name: string) => {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      try {
-        await createTemplate(trimmed, payload);
-        getTemplates().then(setTemplates).catch(() => {});
-        Alert.alert('저장됨', `"${trimmed}" 루틴이 저장되었습니다.`);
-      } catch {
-        Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
-      }
-    };
-    if (Alert.prompt) {
-      Alert.prompt('루틴으로 저장', '루틴 이름을 입력하세요', (name?: string) => doSave(name ?? ''), 'plain-text', detailSession.title ?? '');
-    } else {
-      doSave(detailSession.title?.trim() || formatDate(detailSession.date));
-    }
-  };
-
   const handleDeleteTemplate = (tpl: TemplateSummary) => {
     Alert.alert('루틴 삭제', `"${tpl.name}"을(를) 삭제할까요?`, [
       { text: '취소', style: 'cancel' },
@@ -661,75 +610,6 @@ export default function WorkoutScreen() {
     await upsertExerciseSessionNote(activeSessionId, ex.exerciseId, ex.sessionNote ?? '').catch(() => {});
   };
 
-  const openExerciseSelect = (target: 'active' | 'detail' = 'active') => {
-    setSelectTarget(target);
-    setShowExerciseModal(true);
-  };
-
-  // 모달에서 선택한 종목을 현재 대상(진행 중 세션 / 과거 세션 편집)에 추가
-  const handleAddExercises = async (list: SelectableExercise[]) => {
-    if (list.length === 0) return;
-    if (selectTarget === 'detail') {
-      if (detailSession) {
-        for (const ex of list) {
-          const timeBased = ex.tracking_type === 'TIME';
-          const prev = await getLastSessionSets(ex.id).catch(() => []);
-          const w = timeBased ? 0 : (prev[0]?.weight_kg ?? 60);
-          const r = timeBased ? 0 : (prev[0]?.reps ?? 10);
-          await addWorkoutSet(detailSession.id, ex.id, 1, w, r, epley(w, r), 'NORMAL', null, timeBased ? (prev[0]?.duration_sec ?? 30) : null).catch(() => {});
-        }
-        const sets = await getSessionSets(detailSession.id);
-        setDetailSets(sets);
-        getSessionHistory().then(setHistory);
-      }
-    } else {
-      const entries = await Promise.all(list.map(buildExerciseEntry));
-      // 증량 준비(READY_TO_INCREASE) 종목은 다음 무게로 프리필(항상 1탭 덮어쓰기 가능)
-      for (const e of entries) {
-        const goal = goalByExId.get(e.exerciseId);
-        if (goal?.stage === 'READY_TO_INCREASE' && !e.timeBased) {
-          const nextW = goal.targetWeight ?? parseFloat(goal.nextTarget ?? '');
-          if (nextW && nextW > 0) {
-            e.sets = e.sets.map(s => s.setType === 'WARMUP' ? s : { ...s, weight_kg: nextW });
-          }
-        }
-      }
-      addExercises(entries);
-    }
-    setShowExerciseModal(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  // 과거 세션에 세트 추가 (해당 종목 마지막 세트 복사)
-  const addSetToDetail = async (exerciseId: number) => {
-    if (!detailSession) return;
-    const groupSets = detailSets.filter(s => s.exercise_id === exerciseId);
-    const last = groupSets[groupSets.length - 1];
-    const w = last?.weight_kg ?? 60;
-    const r = last?.reps ?? 10;
-    const nextOrder = (last?.set_order ?? 0) + 1;
-    await addWorkoutSet(detailSession.id, exerciseId, nextOrder, w, r, epley(w, r), last?.set_type ?? 'NORMAL').catch(e => logError('addSetToDetail:addWorkoutSet', e));
-    const sets = await getSessionSets(detailSession.id);
-    setDetailSets(sets);
-    getSessionHistory().then(setHistory);
-  };
-
-  // 과거 세션 편집 내용(세트 무게/횟수 + 제목/메모) 일괄 저장
-  const handleSaveDetail = async () => {
-    if (!detailSession || detailSaving) return;
-    setDetailSaving(true);
-    try {
-      await Promise.all(detailSets.map(s => updateWorkoutSet(s.id, s.weight_kg, s.reps, s.set_type).catch(e => logError('handleSaveDetail:updateWorkoutSet', e))));
-      await updateSession(detailSession.id, { title: detailTitle, note: detailNote }).catch(() => {});
-      setDetailSession({ ...detailSession, title: detailTitle, note: detailNote });
-      getSessionHistory().then(setHistory);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('저장됨', '변경사항이 저장되었습니다.');
-    } finally {
-      setDetailSaving(false);
-    }
-  };
-
   // 완료 체크 해제: DB에서 세트 삭제 후 미완료로 되돌림
   const handleUncompleteSet = async (exIdx: number, setIdx: number) => {
     const s = exercises[exIdx]?.sets[setIdx];
@@ -804,26 +684,6 @@ export default function WorkoutScreen() {
     }
   };
 
-  const openDetail = async (session: SessionSummary) => {
-    const [sets, notes] = await Promise.all([
-      getSessionSets(session.id),
-      getSessionExerciseNotes(session.id).catch(() => []),
-    ]);
-    setDetailSets(sets);
-    const noteMap: Record<number, string> = {};
-    for (const n of notes) if (n.note) noteMap[n.exercise_id] = n.note;
-    setDetailExNotes(noteMap);
-    setDetailSession(session);
-    setDetailTitle(session.title ?? '');
-    setDetailNote(session.note ?? '');
-  };
-
-  const closeDetail = () => {
-    setDetailSession(null);
-    setDetailExNotes({});
-  };
-
-
   const handleRemoveExercise = (exIdx: number) => {
     const ex = exercises[exIdx];
     Alert.alert('운동 삭제', `${ex.exerciseName}을(를) 삭제할까요?`, [
@@ -843,72 +703,6 @@ export default function WorkoutScreen() {
     if (s?.done && s.setId) await deleteWorkoutSet(s.setId).catch(() => {});
     removeSet(exIdx, setIdx);
   };
-
-  const handleDeleteSession = () => {
-    if (!detailSession) return;
-    const id = detailSession.id;
-    Alert.alert('세션 삭제', '이 운동 기록을 삭제할까요?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제', style: 'destructive', onPress: async () => {
-          await deleteSession(id);
-          setDetailSession(null);
-          getSessionHistory().then(setHistory);
-        },
-      },
-    ]);
-  };
-
-  const handleDeleteDetailSet = async (setId: number) => {
-    if (!detailSession) return;
-    await deleteWorkoutSet(setId);
-    const sets = await getSessionSets(detailSession.id);
-    setDetailSets(sets);
-    getSessionHistory().then(setHistory);
-  };
-
-  const handleChangeDetailDate = async (newDate: string) => {
-    if (!detailSession) return;
-    await updateSession(detailSession.id, { date: newDate });
-    setDetailSession({ ...detailSession, date: newDate });
-    getSessionHistory().then(setHistory);
-  };
-
-  const handleDetailTitleBlur = async () => {
-    if (!detailSession) return;
-    await updateSession(detailSession.id, { title: detailTitle }).catch(() => {});
-    setDetailSession({ ...detailSession, title: detailTitle });
-    getSessionHistory().then(setHistory);
-  };
-
-  const handleDetailNoteBlur = async () => {
-    if (!detailSession) return;
-    await updateSession(detailSession.id, { note: detailNote }).catch(() => {});
-    setDetailSession({ ...detailSession, note: detailNote });
-  };
-
-  const handleEditDetailSet = (setId: number, weight: number, reps: number) => {
-    setDetailSets(prev => prev.map(s =>
-      s.id === setId ? { ...s, weight_kg: weight, reps, estimated_1rm: epley(weight, reps) } : s
-    ));
-  };
-
-  const handleEditDetailSetBlur = async (setId: number) => {
-    const s = detailSets.find(d => d.id === setId);
-    if (!s) return;
-    await updateWorkoutSet(setId, s.weight_kg, s.reps).catch(() => {});
-    getSessionHistory().then(setHistory);
-  };
-
-  const groupedDetailSets = detailSets.reduce<Record<number, { exerciseId: number; name: string; brand: string | null; sets: SessionSetRow[] }>>(
-    (acc, row) => {
-      if (!acc[row.exercise_id]) acc[row.exercise_id] = { exerciseId: row.exercise_id, name: row.exercise_name, brand: row.brand, sets: [] };
-      acc[row.exercise_id].sets.push(row);
-      return acc;
-    },
-    {}
-  );
-
 
   if (!activeSessionId) {
     return (
@@ -984,170 +778,11 @@ export default function WorkoutScreen() {
           )}
         </ScrollView>
 
-        {/* 세션 상세 모달 */}
-        <Modal visible={!!detailSession} animationType="slide">
-          <SafeAreaView style={styles.safe}>
-            <View style={styles.detailHeader}>
-              <Pressable onPress={closeDetail}>
-                <Text style={styles.modalBack}>✕ 닫기</Text>
-              </Pressable>
-              <Pressable onPress={() => setShowDetailPicker(true)}>
-                <Text style={styles.detailHeaderTitle}>
-                  {detailSession ? `${formatDate(detailSession.date)} ›` : ''}
-                </Text>
-              </Pressable>
-              <Pressable onPress={handleDeleteSession}>
-                <Text style={styles.detailDelete}>삭제</Text>
-              </Pressable>
-            </View>
-            <DatePickerSheet
-              visible={showDetailPicker}
-              value={detailSession?.date ?? getTodayStr()}
-              onConfirm={(d) => { handleChangeDetailDate(d); setShowDetailPicker(false); }}
-              onClose={() => setShowDetailPicker(false)}
-            />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-              <TextInput
-                style={styles.detailTitleInput}
-                placeholder="운동 이름"
-                placeholderTextColor="#48484A"
-                value={detailTitle}
-                onChangeText={setDetailTitle}
-              />
-              {detailSession?.tags ? (
-                <View style={styles.tagBadgeRow}>
-                  {detailSession.tags.split(',').filter(Boolean).map(t => (
-                    <Text key={t} style={styles.tagBadge}>{t}</Text>
-                  ))}
-                </View>
-              ) : null}
-              <TextInput
-                style={styles.detailNoteInput}
-                placeholder="세션 메모"
-                placeholderTextColor="#48484A"
-                value={detailNote}
-                onChangeText={setDetailNote}
-                multiline
-              />
-              {Object.values(groupedDetailSets).map((group, i) => (
-                <View key={i} style={styles.exerciseCard}>
-                  <View style={styles.exerciseCardHeader}>
-                    <View>
-                      <Text style={styles.exerciseName}>{group.name}</Text>
-                      {group.brand && <Text style={styles.exerciseBrand}>{group.brand}</Text>}
-                    </View>
-                  </View>
-                  {detailExNotes[group.exerciseId] ? (
-                    <View style={styles.detailNoteChip}>
-                      <Text style={styles.detailNoteChipText}>📝 {detailExNotes[group.exerciseId]}</Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.setHeader}>
-                    <Text style={[styles.setCol, { flex: 0.5 }]}>SET</Text>
-                    <Text style={styles.setCol}>무게({u})</Text>
-                    <Text style={styles.setCol}>횟수</Text>
-                    <Text style={styles.setCol}>추정 1RM</Text>
-                  </View>
-                  {group.sets.map((s) => (
-                    <Swipeable
-                      key={s.id}
-                      ref={ref => {
-                        if (ref) detailSwipeRefs.current.set(s.id, ref);
-                        else detailSwipeRefs.current.delete(s.id);
-                      }}
-                      renderRightActions={() => (
-                        <Pressable
-                          style={styles.deleteAction}
-                          onPress={() => {
-                            detailSwipeRefs.current.get(s.id)?.close();
-                            handleDeleteDetailSet(s.id);
-                          }}
-                        >
-                          <Text style={styles.deleteActionText}>삭제</Text>
-                        </Pressable>
-                      )}
-                      rightThreshold={40}
-                      overshootRight={false}
-                    >
-                      <View style={[styles.setRow, (s.set_type ?? 'NORMAL') === 'WARMUP' && styles.setRowWarmup]}>
-                        <View style={[styles.setNum, { flex: 0.5 }]}>
-                          {SET_TYPE_META[s.set_type ?? 'NORMAL'] ? (
-                            <Text style={[styles.setTypeBadge, {
-                              color: SET_TYPE_META[s.set_type ?? 'NORMAL']!.color,
-                              borderColor: SET_TYPE_META[s.set_type ?? 'NORMAL']!.color,
-                            }]}>
-                              {SET_TYPE_META[s.set_type ?? 'NORMAL']!.label}
-                            </Text>
-                          ) : (
-                            <Text style={styles.setNumText}>{s.set_order}</Text>
-                          )}
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <TextInput
-                            style={styles.setInput}
-                            value={String(toDisplay(s.weight_kg, unitKg))}
-                            keyboardType="decimal-pad"
-                            selectTextOnFocus
-                            inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                            onChangeText={v => handleEditDetailSet(s.id, fromInput(parseFloat(v) || 0, unitKg), s.reps)}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          {s.duration_sec != null ? (
-                            <Text style={[styles.setInput, { color: '#FFFFFF' }]}>{s.duration_sec}초</Text>
-                          ) : (
-                            <TextInput
-                              style={styles.setInput}
-                              value={String(s.reps)}
-                              keyboardType="number-pad"
-                              selectTextOnFocus
-                              inputAccessoryViewID={Platform.OS === 'ios' ? KB_ACCESSORY_ID : undefined}
-                              onChangeText={v => handleEditDetailSet(s.id, s.weight_kg, parseInt(v) || 0)}
-                            />
-                          )}
-                        </View>
-                        <Text style={[styles.setReadOnly, { color: '#FF3B30' }]}>
-                          {s.estimated_1rm ? `${toDisplay(s.estimated_1rm, unitKg)}${u}` : '-'}
-                        </Text>
-                      </View>
-                    </Swipeable>
-                  ))}
-                  <Pressable style={styles.addSetBtn} onPress={() => addSetToDetail(group.exerciseId)}>
-                    <Text style={styles.addSetText}>+ 세트 추가</Text>
-                  </Pressable>
-                </View>
-              ))}
-
-              <Pressable style={styles.addExerciseBtn} onPress={() => openExerciseSelect('detail')}>
-                <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
-              </Pressable>
-
-              <Pressable style={styles.detailSaveBtn} onPress={handleSaveDetail} disabled={detailSaving}>
-                <Text style={styles.detailSaveText}>{detailSaving ? '저장 중…' : '저장'}</Text>
-              </Pressable>
-              <Pressable style={styles.detailTemplateBtn} onPress={handleSaveDetailAsTemplate}>
-                <Text style={styles.detailTemplateText}>⭐ 루틴으로 저장</Text>
-              </Pressable>
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
-
-        {/* 과거 세션 입력 키보드 완료 버튼 */}
-        {Platform.OS === 'ios' && (
-          <InputAccessoryView nativeID={KB_ACCESSORY_ID}>
-            <View style={styles.kbAccessory}>
-              <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8}>
-                <Text style={styles.kbAccessoryText}>완료</Text>
-              </Pressable>
-            </View>
-          </InputAccessoryView>
-        )}
-
-        {/* 운동 선택 모달 (과거 세션 종목 추가용) */}
-        <ExerciseSelectModal
-          visible={showExerciseModal}
-          onClose={() => setShowExerciseModal(false)}
-          onConfirm={handleAddExercises}
+        <SessionDetailModal
+          session={detailSession}
+          unitKg={unitKg}
+          onClose={() => setDetailSession(null)}
+          onChanged={() => { getSessionHistory().then(setHistory); getTemplates().then(setTemplates); }}
         />
 
       </SafeAreaView>
@@ -1773,12 +1408,6 @@ export default function WorkoutScreen() {
           if (warmupExIdx != null) prependWarmupSets(warmupExIdx, warmups);
           setWarmupExIdx(null);
         }}
-      />
-
-      <ExerciseSelectModal
-        visible={showExerciseModal}
-        onClose={() => setShowExerciseModal(false)}
-        onConfirm={handleAddExercises}
       />
 
       {/* 오늘 목표 상세 시트 — 배너 탭 시 단계/비교/성공조건 표시 */}
