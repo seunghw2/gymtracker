@@ -248,8 +248,8 @@ export default function WorkoutScreen() {
       : history.filter(h => h.tags?.split(',').includes(historyFilter)),
     [history, historyFilter]);
 
-  // 노력도 시트 — 핵심 종목 마지막 작업 세트 후 (setId로 effort 저장)
-  const [effortPending, setEffortPending] = useState<{ exerciseName: string; setId: number; exIdx: number; setIdx: number } | null>(null);
+  // 인라인 노력도 — 핵심 종목 마지막 작업 세트 아래에 칩으로 표시(흐름 차단 없음·스킵 가능)
+  const [effortInline, setEffortInline] = useState<{ setId: number; exIdx: number; setIdx: number } | null>(null);
   // 오늘 목표 상세 시트 (배너 탭 → 단계/비교/성공조건)
   const [goalSheet, setGoalSheet] = useState<ExerciseGoalDto | null>(null);
   const trackedGoals = useOverloadStore(s => s.exerciseGoals);
@@ -927,17 +927,15 @@ export default function WorkoutScreen() {
     setRestTotal(restSec);
     setRestAnchor({ ex: exIdx, set: setIdx });
 
-    // 핵심(core) 종목의 마지막 작업 세트 완료 시 노력도 시트 (effort를 update API로 저장)
+    // 핵심(core) 종목의 마지막 작업 세트 완료 시 노력도를 인라인으로 받음(흐름 차단 없음·스킵 가능)
     const goal = goalByExId.get(ex.exerciseId);
     if (goal?.role === 'core' && (s.setType ?? 'NORMAL') !== 'WARMUP') {
       const remainingWorkSets = ex.sets.filter((st, j) =>
         j !== setIdx && !st.done && (st.setType ?? 'NORMAL') !== 'WARMUP'
       );
       if (remainingWorkSets.length === 0) {
-        setTimeout(() => setEffortPending({
-          exerciseName: ex.exerciseName ?? ex.exerciseId.toString(),
-          setId, exIdx, setIdx,
-        }), 800);
+        // 자동 팝업 대신 해당 세트 아래 인라인 칩으로 노출 — 다음 세트 흐름을 막지 않음
+        setEffortInline({ setId, exIdx, setIdx });
       }
     }
   };
@@ -1071,7 +1069,7 @@ export default function WorkoutScreen() {
             <Text style={styles.modalBack}>← 뒤로</Text>
           </Pressable>
           <Text style={styles.modalTitle}>
-            {selectStep === 'muscle' && '부위 선택'}
+            {selectStep === 'muscle' && '운동 추가'}
             {selectStep === 'equipment' && '장비 선택'}
             {selectStep === 'brand' && '브랜드 선택'}
             {selectStep === 'custom-brand' && '브랜드 직접 입력'}
@@ -1883,6 +1881,31 @@ export default function WorkoutScreen() {
                       <View style={{ flex: 1, height: 1, backgroundColor: s.done ? 'rgba(48,209,88,0.3)' : 'rgba(120,120,128,0.22)' }} />
                     </Pressable>
                   )}
+                  {effortInline && effortInline.exIdx === exIdx && effortInline.setIdx === setIdx && (
+                    <View style={effortChipStyles.bar}>
+                      <Text style={effortChipStyles.label}>노력도</Text>
+                      <View style={effortChipStyles.chips}>
+                        {EFFORT_OPTIONS.map(opt => (
+                          <Pressable
+                            key={opt.key}
+                            style={effortChipStyles.chip}
+                            onPress={() => {
+                              const sid = effortInline.setId;
+                              setEffortInline(null);
+                              if (sid) setSetEffort(sid, opt.key).catch(e => logError('setSetEffort', e));
+                              Haptics.selectionAsync();
+                            }}
+                            hitSlop={4}
+                          >
+                            <Text style={effortChipStyles.chipEmoji}>{opt.emoji}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <Pressable onPress={() => setEffortInline(null)} hitSlop={8}>
+                        <Text style={effortChipStyles.skip}>✕</Text>
+                      </Pressable>
+                    </View>
+                  )}
                   </React.Fragment>
                 );
               })}
@@ -2239,35 +2262,6 @@ export default function WorkoutScreen() {
 
       {renderExerciseModal()}
 
-      {/* 노력도 시트 — 핵심 종목 마지막 작업 세트 후 (1탭으로 effort 저장·스킵 가능) */}
-      <Modal visible={effortPending !== null} transparent animationType="slide">
-        <Pressable style={styles.gymBackdrop} onPress={() => setEffortPending(null)}>
-          <Pressable style={rirStyles.sheet} onPress={() => {}}>
-            <View style={rirStyles.handle} />
-            <Text style={rirStyles.title}>마지막 세트 어땠나요?</Text>
-            <Text style={rirStyles.sub}>{effortPending?.exerciseName}</Text>
-            <View style={rirStyles.btnRow}>
-              {EFFORT_OPTIONS.map(opt => (
-                <Pressable key={opt.key} style={rirStyles.btn} onPress={() => {
-                  const p = effortPending;
-                  setEffortPending(null);
-                  if (p?.setId) {
-                    setSetEffort(p.setId, opt.key).catch(e => logError('setSetEffort', e));
-                  }
-                  Haptics.selectionAsync();
-                }}>
-                  <Text style={rirStyles.btnEmoji}>{opt.emoji}</Text>
-                  <Text style={rirStyles.btnLabel}>{opt.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable style={rirStyles.skip} onPress={() => setEffortPending(null)}>
-              <Text style={rirStyles.skipText}>건너뛰기</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       {/* 오늘 목표 상세 시트 — 배너 탭 시 단계/비교/성공조건 표시 */}
       <Modal visible={goalSheet !== null} transparent animationType="slide">
         <Pressable style={styles.gymBackdrop} onPress={() => setGoalSheet(null)}>
@@ -2324,6 +2318,16 @@ const EFFORT_OPTIONS: { key: Effort; emoji: string; label: string }[] = [
   { key: 'HARD',     emoji: '🔥', label: '거의 한계' },
   { key: 'FAILURE',  emoji: '❌', label: '실패' },
 ];
+
+const effortChipStyles = RNStyleSheet.create({
+  bar: { flexDirection: 'row', alignItems: 'center', marginVertical: 4, paddingHorizontal: 2, gap: 8 },
+  label: { color: '#8E8E93', fontSize: 11, fontWeight: '700' },
+  chips: { flexDirection: 'row', flex: 1, gap: 6 },
+  chip: { flex: 1, height: 30, borderRadius: 8, backgroundColor: '#1C1C1E',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2C2C2E' },
+  chipEmoji: { fontSize: 16 },
+  skip: { color: '#48484A', fontSize: 15, fontWeight: '700', paddingHorizontal: 2 },
+});
 
 const rirStyles = RNStyleSheet.create({
   sheet: { backgroundColor: '#111113', borderTopLeftRadius: 22, borderTopRightRadius: 22,

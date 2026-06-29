@@ -14,6 +14,7 @@ import { buildExerciseEntry } from '../../lib/exerciseEntry';
 import { createWorkoutSession } from '../../db/queries';
 import { todayStr } from '../../lib/date';
 import ExerciseGoalSheet from '../../components/ExerciseGoalSheet';
+import { SettingIcon } from '../../components/SettingIcon';
 
 function weekdayLabel() {
   return ['일', '월', '화', '수', '목', '금', '토'][new Date().getDay()] + '요일';
@@ -110,8 +111,14 @@ export default function Dashboard() {
     <SafeAreaView style={s.safe}>
       <View style={s.headerRow}>
         <View />
-        <Pressable onPress={() => router.navigate('/settings')} hitSlop={10}>
-          <Text style={s.gearIcon}>⚙️</Text>
+        <Pressable
+          onPress={() => router.navigate('/settings')}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="설정"
+          style={s.iconBtn}
+        >
+          <SettingIcon name="gear" size={22} color={SEM.ink2} />
         </Pressable>
       </View>
 
@@ -221,8 +228,14 @@ export default function Dashboard() {
         )}
       </ScrollView>
 
-      <Pressable style={s.chatFab} onPress={() => router.navigate('/(tabs)/chat')}>
-        <Text style={s.chatFabIcon}>💬</Text>
+      <Pressable
+        style={s.chatFab}
+        onPress={() => router.navigate('/(tabs)/chat')}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="AI 코치"
+      >
+        <SettingIcon name="chat" size={24} color={SEM.ink1} />
       </Pressable>
 
       <ExerciseGoalSheet goal={sheetGoal} onClose={() => setSheetGoal(null)} />
@@ -312,12 +325,11 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  gearIcon: { fontSize: 22 },
+  iconBtn: { alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32 },
   chatFab: { position: 'absolute', right: 18, bottom: 18, width: 52, height: 52, borderRadius: 26,
     backgroundColor: '#1a1a1f', borderWidth: 1, borderColor: '#2a2a2f',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  chatFabIcon: { fontSize: 22 },
   body: { padding: 18, paddingBottom: 90 },
 
   greet: { fontSize: 13, color: SEM.ink3, marginBottom: 12 },
