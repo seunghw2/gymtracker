@@ -24,6 +24,9 @@ import { GAP, cellSize, reservedHeight, rangeToMode, chunkRows, bucketDaily, Hea
 
 type DateRange = { start: string; end: string };
 
+// MVP 축소판: AI 코치 구조화 리포트·체크리스트는 렌더 제외(후속 복구용 플래그).
+const SHOW_COACH = false;
+
 type Metric = '1rm' | 'maxw' | 'vol' | 'freq' | 'reps';
 const METRICS: [Metric, string][] = [['1rm', '1RM'], ['maxw', '최대무게'], ['vol', '볼륨'], ['freq', '빈도'], ['reps', '렙기록']];
 type Period = '1m' | '3m' | '6m' | '1y' | 'all' | 'custom';
@@ -96,13 +99,13 @@ export default function ExerciseReport() {
     if (exReport?.checklist?.length) setItems(exReport.checklist.map(t => ({ text: t, done: false })));
   }, [exReport]);
 
-  // 렙기록 탭 진입 시 1회 로드(반복수 1~12 역대 최고)
+  // 최근 기록 표 — 종목 로드 시 1회 로드(반복수 1~12 역대 최고)
   useEffect(() => {
-    if (metric !== 'reps' || !exId || repMaxes) return;
+    if (!exId || repMaxes) return;
     let on = true;
     getRepMaxes(exId).then(r => { if (on) setRepMaxes(r); }).catch(() => {});
     return () => { on = false; };
-  }, [metric, exId, repMaxes]);
+  }, [exId, repMaxes]);
 
   // 코치 한 줄 = LLM 해석(비동기·실패 시 코드 템플릿 폴백)
   useEffect(() => {
@@ -171,39 +174,46 @@ export default function ExerciseReport() {
             </View>
           </View>
 
-          {/* 지표 탭(밑줄 스타일) */}
+          {/* [MVP 제외 — 후속 복구] 5지표 토글. 축소판은 1RM 단일.
           <View style={s.seg}>
             {METRICS.map(([k, lbl]) => (
               <Pressable key={k} onPress={() => setMetric(k)} style={[s.segItem, metric === k && s.segOn]}>
                 <Text style={[s.segT, metric === k && s.segTOn]}>{lbl}</Text>
               </Pressable>
             ))}
-          </View>
-          {/* 차트 카드 (렙기록은 표) */}
-          <View style={s.card}>
-            {metric === 'reps'
-              ? <RepTable rows={repMaxes} />
-              : <ChartArea data={data} metric={metric} period={period} range={range} />}
+          </View> */}
+
+          {/* 1RM 추세 1차트 */}
+          <View style={[s.card, { marginTop: 14 }]}>
+            <ChartArea data={data} metric="1rm" period={period} range={range} />
           </View>
 
-          {/* 기간 — 차트 아래 */}
-          {metric !== 'reps' && (
-            <View style={s.periodRow}>
-              {PERIODS.map(([k, lbl]) => (
-                <Pressable key={k} onPress={() => (k === 'custom' ? setRangeOpen(true) : setPeriod(k))} style={[s.pc, period === k && s.pcOn]}>
-                  <Text style={[s.pcT, period === k && s.pcTOn]}>
-                    {k === 'custom' && period === 'custom' && range ? `${fmtDate(range.start)}~${fmtDate(range.end)}` : lbl}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
+          {/* 기간 토글 — 차트 아래(1M/3M/6M/1Y/전체/지정) */}
+          <View style={s.periodRow}>
+            {PERIODS.map(([k, lbl]) => (
+              <Pressable key={k} onPress={() => (k === 'custom' ? setRangeOpen(true) : setPeriod(k))} style={[s.pc, period === k && s.pcOn]}>
+                <Text style={[s.pcT, period === k && s.pcTOn]}>
+                  {k === 'custom' && period === 'custom' && range ? `${fmtDate(range.start)}~${fmtDate(range.end)}` : lbl}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
 
-          {/* 진단 + 핵심 지표 */}
-          <Diagnosis data={data} />
+          {/* 핵심 요약(종목 시트 수준) */}
           <KeyStats data={data} />
 
-          {/* 코치 — 목표·방법(코드) + 해석 한 줄 + 편집 가능 체크리스트 메모 */}
+          {/* 최근 기록 표 — 반복수별 역대 최고 */}
+          <Text style={s.secttl}>최근 기록</Text>
+          <View style={s.card}>
+            <RepTable rows={repMaxes} />
+          </View>
+
+          {/* [MVP 제외 — 후속 복구] 진단 카드(정체/신기록 자동판정)
+          <Diagnosis data={data} /> */}
+
+          {/* [MVP 제외 — 후속 복구] AI 코치 구조화 리포트(원인·다음 액션) + 체크리스트 메모.
+              false 가드로 렌더만 제외. 데이터 fetch(getExerciseReport/CoachLine)와 컴포넌트는 보존. */}
+          {SHOW_COACH && (<>
           <View style={s.coachHd}>
             <Text style={s.secttl}>🤖 AI 코치</Text>
             <Pressable onPress={updateAi} disabled={updating} hitSlop={6} style={s.aiUpd}>
@@ -278,6 +288,12 @@ export default function ExerciseReport() {
               ))}
             </View>
           </View>
+          </>)}
+
+          {/* 핵심 요약 시트 열기 — 역할·오늘 목표는 종목 시트에서 */}
+          <Pressable style={s.sheetBtn} onPress={() => goChat()}>
+            <Text style={s.sheetBtnT}>💬 이 종목 대화로 풀기</Text>
+          </Pressable>
         </ScrollView>
       )}
       <RangePickerSheet
@@ -875,4 +891,6 @@ const s = StyleSheet.create({
   chips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 12 },
   chip: { borderWidth: 1, borderColor: '#2a2230', borderRadius: 13, paddingVertical: 6, paddingHorizontal: 11, backgroundColor: '#0d0d0f' },
   chipT: { color: SEM.brand, fontSize: 10.5, fontWeight: '700' },
+  sheetBtn: { marginHorizontal: 14, marginTop: 18, borderWidth: 1, borderColor: '#2a2a30', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  sheetBtnT: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
