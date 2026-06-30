@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>2축 듀얼 게이지 — 인터랙션 후</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { background:#000; }
+  body {
+    width:390px; margin:0 auto; min-height:844px;
+    background:#000; color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:96px;
+  }
+  .wrap { padding:0 16px; }
+
+  /* 캡션 */
+  .caption {
+    margin:0 16px 4px; padding:9px 12px; border-radius:11px;
+    background:rgba(255,138,0,.10); border:1px solid rgba(255,138,0,.28);
+    font-size:11.5px; line-height:1.4; color:#FFD9A8;
+  }
+  .caption b { color:#fff; }
+
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:8px 16px 6px; }
+  .topbar .back { color:#8E8E93; font-size:26px; line-height:1; width:32px; }
+  .topbar .title { font-size:15px; font-weight:600; color:#fff; letter-spacing:.2px; }
+  .topbar .timer { font-size:13px; color:#8E8E93; font-variant-numeric:tabular-nums; width:64px; text-align:right; }
+
+  .exhead { padding:8px 0 4px; }
+  .exhead .name { font-size:24px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub { margin-top:4px; font-size:12.5px; color:#8E8E93; }
+  .exhead .sub b { color:#fff; font-weight:600; }
+  .pill { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:6px; letter-spacing:.3px; vertical-align:middle; }
+  .pill.anchor { background:rgba(43,217,106,.14); color:#2BD96A; }
+
+  /* 게이지 */
+  .gauges { display:flex; gap:10px; margin-top:12px; }
+  .gauge {
+    flex:1; background:#161618; border-radius:16px; padding:13px 13px 14px;
+    position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.04);
+  }
+  .gauge .axislabel { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.4px; }
+  .gauge .axislabel .dot { width:7px; height:7px; border-radius:50%; }
+  .gauge .axislabel .nm { color:#8E8E93; }
+  .gauge.intensity .axislabel .dot { background:#FF3B30; }
+  .gauge.volume .axislabel .dot { background:#FF8A00; }
+  .gauge .headline { margin-top:9px; font-size:20px; font-weight:800; letter-spacing:-.3px; line-height:1.05; }
+  .gauge .headline span { font-size:12px; font-weight:600; color:#8E8E93; }
+  .gauge .goalline { margin-top:3px; font-size:11px; color:#8E8E93; }
+  .gauge .goalline b { color:#fff; font-weight:600; }
+  .bar { margin-top:11px; height:9px; border-radius:6px; background:#0D0D0D; position:relative; overflow:hidden; }
+  .bar .fill { position:absolute; left:0; top:0; bottom:0; border-radius:6px; }
+  .gauge.intensity .bar .fill { background:linear-gradient(90deg,#FF3B30,#FF6B61); }
+  .gauge.volume .bar .fill { background:linear-gradient(90deg,#FF8A00,#FFB04D); }
+  .bar .gate { position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,.55); border-radius:2px; }
+  .gauge .undertxt { margin-top:7px; display:flex; justify-content:space-between; font-size:10.5px; color:#8E8E93; }
+  .gauge .undertxt b { color:#fff; font-weight:600; }
+
+  /* 볼륨 게이지: 만땅 + 글로우 펄스 */
+  .gauge.volume.full {
+    border:1px solid rgba(43,217,106,.7);
+    box-shadow:0 0 0 1px rgba(43,217,106,.25), 0 0 26px rgba(43,217,106,.32);
+    animation:pop .5s ease;
+  }
+  @keyframes pop { 0%{ transform:scale(.97);} 55%{ transform:scale(1.025);} 100%{ transform:scale(1);} }
+  .gauge.volume.full .bar .fill {
+    width:100% !important; background:linear-gradient(90deg,#2BD96A,#7BE8A4);
+    box-shadow:0 0 12px rgba(43,217,106,.6);
+  }
+  .gauge.volume.full .headline { color:#2BD96A; }
+  .fullbadge {
+    position:absolute; top:11px; right:11px; font-size:9.5px; font-weight:800; letter-spacing:.4px;
+    background:#2BD96A; color:#000; padding:2px 7px; border-radius:6px;
+  }
+  /* 만땅 스파클 */
+  .spark { position:absolute; width:5px; height:5px; border-radius:50%; background:#2BD96A; opacity:.9; }
+  .s1 { top:34px; left:18px; box-shadow:0 0 6px #2BD96A; }
+  .s2 { top:52px; right:24px; width:4px; height:4px; box-shadow:0 0 5px #7BE8A4; }
+  .s3 { top:72px; left:40px; width:3px; height:3px; box-shadow:0 0 5px #2BD96A; }
+
+  /* ---- 레벨업 / 증량 게이트 카드 ---- */
+  .levelcard {
+    margin-top:14px; border-radius:18px; padding:16px 16px 15px; position:relative; overflow:hidden;
+    background:linear-gradient(160deg,#11271a,#0c1a12);
+    border:1px solid rgba(43,217,106,.4);
+  }
+  .levelcard .glow { position:absolute; top:-40px; right:-30px; width:160px; height:160px; border-radius:50%;
+    background:radial-gradient(circle,rgba(43,217,106,.22),transparent 70%); }
+  .levelcard .kick { font-size:11px; font-weight:800; letter-spacing:1.2px; color:#2BD96A; display:flex; align-items:center; gap:6px; }
+  .levelcard .kick .lvl { background:#2BD96A; color:#000; font-size:9.5px; padding:1px 6px; border-radius:5px; letter-spacing:.4px; }
+  .levelcard h2 { margin-top:9px; font-size:21px; font-weight:800; letter-spacing:-.3px; line-height:1.18; }
+  .levelcard h2 .from { color:#8E8E93; text-decoration:line-through; text-decoration-color:#5a5a5e; font-weight:700; }
+  .levelcard h2 .arrow { color:#2BD96A; padding:0 4px; }
+  .levelcard h2 .to { color:#2BD96A; }
+  .levelcard .why { margin-top:8px; font-size:12.5px; line-height:1.45; color:#cfeede; }
+  .levelcard .why b { color:#fff; font-weight:700; }
+
+  .levelcard .nextset {
+    margin-top:13px; background:rgba(0,0,0,.32); border:1px solid rgba(43,217,106,.22); border-radius:12px;
+    padding:11px 13px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .levelcard .nextset .l { font-size:11px; color:#8E8E93; }
+  .levelcard .nextset .l b { display:block; margin-top:2px; font-size:16px; font-weight:800; color:#fff; letter-spacing:-.2px; }
+  .levelcard .nextset .r { font-size:11px; color:#8E8E93; text-align:right; }
+  .levelcard .nextset .r b { color:#2BD96A; }
+
+  /* 강도축 미니 상태 (한 축만 증량 — 다른 축은 유지 안내) */
+  .holdnote {
+    margin-top:10px; display:flex; align-items:center; gap:9px; font-size:11.5px; color:#8E8E93;
+    background:#161618; border:1px solid rgba(255,255,255,.05); border-radius:12px; padding:10px 12px;
+  }
+  .holdnote .d { width:8px; height:8px; border-radius:50%; background:#FF3B30; flex:none; }
+  .holdnote b { color:#fff; font-weight:600; }
+
+  /* 방금 친 세트 요약 */
+  .justdid {
+    margin-top:14px; display:flex; align-items:center; gap:11px; background:#161618; border-radius:13px;
+    padding:12px 13px; border:1px solid rgba(43,217,106,.3);
+  }
+  .justdid .idx { width:26px; height:26px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800; color:#FF8A00; background:rgba(255,138,0,.12); }
+  .justdid .vals { flex:1; }
+  .justdid .now { font-size:17px; font-weight:800; letter-spacing:-.2px; }
+  .justdid .now .unit { font-size:12px; font-weight:600; color:#8E8E93; }
+  .justdid .now .x { color:#48484A; padding:0 2px; }
+  .justdid .prev { margin-top:2px; font-size:11px; color:#8E8E93; }
+  .justdid .prev .up { color:#2BD96A; font-weight:600; }
+  .justdid .check { width:28px; height:28px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:800; background:#2BD96A; color:#000; }
+
+  /* 하단 액션 */
+  .bottombar {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px;
+    padding:12px 16px 26px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 32%);
+  }
+  .bigbtn {
+    width:100%; height:54px; border:none; border-radius:15px; background:#FF3B30; color:#fff;
+    font-size:16px; font-weight:800; letter-spacing:.2px; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .bigbtn .small { font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">인터랙션: 마지막 백오프 <b>B3 기록</b> → 볼륨 게이지가 <b>33/33으로 만땅</b> → 다음 단계(백오프 무게 +2.5kg) 증량 게이트 통과 연출.</div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">41:03</div>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · <b>볼륨축 게이지 완성</b></div>
+    </div>
+
+    <!-- 게이지: 강도축은 그대로, 볼륨축 만땅 -->
+    <div class="gauges">
+      <div class="gauge intensity">
+        <div class="axislabel"><span class="dot"></span><span class="nm">강도축 · 탑세트</span></div>
+        <div class="headline">62.5<span>kg</span></div>
+        <div class="goalline">목표 <b>8회 유지</b> · 직전 8/7</div>
+        <div class="bar"><div class="fill" style="width:62%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt"><span>증량까지 <b>탑 6/6</b></span><span>유지 주차</span></div>
+      </div>
+
+      <div class="gauge volume full">
+        <div class="fullbadge">만땅 ✓</div>
+        <span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span>
+        <div class="axislabel"><span class="dot"></span><span class="nm">볼륨축 · 백오프</span></div>
+        <div class="headline">33<span> / 33회</span></div>
+        <div class="goalline">직전 29회 → <b style="color:#2BD96A">+4회 달성</b></div>
+        <div class="bar"><div class="fill"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt"><span style="color:#2BD96A">볼륨축 <b style="color:#2BD96A">다음 단계</b></span><span>레벨업</span></div>
+      </div>
+    </div>
+
+    <!-- 방금 친 세트 -->
+    <div class="justdid">
+      <div class="idx">B3</div>
+      <div class="vals">
+        <div class="now">55<span class="unit">kg</span><span class="x">×</span>12<span class="unit">회</span></div>
+        <div class="prev">직전 55 × 9 · <span class="up">+3회 · 총 33회로 게이지 완성</span></div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 레벨업 / 증량 게이트 카드 -->
+    <div class="levelcard">
+      <div class="glow"></div>
+      <div class="kick"><span class="lvl">LEVEL UP</span> 볼륨축 게이지 완성 — 다음 단계 해금</div>
+      <h2><span class="from">백오프 55kg</span><span class="arrow">→</span><span class="to">57.5kg</span></h2>
+      <div class="why">백오프 3세트가 모두 상단(총 33회)을 채웠어요. 다음 운동부터 <b>백오프 무게를 한 단계 올리고 반복은 8회부터 다시 시작</b>합니다. 볼륨축이 강도축을 끌어올릴 차례예요.</div>
+
+      <div class="nextset">
+        <div class="l">다음 백오프 처방<b>57.5kg × 8 / 8 / 8</b></div>
+        <div class="r">증량폭 +2.5kg<br><b>상체 안전 범위</b></div>
+      </div>
+    </div>
+
+    <!-- 강도축 유지 안내 (둘 동시 증량 금지) -->
+    <div class="holdnote">
+      <span class="d"></span>
+      <span><b>강도축(탑 62.5kg)은 이번엔 그대로 유지</b> — 두 축을 같은 날 동시에 올리지 않아요. 탑은 6/6을 채우면 다음 차례.</span>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <button class="bigbtn">적용하고 다음 종목 <span class="small">· 인클라인 덤벨</span></button>
+  </div>
+</body>
+</html>

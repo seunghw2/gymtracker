@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>2축 듀얼 게이지 — 기본</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { background:#000; }
+  body {
+    width:390px; margin:0 auto; min-height:844px;
+    background:#000; color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:96px;
+  }
+  .wrap { padding:0 16px; }
+
+  /* ---- 상단 바 ---- */
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 6px; }
+  .topbar .back { color:#8E8E93; font-size:26px; line-height:1; width:32px; }
+  .topbar .title { font-size:15px; font-weight:600; color:#fff; letter-spacing:.2px; }
+  .topbar .timer { font-size:13px; color:#8E8E93; font-variant-numeric:tabular-nums; width:64px; text-align:right; }
+
+  /* ---- 종목 헤더 ---- */
+  .exhead { padding:10px 0 4px; }
+  .exhead .name { font-size:26px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub { margin-top:4px; font-size:12.5px; color:#8E8E93; }
+  .exhead .sub b { color:#fff; font-weight:600; }
+  .pill { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:6px; letter-spacing:.3px; vertical-align:middle; }
+  .pill.anchor { background:rgba(43,217,106,.14); color:#2BD96A; }
+
+  /* ---- 듀얼 게이지 ---- */
+  .gauges { display:flex; gap:10px; margin-top:14px; }
+  .gauge {
+    flex:1; background:#161618; border-radius:16px; padding:13px 13px 14px;
+    position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.04);
+  }
+  .gauge.active { border:1px solid rgba(255,138,0,.55); box-shadow:0 0 0 1px rgba(255,138,0,.18); }
+  .gauge .axislabel { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.4px; }
+  .gauge .axislabel .dot { width:7px; height:7px; border-radius:50%; }
+  .gauge .axislabel .nm { color:#8E8E93; }
+  .gauge.intensity .axislabel .dot { background:#FF3B30; }
+  .gauge.volume .axislabel .dot { background:#FF8A00; }
+  .gauge .headline { margin-top:9px; font-size:20px; font-weight:800; letter-spacing:-.3px; line-height:1.05; }
+  .gauge .headline span { font-size:12px; font-weight:600; color:#8E8E93; }
+  .gauge .goalline { margin-top:3px; font-size:11px; color:#8E8E93; }
+  .gauge .goalline b { color:#fff; font-weight:600; }
+
+  /* 세로 바 게이지 */
+  .bar { margin-top:11px; height:9px; border-radius:6px; background:#0D0D0D; position:relative; overflow:hidden; }
+  .bar .fill { position:absolute; left:0; top:0; bottom:0; border-radius:6px; }
+  .gauge.intensity .bar .fill { background:linear-gradient(90deg,#FF3B30,#FF6B61); }
+  .gauge.volume .bar .fill { background:linear-gradient(90deg,#FF8A00,#FFB04D); }
+  .bar .gate { position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,.55); border-radius:2px; }
+  .gauge .undertxt { margin-top:7px; display:flex; justify-content:space-between; font-size:10.5px; color:#8E8E93; }
+  .gauge .undertxt b { color:#fff; font-weight:600; }
+
+  .turnbadge { position:absolute; top:11px; right:11px; font-size:9.5px; font-weight:800; letter-spacing:.4px;
+    background:#FF8A00; color:#000; padding:2px 6px; border-radius:6px; }
+
+  /* ---- 이번 주 축 강조 배너 ---- */
+  .focusbanner {
+    margin-top:13px; background:linear-gradient(90deg,rgba(255,138,0,.16),rgba(255,138,0,.04));
+    border:1px solid rgba(255,138,0,.32); border-radius:13px; padding:11px 13px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .focusbanner .ic { font-size:18px; }
+  .focusbanner .txt { font-size:12.5px; line-height:1.35; color:#FFD9A8; }
+  .focusbanner .txt b { color:#fff; font-weight:700; }
+
+  /* ---- 세트 섹션 ---- */
+  .secttl { margin:18px 2px 8px; font-size:11px; font-weight:700; letter-spacing:.6px; color:#8E8E93; display:flex; align-items:center; gap:6px; }
+  .secttl .ln { flex:1; height:1px; background:rgba(255,255,255,.06); }
+
+  .setrow {
+    display:flex; align-items:center; gap:11px; background:#161618; border-radius:13px;
+    padding:12px 13px; margin-bottom:8px; border:1px solid rgba(255,255,255,.04); position:relative;
+  }
+  .setrow .idx {
+    width:26px; height:26px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800; color:#8E8E93; background:#0D0D0D;
+  }
+  .setrow.top .idx { color:#FF3B30; background:rgba(255,59,48,.12); }
+  .setrow.back .idx { color:#FF8A00; background:rgba(255,138,0,.12); }
+  .setrow .vals { flex:1; }
+  .setrow .now { font-size:17px; font-weight:800; letter-spacing:-.2px; }
+  .setrow .now .unit { font-size:12px; font-weight:600; color:#8E8E93; }
+  .setrow .now .x { color:#48484A; padding:0 2px; }
+  .setrow .prev { margin-top:2px; font-size:11px; color:#8E8E93; }
+  .setrow .prev .beat { color:#fff; font-weight:600; }
+
+  .setrow .check {
+    width:28px; height:28px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:800;
+  }
+  .setrow.done .check { background:#2BD96A; color:#000; }
+  .setrow.done .now { color:#fff; }
+  .setrow.pending .check { border:2px solid #2c2c2e; color:transparent; }
+
+  /* 활성(지금 칠) 세트 */
+  .setrow.activeNow { border:1px solid rgba(255,138,0,.55); background:#1a1611; }
+  .setrow.activeNow::before {
+    content:"지금"; position:absolute; top:-8px; left:13px; font-size:9px; font-weight:800; letter-spacing:.4px;
+    background:#FF8A00; color:#000; padding:1px 6px; border-radius:5px;
+  }
+  .setrow.activeNow .now { color:#fff; }
+  .setrow.activeNow .target { color:#FF8A00; }
+
+  /* RIR 칩 */
+  .rirrow { margin:6px 2px 0; display:flex; align-items:center; gap:8px; }
+  .rirrow .lbl { font-size:11px; color:#8E8E93; }
+  .rirchip { font-size:11px; font-weight:600; color:#8E8E93; background:#161618; border:1px solid rgba(255,255,255,.07);
+    padding:5px 10px; border-radius:8px; }
+  .rirchip.sel { color:#000; background:#2BD96A; border-color:#2BD96A; font-weight:700; }
+
+  /* ---- 하단 액션 ---- */
+  .bottombar {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px;
+    padding:12px 16px 26px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 32%);
+  }
+  .bigbtn {
+    width:100%; height:54px; border:none; border-radius:15px; background:#FF3B30; color:#fff;
+    font-size:16px; font-weight:800; letter-spacing:.2px; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .bigbtn .small { font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">38:12</div>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · <b>탑 무게 유지 · 백오프 반복 쌓기</b></div>
+    </div>
+
+    <!-- 듀얼 게이지 -->
+    <div class="gauges">
+      <!-- 강도축 -->
+      <div class="gauge intensity">
+        <div class="axislabel"><span class="dot"></span><span class="nm">강도축 · 탑세트</span></div>
+        <div class="headline">62.5<span>kg</span></div>
+        <div class="goalline">목표 <b>8회 유지</b> · 직전 8/7</div>
+        <div class="bar"><div class="fill" style="width:62%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt"><span>증량까지 <b>탑 6/6</b></span><span>유지 주차</span></div>
+      </div>
+
+      <!-- 볼륨축 (이번 주 차례) -->
+      <div class="gauge volume active">
+        <div class="turnbadge">이번 주 차례</div>
+        <div class="axislabel"><span class="dot"></span><span class="nm">볼륨축 · 백오프</span></div>
+        <div class="headline">29<span> / 33회</span></div>
+        <div class="goalline">직전 총 <b>29회</b> · 남은 <b>4회</b></div>
+        <div class="bar"><div class="fill" style="width:74%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt"><span>채우면 <b>57.5kg 리셋</b></span><span>볼륨 적립</span></div>
+      </div>
+    </div>
+
+    <div class="focusbanner">
+      <div class="ic">🎯</div>
+      <div class="txt">이번 주는 <b>볼륨축 차례</b> — 탑은 62.5kg 그대로 두고, 백오프에서 <b>직전 29회를 33회로</b> 넘기면 게이지가 꽉 차요.</div>
+    </div>
+
+    <!-- 탑세트 -->
+    <div class="secttl">탑세트 · 강도축<span class="ln"></span><span style="color:#FF3B30">2세트</span></div>
+
+    <div class="setrow top done">
+      <div class="idx">T1</div>
+      <div class="vals">
+        <div class="now">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></div>
+        <div class="prev">직전 <span class="beat">62.5 × 8</span> · 동률 유지</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <div class="setrow top done">
+      <div class="idx">T2</div>
+      <div class="vals">
+        <div class="now">62.5<span class="unit">kg</span><span class="x">×</span>7<span class="unit">회</span></div>
+        <div class="prev">직전 <span class="beat">62.5 × 7</span> · 동률 유지</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 백오프 -->
+    <div class="secttl">백오프 · 볼륨축<span class="ln"></span><span style="color:#FF8A00">3세트 · 55kg</span></div>
+
+    <div class="setrow back done">
+      <div class="idx">B1</div>
+      <div class="vals">
+        <div class="now">55<span class="unit">kg</span><span class="x">×</span>11<span class="unit">회</span></div>
+        <div class="prev">직전 <span class="beat">55 × 10</span> · <span style="color:#2BD96A">+1 갱신</span></div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <div class="setrow back done">
+      <div class="idx">B2</div>
+      <div class="vals">
+        <div class="now">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회</span></div>
+        <div class="prev">직전 <span class="beat">55 × 10</span> · 동률</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <div class="setrow back activeNow pending">
+      <div class="idx">B3</div>
+      <div class="vals">
+        <div class="now"><span class="target">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회+</span></span></div>
+        <div class="prev">직전 <span class="beat">55 × 9</span> · <b style="color:#FF8A00">이걸 넘기면 총 33회</b></div>
+      </div>
+      <div class="check">○</div>
+    </div>
+
+    <div class="rirrow">
+      <span class="lbl">노력도? (선택)</span>
+      <span class="rirchip">여유 많음</span>
+      <span class="rirchip sel">2~3개 남음</span>
+      <span class="rirchip">거의 한계</span>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <button class="bigbtn">B3 기록하고 채우기 <span class="small">· 볼륨 게이지 +1칸</span></button>
+  </div>
+</body>
+</html>

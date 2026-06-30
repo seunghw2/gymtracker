@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Quest — 운동 중 (기본)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { background:#000; }
+  body {
+    width:390px; margin:0 auto; min-height:844px;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+    color:#fff; background:linear-gradient(180deg,#0D0D0D 0%,#000 100%);
+    padding:0 0 28px;
+  }
+  .safe { height:54px; }
+
+  /* ---- 상단 바 ---- */
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:4px 18px 10px; }
+  .topbar .back { color:#8E8E93; font-size:26px; line-height:1; }
+  .topbar .title { font-size:15px; font-weight:600; letter-spacing:.2px; }
+  .topbar .title .sub { display:block; font-size:11px; color:#8E8E93; font-weight:500; margin-top:2px; text-align:center; }
+  .topbar .timer { font-size:13px; color:#8E8E93; font-variant-numeric:tabular-nums; min-width:40px; text-align:right; }
+
+  /* ---- 퀘스트 헤더 카드 ---- */
+  .quest { margin:6px 14px 0; background:#161618; border:1px solid #1f1f22; border-radius:18px; padding:16px 16px 14px; position:relative; overflow:hidden; }
+  .quest::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:linear-gradient(180deg,#FF3B30,#FF8A00); }
+  .quest .qlabel { font-size:11px; letter-spacing:1.5px; color:#FF8A00; font-weight:700; }
+  .quest h1 { font-size:20px; font-weight:700; margin-top:4px; letter-spacing:-.3px; }
+  .quest .qgoal { font-size:13px; color:#c7c7cc; margin-top:8px; line-height:1.5; }
+  .quest .qgoal b { color:#fff; font-weight:600; }
+  .quest .chips { display:flex; gap:7px; margin-top:12px; }
+  .chip { font-size:11px; padding:5px 9px; border-radius:8px; font-weight:600; }
+  .chip.keep { background:rgba(255,138,0,.14); color:#FF8A00; border:1px solid rgba(255,138,0,.3); }
+  .chip.build { background:rgba(43,217,106,.13); color:#2BD96A; border:1px solid rgba(43,217,106,.3); }
+  .chip.anchor { background:#202024; color:#8E8E93; }
+
+  /* ---- 퀘스트 진척 바 (서브 스텝 도트) ---- */
+  .qprog { display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .qprog .track { flex:1; height:8px; border-radius:6px; background:#0d0d0d; border:1px solid #232327; overflow:hidden; display:flex; }
+  .qprog .seg { height:100%; }
+  .qprog .seg.done { background:#2BD96A; }
+  .qprog .seg.now { background:repeating-linear-gradient(45deg,#FF3B30,#FF3B30 6px,#c12d25 6px,#c12d25 12px); }
+  .qprog .seg.todo { background:transparent; }
+  .qprog .seg + .seg { border-left:1px solid #000; }
+  .qprog .ratio { font-size:12px; color:#8E8E93; font-weight:600; font-variant-numeric:tabular-nums; }
+  .qprog .ratio b { color:#fff; }
+
+  /* ---- 스테이지 헤더 ---- */
+  .stage { margin:22px 18px 0; display:flex; align-items:center; gap:9px; }
+  .stage .dot { width:8px; height:8px; border-radius:50%; }
+  .stage.top .dot { background:#FF3B30; }
+  .stage.back .dot { background:#FF8A00; }
+  .stage .name { font-size:13px; font-weight:700; letter-spacing:.4px; }
+  .stage.top .name { color:#FF3B30; }
+  .stage.back .name { color:#FF8A00; }
+  .stage .axis { font-size:11px; color:#8E8E93; font-weight:500; }
+  .stage .line { flex:1; height:1px; background:#1c1c1f; }
+  .stage .count { font-size:11px; color:#8E8E93; font-variant-numeric:tabular-nums; }
+
+  /* ---- 세트 스텝 ---- */
+  .steps { margin:10px 14px 0; display:flex; flex-direction:column; gap:9px; }
+  .step { background:#131315; border:1px solid #1d1d20; border-radius:14px; padding:13px 14px; display:flex; align-items:center; gap:13px; position:relative; }
+  .step.done { background:#101311; border-color:#1d2a20; }
+  .step.now { background:#161618; border-color:#FF3B30; box-shadow:0 0 0 1px #FF3B30, 0 8px 22px rgba(255,59,48,.18); }
+  .step.todo { opacity:.62; }
+
+  .step .mark { width:30px; height:30px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; }
+  .step.done .mark { background:#2BD96A; color:#06210f; }
+  .step.now .mark { background:transparent; border:2px solid #FF3B30; color:#FF3B30; font-size:13px; }
+  .step.todo .mark { background:transparent; border:2px solid #2c2c30; color:#5a5a5f; }
+
+  .step .body { flex:1; min-width:0; }
+  .step .srow { display:flex; align-items:baseline; gap:8px; }
+  .step .setno { font-size:12px; color:#8E8E93; font-weight:600; }
+  .step .prev { font-size:12px; color:#8E8E93; }
+  .step .prev .num { color:#aeaeb2; font-weight:600; font-variant-numeric:tabular-nums; }
+
+  .step .target { display:flex; align-items:baseline; gap:6px; margin-top:5px; }
+  .step .tw { font-size:26px; font-weight:700; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .step .tx { font-size:15px; color:#8E8E93; font-weight:600; }
+  .step .tr { font-size:26px; font-weight:700; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .step .tu { font-size:13px; color:#8E8E93; font-weight:600; align-self:flex-end; margin-bottom:3px; }
+  .step.now .tw, .step.now .tr { color:#fff; }
+  .step.done .tw, .step.done .tr { color:#dcdcdc; font-size:22px; }
+  .step.done .target { margin-top:3px; }
+
+  .step .goaltag { display:inline-block; font-size:11px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:7px; }
+  .goaltag.beat { background:rgba(43,217,106,.14); color:#2BD96A; }     /* 직전 갱신 목표 */
+  .goaltag.hold { background:rgba(255,138,0,.14); color:#FF8A00; }      /* 무게 유지 목표 */
+  .goaltag.cleared { background:rgba(43,217,106,.16); color:#2BD96A; }
+
+  .step .delta { font-size:11px; color:#2BD96A; font-weight:600; margin-top:4px; }
+  .step .delta.miss { color:#8E8E93; }
+
+  /* now 세트 우측: 입력 힌트 */
+  .step .enter { flex:none; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .step .enter .btn { width:46px; height:46px; border-radius:13px; background:#FF3B30; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .step .enter .lab { font-size:10px; color:#8E8E93; }
+
+  /* ---- 게이트 (다음 레벨/보스) ---- */
+  .gate { margin:18px 14px 0; background:linear-gradient(135deg,#161618,#141416); border:1px dashed #3a2a12; border-radius:16px; padding:15px 16px; }
+  .gate .ghead { display:flex; align-items:center; gap:8px; }
+  .gate .lock { font-size:15px; }
+  .gate .gtitle { font-size:13px; font-weight:700; color:#FF8A00; letter-spacing:.3px; }
+  .gate .gtitle .lv { color:#8E8E93; font-weight:600; }
+  .gate .gdesc { font-size:12px; color:#c7c7cc; margin-top:7px; line-height:1.5; }
+  .gate .gdesc b { color:#fff; }
+  .gate .gbar { display:flex; align-items:center; gap:9px; margin-top:11px; }
+  .gate .gtrack { flex:1; height:7px; border-radius:5px; background:#0d0d0d; border:1px solid #2a2118; overflow:hidden; }
+  .gate .gfill { height:100%; width:73%; background:linear-gradient(90deg,#FF8A00,#FFb04a); border-radius:5px; }
+  .gate .gnum { font-size:12px; color:#FF8A00; font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* ---- 하단 액션 ---- */
+  .footer { position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,rgba(0,0,0,0),#000 38%); }
+  .footer .complete { width:100%; height:54px; border-radius:15px; background:#FF3B30; color:#fff; font-size:17px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:9px; }
+  .footer .complete .small { font-size:12px; font-weight:600; opacity:.85; }
+  .botpad { height:96px; }
+</style>
+</head>
+<body>
+  <div class="safe"></div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">벤치프레스<span class="sub">오늘의 퀘스트 · 2번째 종목</span></div>
+    <div class="timer">12:04</div>
+  </div>
+
+  <!-- 퀘스트 헤더 -->
+  <div class="quest">
+    <div class="qlabel">TODAY'S QUEST</div>
+    <h1>탑 무게 지키고 · 백오프 채우기</h1>
+    <div class="qgoal">탑은 <b>62.5kg</b> 강도 유지, 백오프 55kg 총 반복을 <b>지난 29회 → 30회</b>로 넘겨라.</div>
+    <div class="chips">
+      <span class="chip keep">강도 유지</span>
+      <span class="chip build">볼륨 +1↑</span>
+      <span class="chip anchor">ANCHOR · PR 신뢰</span>
+    </div>
+    <div class="qprog">
+      <div class="track">
+        <div class="seg done" style="width:40%"></div>
+        <div class="seg now" style="width:20%"></div>
+        <div class="seg todo" style="width:40%"></div>
+      </div>
+      <div class="ratio"><b>2</b>/5 클리어</div>
+    </div>
+  </div>
+
+  <!-- 스테이지 1: 탑세트 -->
+  <div class="stage top">
+    <span class="dot"></span><span class="name">탑세트</span>
+    <span class="axis">강도축 · 무게 유지</span>
+    <span class="line"></span>
+    <span class="count">2/2 ✓</span>
+  </div>
+
+  <div class="steps">
+    <div class="step done">
+      <div class="mark">✓</div>
+      <div class="body">
+        <div class="srow"><span class="setno">탑 1</span><span class="prev">지난 <span class="num">62.5×8</span></span><span class="goaltag cleared">갱신 ✓</span></div>
+        <div class="target"><span class="tw">62.5</span><span class="tx">kg ×</span><span class="tr">8</span></div>
+        <div class="delta">반복 7 → 8 · 직전 갱신</div>
+      </div>
+    </div>
+
+    <div class="step done">
+      <div class="mark">✓</div>
+      <div class="body">
+        <div class="srow"><span class="setno">탑 2</span><span class="prev">지난 <span class="num">62.5×7</span></span><span class="goaltag cleared">갱신 ✓</span></div>
+        <div class="target"><span class="tw">62.5</span><span class="tx">kg ×</span><span class="tr">8</span></div>
+        <div class="delta">반복 7 → 8 · 직전 갱신</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 스테이지 2: 백오프 -->
+  <div class="stage back">
+    <span class="dot"></span><span class="name">백오프</span>
+    <span class="axis">볼륨축 · 반복 쌓기</span>
+    <span class="line"></span>
+    <span class="count">0/3</span>
+  </div>
+
+  <div class="steps">
+    <!-- 지금 칠 세트 (now) -->
+    <div class="step now">
+      <div class="mark">3</div>
+      <div class="body">
+        <div class="srow"><span class="setno">백오프 1</span><span class="prev">지난 <span class="num">55×10</span></span><span class="goaltag hold">무게 유지</span></div>
+        <div class="target"><span class="tw">55</span><span class="tx">kg ×</span><span class="tr">10</span><span class="tu">목표</span></div>
+        <div class="delta">이겨야 할 숫자 · 10 이상</div>
+      </div>
+      <div class="enter">
+        <div class="btn">＋</div>
+        <div class="lab">기록</div>
+      </div>
+    </div>
+
+    <div class="step todo">
+      <div class="mark">4</div>
+      <div class="body">
+        <div class="srow"><span class="setno">백오프 2</span><span class="prev">지난 <span class="num">55×10</span></span><span class="goaltag hold">무게 유지</span></div>
+        <div class="target"><span class="tw">55</span><span class="tx">kg ×</span><span class="tr">10</span><span class="tu">목표</span></div>
+      </div>
+    </div>
+
+    <div class="step todo">
+      <div class="mark">5</div>
+      <div class="body">
+        <div class="srow"><span class="setno">백오프 3</span><span class="prev">지난 <span class="num">55×9</span></span><span class="goaltag beat">RIR 여기</span></div>
+        <div class="target"><span class="tw">55</span><span class="tx">kg ×</span><span class="tr">10</span><span class="tu">목표</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 게이트: 다음 레벨 -->
+  <div class="gate">
+    <div class="ghead">
+      <span class="lock">🔒</span>
+      <span class="gtitle">다음 레벨 — 백오프 57.5kg <span class="lv">(Lv.2 증량)</span></span>
+    </div>
+    <div class="gdesc">백오프 <b>3세트 모두 10회</b>를 채우면 다음 운동부터 <b>57.5kg</b>로 레벨업. 지금 <b>총 29 → 30회</b>까지 1회 남음.</div>
+    <div class="gbar">
+      <div class="gtrack"><div class="gfill"></div></div>
+      <div class="gnum">29 / 30</div>
+    </div>
+  </div>
+
+  <div class="botpad"></div>
+
+  <!-- 하단 액션 -->
+  <div class="footer">
+    <div class="complete">백오프 1 완료<span class="small">· 다음 스텝으로</span></div>
+  </div>
+</body>
+</html>

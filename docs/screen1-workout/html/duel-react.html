@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>운동 중 · 직전 대결형 (interaction)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000000; --bg2:#0D0D0D; --card:#161618; --card2:#1E1E20;
+    --red:#FF3B30; --white:#FFFFFF; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+    --line:#262629;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
+    color:var(--white); padding-bottom:40px; position:relative; overflow-x:hidden;
+  }
+
+  .caption{ background:#0d0d0f; border-bottom:1px solid var(--line); padding:9px 16px; font-size:11px; color:var(--gray); line-height:1.45; }
+  .caption b{ color:var(--white); }
+
+  .h{ padding:12px 18px 4px; display:flex; align-items:center; justify-content:space-between; }
+  .h .t{ font-size:13px; color:var(--gray); }
+  .h .clock{ font-size:13px; color:var(--gray); }
+
+  .ex{ padding:2px 18px 0; }
+  .ex .name{ font-size:22px; font-weight:800; letter-spacing:-0.5px; }
+
+  .steps{ display:flex; gap:6px; padding:11px 18px 4px; }
+  .step{ flex:1; height:5px; border-radius:3px; background:#242427; position:relative; overflow:hidden; }
+  .step.win{ background:var(--green); }
+  .step.tie{ background:var(--orange); }
+  .step.flash{ animation:stepflash .9s ease; }
+  @keyframes stepflash{ 0%{ box-shadow:0 0 0 0 rgba(43,217,106,.6);} 100%{ box-shadow:0 0 0 8px rgba(43,217,106,0);} }
+  .steplbl{ display:flex; justify-content:space-between; padding:3px 18px 0; font-size:10px; color:var(--gray); }
+  .steplbl b.g{ color:var(--green); }
+
+  .seclab{ display:flex; align-items:center; gap:8px; padding:14px 18px 6px; }
+  .seclab .dot{ width:8px; height:8px; border-radius:50%; }
+  .seclab .dot.top{ background:var(--red); }
+  .seclab .dot.back{ background:var(--orange); }
+  .seclab .ttl{ font-size:13px; font-weight:800; }
+  .seclab .meta{ font-size:11px; color:var(--gray); margin-left:auto; }
+
+  .duel{ margin:0 18px 10px; background:var(--card); border-radius:14px; padding:11px 12px 12px; border:1px solid var(--line); position:relative; overflow:hidden; }
+
+  .vs-row{ display:grid; grid-template-columns:1fr 30px 1fr; align-items:stretch; }
+  .side{ padding:2px 4px; }
+  .side .role{ font-size:10px; font-weight:700; color:var(--gray); letter-spacing:.4px; }
+  .side .val{ font-size:21px; font-weight:800; letter-spacing:-.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .side .val .u{ font-size:12px; font-weight:600; color:var(--gray); margin-left:1px; }
+  .side .reps{ font-size:12px; color:var(--gray); margin-top:1px; }
+  .prev .val{ color:var(--gray); }
+  .today{ text-align:right; }
+  .vs{ display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .vs .k{ font-size:11px; font-weight:900; color:#48484d; letter-spacing:1px; }
+  .vs .bar{ width:1px; flex:1; background:var(--line); margin:4px 0; }
+
+  .verdict{ margin-top:9px; font-size:11px; display:flex; align-items:center; gap:6px; }
+  .verdict.win{ color:var(--green); }
+  .verdict.tie{ color:var(--orange); }
+  .verdict.todo{ color:var(--gray); }
+  .verdict .tag{ font-weight:800; }
+
+  /* === 승리 연출 카드 === */
+  .winflash{ border:1px solid rgba(43,217,106,.55) !important; background:#10160f !important;
+             box-shadow:0 0 0 1px rgba(43,217,106,.25), 0 0 32px rgba(43,217,106,.20); animation:cardpop .5s cubic-bezier(.2,.9,.3,1.3); }
+  @keyframes cardpop{ 0%{ transform:scale(.97);} 60%{ transform:scale(1.012);} 100%{ transform:scale(1);} }
+  .winflash .today .val{ color:var(--green); animation:numpop .55s ease; }
+  @keyframes numpop{ 0%{ transform:scale(1);} 35%{ transform:scale(1.18);} 100%{ transform:scale(1);} }
+
+  /* 승리 배너(카드 위 오버레이) */
+  .winbanner{ display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:7px 10px;
+              background:rgba(43,217,106,.12); border:1px solid rgba(43,217,106,.4); border-radius:10px; animation:slidein .45s ease; }
+  .winbanner .wb-ic{ font-size:16px; }
+  .winbanner .wb-t{ font-size:13px; font-weight:800; color:var(--green); }
+  .winbanner .wb-d{ font-size:11px; color:#9fe6ba; margin-left:auto; }
+  @keyframes slidein{ from{ opacity:0; transform:translateY(-6px);} to{ opacity:1; transform:translateY(0);} }
+
+  /* tie(쉬워짐 승리) 배너 */
+  .tiebanner{ background:rgba(255,138,0,.12); border:1px solid rgba(255,138,0,.4); }
+  .tiebanner .wb-t{ color:var(--orange); }
+  .tiebanner .wb-d{ color:#ffce8f; }
+  .winflash.tieflash{ border-color:rgba(255,138,0,.55) !important; background:#1a1208 !important;
+                      box-shadow:0 0 0 1px rgba(255,138,0,.22), 0 0 30px rgba(255,138,0,.18); }
+  .winflash.tieflash .today .val{ color:var(--orange); }
+
+  /* 떠오르는 파편(승리 입자) */
+  .spark{ position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:2px; pointer-events:none; }
+  .s1{ background:var(--green); animation:fly1 .9s ease forwards; }
+  .s2{ background:#7FE0A0; animation:fly2 1s ease forwards; }
+  .s3{ background:var(--green); animation:fly3 .85s ease forwards; }
+  .s4{ background:#7FE0A0; animation:fly4 .95s ease forwards; }
+  @keyframes fly1{ to{ transform:translate(-70px,-46px) rotate(180deg); opacity:0;} }
+  @keyframes fly2{ to{ transform:translate(60px,-54px) rotate(-160deg); opacity:0;} }
+  @keyframes fly3{ to{ transform:translate(-44px,40px) rotate(140deg); opacity:0;} }
+  @keyframes fly4{ to{ transform:translate(72px,30px) rotate(-120deg); opacity:0;} }
+
+  /* 토스트 (+경험/스트릭 미세 보상) */
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:120px; background:#15311c; border:1px solid rgba(43,217,106,.5);
+          color:var(--green); font-size:12px; font-weight:700; padding:9px 14px; border-radius:12px; display:flex; align-items:center; gap:8px;
+          box-shadow:0 10px 30px rgba(0,0,0,.5); animation:toastin 3s ease forwards; }
+  .toast .pill{ background:rgba(43,217,106,.18); border-radius:20px; padding:2px 8px; font-size:11px; }
+  @keyframes toastin{ 0%{ opacity:0; transform:translate(-50%,10px);} 12%{ opacity:1; transform:translate(-50%,0);} 80%{ opacity:1;} 100%{ opacity:0; transform:translate(-50%,-6px);} }
+
+  /* 다음 상대 안내 (승리 후 자동 포커스 이동) */
+  .nextcue{ margin:2px 18px 8px; font-size:11px; color:var(--gray); display:flex; align-items:center; gap:6px; padding-left:2px; }
+  .nextcue .arr{ color:var(--green); font-weight:800; }
+
+  .duel.active{ border:1px solid #44292a; background:#191416; box-shadow:0 0 0 1px rgba(255,59,48,.18); }
+  .duel.active .today .reps{ color:#5d5d63; }
+  .inrow{ margin-top:11px; padding-top:11px; border-top:1px dashed #2c2c30; display:flex; align-items:center; gap:8px; }
+  .field{ flex:1; background:#0e0e0f; border:1px solid #2c2c30; border-radius:10px; padding:7px 6px; text-align:center; }
+  .field .fl{ font-size:9px; color:var(--gray); }
+  .field .fv{ font-size:18px; font-weight:800; margin-top:1px; }
+  .field.focus{ border-color:var(--red); background:#160e0e; }
+  .clearbtn{ background:var(--green); color:#04210e; font-weight:800; font-size:13px; border:none; border-radius:11px; padding:11px 12px; white-space:nowrap; }
+
+  .actionbar{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:390px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 22%); padding:14px 18px 22px; }
+  .resttimer{ display:flex; align-items:center; justify-content:space-between; background:#141416; border:1px solid var(--line); border-radius:12px; padding:9px 12px; }
+  .resttimer .rl{ font-size:11px; color:var(--gray); }
+  .resttimer .rt{ font-size:16px; font-weight:800; }
+  .resttimer .radd{ font-size:11px; color:var(--gray); border:1px solid var(--line); border-radius:7px; padding:4px 8px; }
+</style>
+</head>
+<body>
+
+  <div class="caption">
+    인터랙션: 탑세트 2 <b>「8회 완료 →」</b>를 누른 직후. 직전 7회를 넘겨 <b>대결 승리</b> 연출(초록 플래시·승리 입자·스텝 점등·스트릭 토스트)이 터지고, 포커스가 다음 대결로 이동한다. 아래 백오프 칸에는 무게 정체 주간용 <b>「쉬워짐 승리」</b>(같은 무게·같은 반복인데 RIR 개선=주황 승리) 케이스도 함께 보여준다.
+  </div>
+
+  <div class="h">
+    <div class="t">가슴 · 1번째 종목</div>
+    <div class="clock">⏱ 26:03</div>
+  </div>
+
+  <div class="ex"><div class="name">벤치프레스</div></div>
+
+  <div class="steps">
+    <div class="step win"></div>
+    <div class="step win flash"></div>
+    <div class="step"></div>
+    <div class="step tie"></div>
+    <div class="step"></div>
+  </div>
+  <div class="steplbl"><span>대결 2/5 <b class="g">승리!</b></span><span><b class="g">승 2</b> · 무 0 · 패 0</span></div>
+
+  <!-- 탑세트 -->
+  <div class="seclab">
+    <span class="dot top"></span><span class="ttl">탑세트 · 강도 대결</span>
+    <span class="meta">62.5kg 유지</span>
+  </div>
+
+  <!-- ★ 방금 승리한 카드 -->
+  <div class="duel winflash">
+    <div class="winbanner">
+      <span class="wb-ic">🏆</span>
+      <span class="wb-t">직전을 넘었다</span>
+      <span class="wb-d">7회 → 8회</span>
+    </div>
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">62.5<span class="u">kg</span></div>
+        <div class="reps">7회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role">오늘의 나</div>
+        <div class="val">62.5<span class="u">kg</span></div>
+        <div class="reps" style="color:var(--green); font-weight:700">8회</div>
+      </div>
+    </div>
+    <div class="verdict win"><span class="tag">승리</span>· 무게 유지하며 반복 +1 — 탑 강도축 전진</div>
+    <span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span><span class="spark s4"></span>
+  </div>
+
+  <!-- 다음 상대로 포커스 이동 안내 -->
+  <div class="nextcue"><span class="arr">▾</span> 다음 상대 — 직전의 나 (62.5kg 8회) 로 이동</div>
+
+  <!-- 백오프 -->
+  <div class="seclab">
+    <span class="dot back"></span><span class="ttl">백오프 · 볼륨 대결</span>
+    <span class="meta">55kg 정체 주간</span>
+  </div>
+
+  <!-- ★ 쉬워짐 승리 (무게·반복 동일, RIR 개선) -->
+  <div class="duel winflash tieflash">
+    <div class="winbanner tiebanner">
+      <span class="wb-ic">🔥</span>
+      <span class="wb-t">쉬워짐 승리</span>
+      <span class="wb-d">RIR 0~1 → 2</span>
+    </div>
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">55<span class="u">kg</span></div>
+        <div class="reps">10회 · 빠듯(0~1)</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role">오늘의 나</div>
+        <div class="val">55<span class="u">kg</span></div>
+        <div class="reps" style="color:var(--orange); font-weight:700">10회 · 적당(2)</div>
+      </div>
+    </div>
+    <div class="verdict tie"><span class="tag">승리</span>· 무게·반복 같아도 더 쉬워짐 = 강해진 증거(곧 무게↑)</div>
+  </div>
+
+  <!-- 다음 백오프 (대기) -->
+  <div class="duel">
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">55<span class="u">kg</span></div>
+        <div class="reps">9회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role">오늘의 나</div>
+        <div class="val" style="color:#5d5d63">55<span class="u">kg</span></div>
+        <div class="reps" style="color:#5d5d63">— 회</div>
+      </div>
+    </div>
+    <div class="verdict todo">직전 9회 → <span style="color:#fff">10회면 백오프 상단 채움 = 다음 55→57.5kg</span></div>
+  </div>
+
+  <!-- 미세 보상 토스트 -->
+  <div class="toast">
+    <span>⚔️ 2연승 · 벤치 전 대결 무패</span>
+    <span class="pill">+15 XP</span>
+    <span class="pill">🔥 4주</span>
+  </div>
+
+  <div class="actionbar">
+    <div class="resttimer">
+      <span class="rl">다음 세트까지 휴식</span>
+      <span class="rt">2:00</span>
+      <span class="radd">+30초</span>
+    </div>
+  </div>
+
+</body>
+</html>

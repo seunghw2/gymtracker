@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>운동 중 · 직전 대결형 (base)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000000; --bg2:#0D0D0D; --card:#161618; --card2:#1E1E20;
+    --red:#FF3B30; --white:#FFFFFF; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+    --line:#262629;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
+    color:var(--white); padding-bottom:96px; position:relative;
+  }
+  .h{ padding:14px 18px 6px; display:flex; align-items:center; justify-content:space-between; }
+  .h .t{ font-size:13px; color:var(--gray); }
+  .h .clock{ font-size:13px; color:var(--gray); font-variant-numeric:tabular-nums; }
+
+  /* 종목 헤더 + 진행 스텝 */
+  .ex{ padding:4px 18px 0; }
+  .ex .name{ font-size:26px; font-weight:800; letter-spacing:-0.5px; }
+  .ex .sub{ font-size:12px; color:var(--gray); margin-top:3px; display:flex; gap:8px; align-items:center; }
+  .badge{ font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; background:#202024; color:var(--gray); letter-spacing:.3px; }
+  .badge.anchor{ color:#7FE0A0; background:rgba(43,217,106,.12); }
+
+  .steps{ display:flex; gap:6px; padding:12px 18px 4px; }
+  .step{ flex:1; height:5px; border-radius:3px; background:#242427; position:relative; overflow:hidden; }
+  .step.win{ background:var(--green); }
+  .step.win.tie{ background:var(--orange); }
+  .step.now{ background:#3a3a3f; }
+  .step.now::after{ content:""; position:absolute; inset:0; width:40%; background:var(--red); }
+  .steplbl{ display:flex; justify-content:space-between; padding:2px 18px 0; font-size:10px; color:var(--gray); }
+
+  /* 오늘의 미션 배너 */
+  .mission{ margin:12px 18px 4px; background:linear-gradient(180deg,#1b1416,#161618); border:1px solid #2a1d1f;
+            border-radius:14px; padding:12px 14px; display:flex; gap:10px; align-items:center; }
+  .mission .ico{ width:34px; height:34px; border-radius:10px; background:rgba(255,59,48,.14); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .mission .mt{ font-size:11px; color:var(--gray); font-weight:600; }
+  .mission .mb{ font-size:14px; font-weight:700; margin-top:1px; }
+  .mission .mb b{ color:var(--red); }
+  .mission .mb .g{ color:var(--green); }
+
+  /* 섹션 라벨 */
+  .seclab{ display:flex; align-items:center; gap:8px; padding:14px 18px 6px; }
+  .seclab .dot{ width:8px; height:8px; border-radius:50%; }
+  .seclab .dot.top{ background:var(--red); }
+  .seclab .dot.back{ background:var(--orange); }
+  .seclab .ttl{ font-size:13px; font-weight:800; letter-spacing:.2px; }
+  .seclab .meta{ font-size:11px; color:var(--gray); margin-left:auto; }
+
+  /* 대결 카드 (세트) */
+  .duel{ margin:0 18px 10px; background:var(--card); border-radius:14px; padding:11px 12px 12px; border:1px solid var(--line); }
+  .duel.done{ opacity:.62; }
+  .duel.active{ border:1px solid #44292a; background:#191416; box-shadow:0 0 0 1px rgba(255,59,48,.18), 0 8px 22px rgba(0,0,0,.4); }
+
+  .vs-row{ display:grid; grid-template-columns:1fr 30px 1fr; align-items:stretch; gap:0; }
+  .side{ padding:2px 4px; }
+  .side .role{ font-size:10px; font-weight:700; color:var(--gray); letter-spacing:.4px; display:flex; align-items:center; gap:5px; }
+  .side .who{ font-size:10px; color:#5d5d63; }
+  .side .val{ font-size:21px; font-weight:800; letter-spacing:-.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .side .val .u{ font-size:12px; font-weight:600; color:var(--gray); margin-left:1px; }
+  .side .reps{ font-size:12px; color:var(--gray); margin-top:1px; font-variant-numeric:tabular-nums; }
+
+  .prev{ text-align:left; }
+  .prev .val{ color:var(--gray); }
+  .today{ text-align:right; }
+  .today .val{ color:var(--white); }
+  .today.win .val{ color:var(--green); }
+
+  .vs{ display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .vs .k{ font-size:11px; font-weight:900; color:#48484d; letter-spacing:1px; }
+  .vs .bar{ width:1px; flex:1; background:var(--line); margin:4px 0; }
+
+  /* 입력 행 (활성 카드 전용) */
+  .inrow{ margin-top:11px; padding-top:11px; border-top:1px dashed #2c2c30; display:flex; align-items:center; gap:8px; }
+  .field{ flex:1; background:#0e0e0f; border:1px solid #2c2c30; border-radius:10px; padding:7px 6px; text-align:center; }
+  .field .fl{ font-size:9px; color:var(--gray); letter-spacing:.4px; }
+  .field .fv{ font-size:18px; font-weight:800; margin-top:1px; font-variant-numeric:tabular-nums; }
+  .field.focus{ border-color:var(--red); background:#160e0e; }
+  .clearbtn{ background:var(--green); color:#04210e; font-weight:800; font-size:13px; border:none; border-radius:11px; padding:11px 12px; white-space:nowrap; }
+
+  /* 대결 결과 마이크로카피 */
+  .verdict{ margin-top:9px; font-size:11px; display:flex; align-items:center; gap:6px; }
+  .verdict.win{ color:var(--green); }
+  .verdict.tie{ color:var(--orange); }
+  .verdict.todo{ color:var(--gray); }
+  .verdict .tag{ font-weight:800; }
+
+  /* RIR 칩 */
+  .rir{ margin:2px 18px 6px; }
+  .rir .lab{ font-size:11px; color:var(--gray); margin:0 2px 6px; }
+  .rir .chips{ display:flex; gap:6px; }
+  .chip{ flex:1; text-align:center; background:#151517; border:1px solid var(--line); border-radius:9px; padding:7px 2px; font-size:11px; color:var(--gray); }
+  .chip.sel{ border-color:var(--orange); color:var(--orange); background:rgba(255,138,0,.08); font-weight:700; }
+  .chip b{ display:block; font-size:13px; color:inherit; }
+
+  /* 하단 액션 바 */
+  .actionbar{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:390px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 22%); padding:14px 18px 22px; }
+  .resttimer{ display:flex; align-items:center; justify-content:space-between; background:#141416; border:1px solid var(--line); border-radius:12px; padding:9px 12px; margin-bottom:10px; }
+  .resttimer .rl{ font-size:11px; color:var(--gray); }
+  .resttimer .rt{ font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .resttimer .radd{ font-size:11px; color:var(--gray); border:1px solid var(--line); border-radius:7px; padding:4px 8px; }
+  .endbtn{ width:100%; background:var(--card2); color:var(--white); font-weight:700; font-size:15px; border:none; border-radius:13px; padding:15px; }
+
+  .tinyhint{ text-align:center; font-size:10px; color:#48484d; margin-top:8px; }
+</style>
+</head>
+<body>
+
+  <div class="h">
+    <div class="t">가슴 · 1번째 종목</div>
+    <div class="clock">⏱ 24:18</div>
+  </div>
+
+  <div class="ex">
+    <div class="name">벤치프레스</div>
+    <div class="sub">
+      <span class="badge anchor">앵커 · 프리웨이트</span>
+      <span>탑세트+백오프</span>
+    </div>
+  </div>
+
+  <!-- 5세트 진행 스텝(= 5번의 대결) -->
+  <div class="steps">
+    <div class="step win"></div>
+    <div class="step now"></div>
+    <div class="step"></div>
+    <div class="step"></div>
+    <div class="step"></div>
+  </div>
+  <div class="steplbl"><span>대결 1/5 승 · 2번째 진행 중</span><span>승 1 · 무 0 · 패 0</span></div>
+
+  <!-- 오늘의 미션 -->
+  <div class="mission">
+    <div class="ico">⚔️</div>
+    <div>
+      <div class="mt">오늘의 상대 — 직전의 나</div>
+      <div class="mb">탑 <b>62.5kg 유지</b>, 백오프 <span class="g">반복 더 쌓기</span></div>
+    </div>
+  </div>
+
+  <!-- 탑세트 -->
+  <div class="seclab">
+    <span class="dot top"></span><span class="ttl">탑세트 · 강도 대결</span>
+    <span class="meta">62.5kg 유지 · 8회 이상</span>
+  </div>
+
+  <!-- 탑1: 이김(완료) -->
+  <div class="duel done">
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">62.5<span class="u">kg</span></div>
+        <div class="reps">8회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today win">
+        <div class="role" style="justify-content:flex-end">오늘의 나</div>
+        <div class="val">62.5<span class="u">kg</span></div>
+        <div class="reps">9회</div>
+      </div>
+    </div>
+    <div class="verdict win"><span class="tag">승리</span>· 같은 무게에 반복 +1, 직전을 넘었다</div>
+  </div>
+
+  <!-- 탑2: 활성(지금 칠 세트) -->
+  <div class="duel active">
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나 <span class="who">(이겨야 할 숫자)</span></div>
+        <div class="val">62.5<span class="u">kg</span></div>
+        <div class="reps">7회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role" style="justify-content:flex-end">오늘의 나</div>
+        <div class="val">62.5<span class="u">kg</span></div>
+        <div class="reps" style="color:#5d5d63">— 회</div>
+      </div>
+    </div>
+    <div class="inrow">
+      <div class="field"><div class="fl">무게 kg</div><div class="fv">62.5</div></div>
+      <div class="field focus"><div class="fl">반복</div><div class="fv">8</div></div>
+      <button class="clearbtn">이 세트 완료 →</button>
+    </div>
+    <div class="verdict todo">직전 7회 → <span style="color:var(--white)">8회면 대결 승리</span></div>
+  </div>
+
+  <!-- 백오프 -->
+  <div class="seclab">
+    <span class="dot back"></span><span class="ttl">백오프 · 볼륨 대결</span>
+    <span class="meta">55kg · 총 29회 → 30회+ 노리기</span>
+  </div>
+
+  <div class="duel">
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">55<span class="u">kg</span></div>
+        <div class="reps">10회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role" style="justify-content:flex-end">오늘의 나</div>
+        <div class="val" style="color:#5d5d63">55<span class="u">kg</span></div>
+        <div class="reps" style="color:#5d5d63">— 회</div>
+      </div>
+    </div>
+    <div class="verdict todo">직전 10회 → 10회 이상 지키기</div>
+  </div>
+
+  <div class="duel">
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">55<span class="u">kg</span></div>
+        <div class="reps">10회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role" style="justify-content:flex-end">오늘의 나</div>
+        <div class="val" style="color:#5d5d63">55<span class="u">kg</span></div>
+        <div class="reps" style="color:#5d5d63">— 회</div>
+      </div>
+    </div>
+    <div class="verdict todo">직전 10회 → 10회 이상 지키기</div>
+  </div>
+
+  <div class="duel">
+    <div class="vs-row">
+      <div class="side prev">
+        <div class="role">직전의 나</div>
+        <div class="val">55<span class="u">kg</span></div>
+        <div class="reps">9회</div>
+      </div>
+      <div class="vs"><div class="bar"></div><div class="k">VS</div><div class="bar"></div></div>
+      <div class="side today">
+        <div class="role" style="justify-content:flex-end">오늘의 나</div>
+        <div class="val" style="color:#5d5d63">55<span class="u">kg</span></div>
+        <div class="reps" style="color:#5d5d63">— 회</div>
+      </div>
+    </div>
+    <div class="verdict todo">직전 9회 → <span style="color:var(--white)">10회면 백오프 상단 채움</span></div>
+  </div>
+
+  <!-- RIR (백오프 마지막 세트) -->
+  <div class="rir">
+    <div class="lab">마지막 백오프 노력도 <span style="opacity:.6">(선택)</span></div>
+    <div class="chips">
+      <div class="chip"><b>여유</b>3+ RIR</div>
+      <div class="chip sel"><b>적당</b>2 RIR</div>
+      <div class="chip"><b>빠듯</b>0~1</div>
+      <div class="chip"><b>실패</b>0</div>
+    </div>
+  </div>
+
+  <!-- 하단 -->
+  <div class="actionbar">
+    <div class="resttimer">
+      <span class="rl">다음 세트까지 휴식</span>
+      <span class="rt">1:42</span>
+      <span class="radd">+30초</span>
+    </div>
+    <button class="endbtn">운동 종료</button>
+    <div class="tinyhint">처방 숫자는 직전 기록 기준 · 무게/반복이 진짜 데이터</div>
+  </div>
+
+</body>
+</html>

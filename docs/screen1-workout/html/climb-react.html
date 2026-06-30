@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>운동 중 · 클라이밍형 (react)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { background:#000; }
+  body {
+    width:390px; margin:0 auto; min-height:844px;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    color:#fff; background:#0D0D0D; position:relative; padding-bottom:30px; overflow:hidden;
+  }
+  .scr { padding:0 16px; }
+
+  .caption {
+    background:#161618; border:1px solid #2A2A2C; margin:8px 16px 0; padding:9px 13px;
+    border-radius:11px; font-size:11.5px; color:#9A9A9F; line-height:1.45;
+  }
+  .caption b { color:#FF8A00; }
+
+  .statusbar { height:34px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:13px; color:#8E8E93; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:4px 16px 10px; }
+  .topbar h1 { font-size:21px; font-weight:700; letter-spacing:-0.3px; }
+  .topbar .sub { font-size:12px; color:#8E8E93; margin-top:2px; }
+  .topbar .streak { background:#161618; border-radius:11px; padding:6px 11px; text-align:center; }
+  .topbar .streak .t { font-size:15px; font-weight:700; }
+  .topbar .streak .l { font-size:9px; color:#8E8E93; }
+
+  .route { background:#161618; border-radius:18px; padding:14px 14px 12px; margin-top:4px; position:relative; overflow:hidden; }
+  .route .rtop { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .route .rtop .lab { font-size:12px; color:#8E8E93; }
+  .route .rtop .lvl { font-size:11px; color:#FF8A00; font-weight:600; background:rgba(255,138,0,0.12); padding:3px 8px; border-radius:8px; transition:.4s; }
+
+  .summit { display:flex; align-items:center; gap:8px; margin:8px 0 4px; padding-left:2px; transition:.4s; }
+  .summit .ico { width:22px; height:22px; border-radius:6px; background:rgba(255,138,0,0.14); display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .summit .txt { font-size:11px; color:#8E8E93; line-height:1.35; }
+  .summit .txt b { color:#FF8A00; }
+
+  .steps { display:flex; flex-direction:column; gap:0; }
+  .step {
+    position:relative; display:flex; align-items:center; height:38px;
+    border-left:2px solid #2A2A2C; padding-left:16px; transition:all .45s cubic-bezier(.3,1.2,.5,1);
+  }
+  .step::before {
+    content:''; position:absolute; left:-7px; top:50%; transform:translateY(-50%);
+    width:12px; height:12px; border-radius:50%; background:#2A2A2C; border:2px solid #161618; transition:all .45s;
+  }
+  .step.done { border-left-color:#2BD96A; }
+  .step.done::before { background:#2BD96A; box-shadow:0 0 0 3px rgba(43,217,106,0.15); }
+  .step.cur { border-left-color:#FF3B30; }
+  .step.cur::before { background:#FF3B30; width:16px; height:16px; left:-9px; box-shadow:0 0 0 5px rgba(255,59,48,0.18); }
+  .step.next { border-left-color:#3A3A3C; }
+  .step.locked { opacity:0.45; }
+  .step .rung { font-size:13px; font-variant-numeric:tabular-nums; }
+  .step .rung b { font-size:15px; font-weight:700; }
+  .step .tag { font-size:9px; color:#8E8E93; margin-left:8px; padding:2px 6px; border-radius:6px; background:#222; }
+  .step.cur .tag { background:rgba(255,59,48,0.16); color:#FF6A60; }
+  .step .you { position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:9px; font-weight:700; background:#FF3B30; color:#fff; padding:3px 7px; border-radius:7px; }
+  .step .beat { position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:10px; color:#8E8E93; }
+  .step .beat s { color:#636366; }
+
+  .floordiv { display:flex; align-items:center; gap:8px; margin:9px 0 7px; }
+  .floordiv .line { flex:1; height:1px; background:#2A2A2C; }
+  .floordiv .cap { font-size:10px; color:#636366; letter-spacing:0.4px; }
+
+  /* climb feedback toast */
+  .toast {
+    position:absolute; left:50%; top:150px; transform:translate(-50%,-6px);
+    background:rgba(43,217,106,0.95); color:#04210F; font-weight:800; font-size:14px;
+    padding:9px 18px; border-radius:30px; opacity:0; pointer-events:none; transition:.4s; z-index:40;
+    box-shadow:0 8px 26px rgba(43,217,106,0.4); letter-spacing:-0.2px;
+  }
+  .toast.show { opacity:1; transform:translate(-50%,0); }
+
+  /* level-up overlay */
+  .levelup {
+    position:absolute; inset:0; background:rgba(0,0,0,0.82); backdrop-filter:blur(3px);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    opacity:0; pointer-events:none; transition:.45s; z-index:60; padding:0 32px; text-align:center;
+  }
+  .levelup.show { opacity:1; }
+  .levelup .flag { font-size:60px; transform:scale(.4); transition:.6s cubic-bezier(.2,1.5,.4,1); }
+  .levelup.show .flag { transform:scale(1); }
+  .levelup h2 { font-size:26px; font-weight:800; letter-spacing:-0.5px; margin-top:4px; }
+  .levelup h2 .o { color:#FF8A00; }
+  .levelup p { font-size:13px; color:#B8B8BD; line-height:1.5; max-width:280px; }
+  .levelup .prescard {
+    margin-top:14px; background:#161618; border-radius:16px; padding:14px 18px; width:100%;
+    box-shadow:inset 0 0 0 1px rgba(255,138,0,0.3);
+  }
+  .levelup .prescard .pl { font-size:10px; color:#8E8E93; letter-spacing:0.5px; }
+  .levelup .prescard .pv { font-size:22px; font-weight:700; margin-top:3px; }
+  .levelup .prescard .pv .ar { color:#2BD96A; }
+  .levelup .prescard .pn { font-size:11px; color:#8E8E93; margin-top:5px; }
+  .levelup .ok { margin-top:18px; width:100%; height:52px; border:none; border-radius:15px; background:#FF3B30; color:#fff; font-size:16px; font-weight:700; }
+
+  .banner { display:flex; gap:9px; margin-top:12px; }
+  .bcard { flex:1; background:#161618; border-radius:14px; padding:11px 12px; transition:.4s; }
+  .bcard .h { display:flex; align-items:center; gap:5px; font-size:10px; color:#8E8E93; margin-bottom:5px; }
+  .bcard .dot { width:7px; height:7px; border-radius:50%; }
+  .bcard.top .dot { background:#FF3B30; }
+  .bcard.back .dot { background:#FF8A00; }
+  .bcard .big { font-size:17px; font-weight:700; }
+  .bcard .big small { font-size:11px; color:#8E8E93; font-weight:500; }
+  .bcard .goal { font-size:11px; color:#2BD96A; margin-top:3px; }
+  .bcard .goal.hold { color:#8E8E93; }
+  .bcard.flash { box-shadow:0 0 0 1.5px #2BD96A; }
+
+  .climbbtn {
+    margin-top:13px; width:100%; height:56px; border:none; border-radius:16px;
+    background:#FF3B30; color:#fff; font-size:17px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; gap:8px; transition:.2s;
+  }
+  .climbbtn:active { transform:scale(.97); }
+  .climbbtn:disabled { background:#2A2A2C; color:#636366; }
+
+  .hint { text-align:center; font-size:11px; color:#48484A; margin-top:14px; }
+</style>
+</head>
+<body>
+  <div class="caption">⬆︎ 인터랙션 — <b>「이 칸 완료」</b>를 누를 때마다 사다리를 한 칸 등반한다. 마지막 백오프 칸(상단)을 채우면 루트 완등 → <b>다음 층(57.5kg)으로 레벨업</b> 연출이 뜬다.</div>
+
+  <div class="statusbar"><span>9:43</span><span>벤치 데이</span><span>●●●</span></div>
+
+  <div class="topbar">
+    <div>
+      <h1>벤치프레스</h1>
+      <div class="sub">탑세트＋백오프 · 직전을 이기는 중</div>
+    </div>
+    <div class="streak">
+      <div class="t">🔥 4주</div>
+      <div class="l">연속 등반</div>
+    </div>
+  </div>
+
+  <div class="scr" style="position:relative;">
+    <div class="toast" id="toast">▲ 한 칸 등반!</div>
+
+    <div class="route">
+      <div class="rtop">
+        <span class="lab">오늘의 루트</span>
+        <span class="lvl" id="lvl">완등까지 ▲ 1칸</span>
+      </div>
+
+      <div class="summit" id="summit">
+        <div class="ico">🚩</div>
+        <div class="txt">이 칸만 채우면 <b>55kg 완등 → 57.5kg 층</b> 도달</div>
+      </div>
+
+      <div class="steps" id="steps">
+        <div class="step cur" id="s-top"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="you">YOU ▶</span></div>
+        <div class="step done"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="beat">지난 <s>9</s> → 10 ✓</span></div>
+        <div class="step done"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="beat">지난 10 = ✓</span></div>
+        <div class="floordiv"><span class="line"></span><span class="cap">▲ 백오프 · ▼ 탑세트</span><span class="line"></span></div>
+        <div class="step done"><span class="rung"><b>8</b>회</span><span class="tag">탑 62.5</span><span class="beat">지난 <s>7</s> → 8 ✓</span></div>
+        <div class="step done"><span class="rung"><b>8</b>회</span><span class="tag">탑 62.5</span><span class="beat">지난 8 = ✓</span></div>
+      </div>
+    </div>
+
+    <div class="banner">
+      <div class="bcard top">
+        <div class="h"><span class="dot"></span>탑세트 · 강도</div>
+        <div class="big">62.5<small>kg</small> × 8</div>
+        <div class="goal hold">무게 유지 · 완등 ✓</div>
+      </div>
+      <div class="bcard back" id="bback">
+        <div class="h"><span class="dot"></span>백오프 · 볼륨</div>
+        <div class="big">55<small>kg</small> × 10</div>
+        <div class="goal" id="bgoal">마지막 칸 ▲ 지난 9 → 10</div>
+      </div>
+    </div>
+
+    <button class="climbbtn" id="climb"><span>▲</span> 이 칸 완료 · 루트 완등</button>
+    <div class="hint" id="hint">55kg × 10회 — 직전 9회를 이기면 이번 층 클리어</div>
+  </div>
+
+  <!-- LEVEL UP -->
+  <div class="levelup" id="levelup">
+    <div class="flag">🚩</div>
+    <h2>다음 층 <span class="o">등반!</span></h2>
+    <p>백오프 55kg에서 <b>10/10/10</b> 전 칸을 채웠어요. 반복을 다 쌓았으니 한 층 위로 — 무게가 오릅니다.</p>
+    <div class="prescard">
+      <div class="pl">다음 운동 · 백오프 처방</div>
+      <div class="pv">55kg <span class="ar">→ 57.5kg</span> · 8회부터</div>
+      <div class="pn">반복은 하단 8회로 리셋 · 탑세트 62.5kg는 그대로 유지</div>
+    </div>
+    <button class="ok" id="okbtn">다음 종목으로 ▶</button>
+  </div>
+
+<script>
+  var climbed = false;
+  var btn = document.getElementById('climb');
+  var toast = document.getElementById('toast');
+  var cur = document.getElementById('s-top');
+  var levelup = document.getElementById('levelup');
+
+  btn.addEventListener('click', function(){
+    if (climbed) return;
+    climbed = true;
+
+    // 1) current rung becomes done
+    cur.classList.remove('cur');
+    cur.classList.add('done');
+    cur.querySelector('.you').outerHTML = '<span class="beat">지난 <s>—</s> → 10 ✓</span>';
+
+    // 2) climb toast
+    toast.textContent = '▲ 백오프 10/10/10 — 완등!';
+    toast.classList.add('show');
+
+    // 3) banner flash + goal flip
+    document.getElementById('bback').classList.add('flash');
+    document.getElementById('bgoal').textContent = '상단 다 채움 ✓ 레벨업';
+    document.getElementById('bgoal').classList.add('hold');
+    document.getElementById('lvl').textContent = '루트 완등 ✓';
+    document.getElementById('hint').textContent = '전 칸 클리어 — 다음 층으로 오릅니다';
+    btn.disabled = true;
+    btn.innerHTML = '<span>✓</span> 완등';
+
+    // 4) level up overlay
+    setTimeout(function(){ toast.classList.remove('show'); }, 1400);
+    setTimeout(function(){ levelup.classList.add('show'); }, 900);
+  });
+
+  document.getElementById('okbtn').addEventListener('click', function(){
+    levelup.classList.remove('show');
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>운동 중 · 클라이밍형 (base)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { background:#000; }
+  body {
+    width:390px; margin:0 auto; min-height:844px;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    color:#fff; background:#0D0D0D; position:relative; padding-bottom:96px;
+  }
+  .scr { padding:0 16px; }
+
+  /* ── status / header ── */
+  .statusbar { height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:13px; color:#8E8E93; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:6px 16px 12px; }
+  .topbar .ex { display:flex; flex-direction:column; gap:2px; }
+  .topbar .ex h1 { font-size:21px; font-weight:700; letter-spacing:-0.3px; }
+  .topbar .ex .sub { font-size:12px; color:#8E8E93; }
+  .topbar .timer { background:#161618; border-radius:11px; padding:7px 12px; text-align:center; min-width:74px; }
+  .topbar .timer .t { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .topbar .timer .l { font-size:9px; color:#8E8E93; letter-spacing:0.4px; }
+
+  /* ── climb route panel ── */
+  .route { background:#161618; border-radius:18px; padding:14px 14px 12px; margin-top:4px; position:relative; overflow:hidden; }
+  .route .rtop { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .route .rtop .lab { font-size:12px; color:#8E8E93; letter-spacing:0.3px; }
+  .route .rtop .lvl { font-size:11px; color:#FF8A00; font-weight:600; background:rgba(255,138,0,0.12); padding:3px 8px; border-radius:8px; }
+
+  /* the ladder */
+  .ladder { display:flex; gap:13px; }
+  .rail { flex:0 0 44px; position:relative; }
+  /* steps column */
+  .steps { flex:1; display:flex; flex-direction:column-reverse; gap:0; }
+  .step {
+    position:relative; display:flex; align-items:center; height:38px;
+    border-left:2px solid #2A2A2C; padding-left:16px;
+  }
+  .step::before {
+    content:''; position:absolute; left:-7px; top:50%; transform:translateY(-50%);
+    width:12px; height:12px; border-radius:50%; background:#2A2A2C; border:2px solid #161618;
+  }
+  .step.done { border-left-color:#2BD96A; }
+  .step.done::before { background:#2BD96A; box-shadow:0 0 0 3px rgba(43,217,106,0.15); }
+  .step.cur { border-left-color:#FF3B30; }
+  .step.cur::before { background:#FF3B30; width:16px; height:16px; left:-9px; box-shadow:0 0 0 5px rgba(255,59,48,0.18); }
+  .step.next { border-left-color:#3A3A3C; }
+  .step.locked { opacity:0.45; }
+  .step .rung { font-size:13px; font-variant-numeric:tabular-nums; }
+  .step .rung b { font-size:15px; font-weight:700; }
+  .step.cur .rung b { color:#fff; }
+  .step .tag { font-size:9px; color:#8E8E93; margin-left:8px; padding:2px 6px; border-radius:6px; background:#222; letter-spacing:0.3px; }
+  .step.cur .tag { background:rgba(255,59,48,0.16); color:#FF6A60; }
+  .step .you {
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    font-size:9px; font-weight:700; letter-spacing:0.5px;
+    background:#FF3B30; color:#fff; padding:3px 7px; border-radius:7px;
+  }
+  .step .beat { position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:10px; color:#8E8E93; }
+  .step .beat s { text-decoration:none; color:#636366; }
+
+  /* summit / next floor marker on top */
+  .summit { display:flex; align-items:center; gap:8px; margin:8px 0 2px; padding-left:2px; }
+  .summit .ico { width:22px; height:22px; border-radius:6px; background:rgba(255,138,0,0.14); display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .summit .txt { font-size:11px; color:#8E8E93; line-height:1.35; }
+  .summit .txt b { color:#FF8A00; }
+
+  /* divider between top and backoff */
+  .floordiv { display:flex; align-items:center; gap:8px; margin:9px 0 7px; }
+  .floordiv .line { flex:1; height:1px; background:#2A2A2C; }
+  .floordiv .cap { font-size:10px; color:#636366; letter-spacing:0.6px; }
+
+  /* ── target banner ── */
+  .banner { display:flex; gap:9px; margin-top:12px; }
+  .bcard { flex:1; background:#161618; border-radius:14px; padding:11px 12px; }
+  .bcard .h { display:flex; align-items:center; gap:5px; font-size:10px; color:#8E8E93; letter-spacing:0.4px; margin-bottom:5px; }
+  .bcard .dot { width:7px; height:7px; border-radius:50%; }
+  .bcard.top .dot { background:#FF3B30; }
+  .bcard.back .dot { background:#FF8A00; }
+  .bcard .big { font-size:17px; font-weight:700; letter-spacing:-0.2px; }
+  .bcard .big small { font-size:11px; color:#8E8E93; font-weight:500; }
+  .bcard .goal { font-size:11px; color:#2BD96A; margin-top:3px; }
+  .bcard .goal.hold { color:#8E8E93; }
+
+  /* ── input pad ── */
+  .inp { margin-top:14px; }
+  .inp .ihead { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+  .inp .ihead .now { font-size:13px; color:#8E8E93; }
+  .inp .ihead .now b { color:#fff; font-weight:700; }
+  .inp .ihead .now .t2 { color:#FF6A60; }
+  .inp .fields { display:flex; gap:9px; }
+  .field { flex:1; background:#161618; border-radius:14px; padding:10px 12px; position:relative; }
+  .field .fl { font-size:10px; color:#8E8E93; letter-spacing:0.3px; }
+  .field .fv { font-size:26px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .field .fv small { font-size:13px; color:#8E8E93; font-weight:500; }
+  .field .prev { position:absolute; right:11px; bottom:11px; font-size:10px; color:#636366; }
+  .field.active { box-shadow:inset 0 0 0 1.5px #FF3B30; }
+
+  .step-ctrl { display:flex; gap:9px; margin-top:9px; }
+  .step-ctrl button { flex:1; height:44px; border:none; border-radius:13px; background:#161618; color:#fff; font-size:20px; font-weight:600; }
+  .step-ctrl .lbl { flex:2; display:flex; align-items:center; justify-content:center; background:transparent; color:#8E8E93; font-size:11px; font-weight:500; }
+
+  .climbbtn {
+    margin-top:11px; width:100%; height:56px; border:none; border-radius:16px;
+    background:#FF3B30; color:#fff; font-size:17px; font-weight:700; letter-spacing:-0.2px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .climbbtn .ar { font-size:18px; }
+
+  .rir { display:flex; align-items:center; gap:7px; margin-top:12px; padding:0 2px; }
+  .rir .q { font-size:11px; color:#636366; }
+  .rir .chip { font-size:11px; color:#8E8E93; background:#161618; border-radius:9px; padding:6px 10px; }
+  .rir .chip.sel { color:#FF8A00; box-shadow:inset 0 0 0 1px rgba(255,138,0,0.4); }
+
+  /* ── tabbar ── */
+  .tabbar { position:absolute; left:0; right:0; bottom:0; height:84px; background:#0D0D0D; border-top:1px solid #1C1C1E; display:flex; padding:8px 8px 0; }
+  .tabbar .tab { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding-top:6px; }
+  .tabbar .tab .ic { width:24px; height:24px; border-radius:7px; background:#2A2A2C; }
+  .tabbar .tab.on .ic { background:#FF3B30; }
+  .tabbar .tab .tl { font-size:10px; color:#636366; }
+  .tabbar .tab.on .tl { color:#FF3B30; }
+</style>
+</head>
+<body>
+  <div class="statusbar"><span>9:41</span><span>벤치 데이 · 2번째 종목</span><span>●●●</span></div>
+
+  <div class="topbar">
+    <div class="ex">
+      <h1>벤치프레스</h1>
+      <div class="sub">바벨 · 앵커 · 탑세트＋백오프</div>
+    </div>
+    <div class="timer">
+      <div class="t">1:32</div>
+      <div class="l">세트 휴식</div>
+    </div>
+  </div>
+
+  <div class="scr">
+    <!-- ───── CLIMB ROUTE ───── -->
+    <div class="route">
+      <div class="rtop">
+        <span class="lab">오늘의 루트 · 한 칸씩 위로</span>
+        <span class="lvl">다음 층까지 ▲ 2칸</span>
+      </div>
+
+      <!-- summit marker (next floor = load up) -->
+      <div class="summit">
+        <div class="ico">🚩</div>
+        <div class="txt">백오프 <b>55kg 다 채우면 → 57.5kg</b>로 등반 (다음 층)</div>
+      </div>
+
+      <!-- BACKOFF steps (top of ladder = volume axis) -->
+      <div class="step locked"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="beat">상단</span></div>
+      <div class="step next"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="beat">지난 <s>9</s> → 10</span></div>
+      <div class="step cur"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="you">YOU ▶</span></div>
+      <div class="step done"><span class="rung"><b>10</b>회</span><span class="tag">백오프 55</span><span class="beat">지난 10 = </span></div>
+
+      <div class="floordiv"><span class="line"></span><span class="cap">▲ 백오프 (볼륨) · ▼ 탑세트 (강도)</span><span class="line"></span></div>
+
+      <!-- TOP steps (bottom of ladder = strength axis, just hold) -->
+      <div class="step done"><span class="rung"><b>8</b>회</span><span class="tag">탑 62.5</span><span class="beat">지난 <s>7</s> → 8</span></div>
+      <div class="step done"><span class="rung"><b>8</b>회</span><span class="tag">탑 62.5</span><span class="beat">지난 8 = </span></div>
+    </div>
+
+    <!-- ───── DUAL TARGET BANNER ───── -->
+    <div class="banner">
+      <div class="bcard top">
+        <div class="h"><span class="dot"></span>탑세트 · 강도</div>
+        <div class="big">62.5<small>kg</small> × 8</div>
+        <div class="goal hold">무게 유지 · 완등 ✓</div>
+      </div>
+      <div class="bcard back">
+        <div class="h"><span class="dot"></span>백오프 · 볼륨</div>
+        <div class="big">55<small>kg</small> × 10</div>
+        <div class="goal">다음 칸 ▲ 지난 9 → 10</div>
+      </div>
+    </div>
+
+    <!-- ───── SET INPUT ───── -->
+    <div class="inp">
+      <div class="ihead">
+        <span class="now">지금 칠 칸 · <b class="t2">백오프 4세트</b> · 직전 <b>55×9</b> 이겨라</span>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <div class="fl">무게 KG</div>
+          <div class="fv">55<small></small></div>
+          <div class="prev">지난 55</div>
+        </div>
+        <div class="field active">
+          <div class="fl">반복</div>
+          <div class="fv">10</div>
+          <div class="prev">지난 9</div>
+        </div>
+      </div>
+      <div class="step-ctrl">
+        <button>−</button>
+        <div class="lbl">반복 조정</div>
+        <button>＋</button>
+      </div>
+
+      <button class="climbbtn"><span class="ar">▲</span> 이 칸 완료 · 한 칸 등반</button>
+
+      <div class="rir">
+        <span class="q">노력도?</span>
+        <span class="chip">여유</span>
+        <span class="chip sel">2~3 남음</span>
+        <span class="chip">거의 한계</span>
+        <span class="chip">✕</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab on"><div class="ic"></div><div class="tl">운동</div></div>
+    <div class="tab"><div class="ic"></div><div class="tl">기록</div></div>
+    <div class="tab"><div class="ic"></div><div class="tl">분석</div></div>
+    <div class="tab"><div class="ic"></div><div class="tl">코치</div></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Quest — 운동 중 (인터랙션)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { background:#000; }
+  body {
+    width:390px; margin:0 auto; min-height:844px;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+    color:#fff; background:linear-gradient(180deg,#0D0D0D 0%,#000 100%);
+    padding:0 0 28px; overflow:hidden;
+  }
+
+  /* 캡션 */
+  .caption { background:#1a1206; border-bottom:1px solid #2a1e0a; padding:8px 16px; font-size:11.5px; color:#FF8A00; line-height:1.45; }
+  .caption b { color:#fff; font-weight:700; }
+  .safe { height:14px; }
+
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:4px 18px 10px; }
+  .topbar .back { color:#8E8E93; font-size:26px; line-height:1; }
+  .topbar .title { font-size:15px; font-weight:600; }
+  .topbar .title .sub { display:block; font-size:11px; color:#8E8E93; font-weight:500; margin-top:2px; text-align:center; }
+  .topbar .timer { font-size:13px; color:#8E8E93; min-width:40px; text-align:right; font-variant-numeric:tabular-nums; }
+
+  .quest { margin:6px 14px 0; background:#161618; border:1px solid #1f1f22; border-radius:18px; padding:16px 16px 14px; position:relative; overflow:hidden; }
+  .quest::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:linear-gradient(180deg,#FF3B30,#FF8A00); }
+  .quest .qlabel { font-size:11px; letter-spacing:1.5px; color:#FF8A00; font-weight:700; }
+  .quest h1 { font-size:20px; font-weight:700; margin-top:4px; letter-spacing:-.3px; }
+  .quest .qgoal { font-size:13px; color:#c7c7cc; margin-top:8px; line-height:1.5; }
+  .quest .qgoal b { color:#fff; }
+  .qprog { display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .qprog .track { flex:1; height:8px; border-radius:6px; background:#0d0d0d; border:1px solid #232327; overflow:hidden; display:flex; }
+  .qprog .seg { height:100%; transition:width .5s cubic-bezier(.2,.8,.2,1); }
+  .qprog .seg.done { background:#2BD96A; }
+  .qprog .seg.flash { background:#2BD96A; animation:segpop .6s ease; }
+  @keyframes segpop { 0%{filter:brightness(2.2);} 100%{filter:brightness(1);} }
+  .qprog .seg.todo { background:transparent; }
+  .qprog .seg + .seg { border-left:1px solid #000; }
+  .qprog .ratio { font-size:12px; color:#8E8E93; font-weight:600; font-variant-numeric:tabular-nums; }
+  .qprog .ratio b { color:#2BD96A; }
+
+  .stage { margin:20px 18px 0; display:flex; align-items:center; gap:9px; }
+  .stage .dot { width:8px; height:8px; border-radius:50%; background:#FF8A00; }
+  .stage .name { font-size:13px; font-weight:700; color:#FF8A00; letter-spacing:.4px; }
+  .stage .axis { font-size:11px; color:#8E8E93; }
+  .stage .line { flex:1; height:1px; background:#1c1c1f; }
+  .stage .count { font-size:11px; color:#2BD96A; font-weight:600; }
+
+  .steps { margin:10px 14px 0; display:flex; flex-direction:column; gap:9px; }
+  .step { background:#131315; border:1px solid #1d1d20; border-radius:14px; padding:13px 14px; display:flex; align-items:center; gap:13px; position:relative; }
+  .step.justdone { background:#101311; border-color:#2BD96A; box-shadow:0 0 0 1px #2BD96A, 0 8px 26px rgba(43,217,106,.22); animation:clearpop .5s ease; }
+  @keyframes clearpop { 0%{transform:scale(1);} 35%{transform:scale(1.025);} 100%{transform:scale(1);} }
+  .step.todo { opacity:.62; }
+  .step .mark { width:30px; height:30px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; }
+  .step.justdone .mark { background:#2BD96A; color:#06210f; animation:markpop .5s ease; }
+  @keyframes markpop { 0%{transform:scale(0); } 60%{transform:scale(1.25);} 100%{transform:scale(1);} }
+  .step.todo .mark { background:transparent; border:2px solid #2c2c30; color:#5a5a5f; }
+  .step .body { flex:1; min-width:0; }
+  .step .srow { display:flex; align-items:baseline; gap:8px; }
+  .step .setno { font-size:12px; color:#8E8E93; font-weight:600; }
+  .step .prev { font-size:12px; color:#8E8E93; }
+  .step .prev .num { color:#aeaeb2; font-weight:600; }
+  .step .goaltag { display:inline-block; font-size:11px; font-weight:700; padding:2px 7px; border-radius:6px; }
+  .goaltag.cleared { background:rgba(43,217,106,.16); color:#2BD96A; }
+  .goaltag.hold { background:rgba(255,138,0,.14); color:#FF8A00; }
+  .step .target { display:flex; align-items:baseline; gap:6px; margin-top:4px; }
+  .step .tw { font-size:22px; font-weight:700; color:#dcdcdc; font-variant-numeric:tabular-nums; }
+  .step .tx { font-size:14px; color:#8E8E93; font-weight:600; }
+  .step .tr { font-size:22px; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; }
+  .step .delta { font-size:11px; color:#2BD96A; font-weight:700; margin-top:4px; }
+
+  /* +1 떠오르는 칩 */
+  .floatchip { position:absolute; right:16px; top:6px; background:#2BD96A; color:#06210f; font-size:12px; font-weight:800; padding:3px 8px; border-radius:8px; animation:floatup 1.1s ease forwards; }
+  @keyframes floatup { 0%{opacity:0; transform:translateY(8px);} 20%{opacity:1;} 80%{opacity:1; transform:translateY(-10px);} 100%{opacity:0; transform:translateY(-18px);} }
+
+  /* ===== 게이트 통과 = 레벨업 오버레이 ===== */
+  .levelup { position:fixed; left:50%; transform:translateX(-50%); top:0; width:390px; height:844px; background:rgba(0,0,0,.78); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:30; animation:fadein .35s ease; }
+  @keyframes fadein { from{opacity:0;} to{opacity:1;} }
+  .lu-card { width:316px; background:linear-gradient(160deg,#1c1612,#141416); border:1px solid #3a2a12; border-radius:24px; padding:30px 24px 24px; text-align:center; position:relative; box-shadow:0 24px 60px rgba(255,138,0,.18); animation:lupop .5s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes lupop { 0%{transform:scale(.82); opacity:0;} 100%{transform:scale(1); opacity:1;} }
+  .lu-ring { width:96px; height:96px; margin:0 auto 16px; border-radius:50%; background:radial-gradient(circle,#FF8A00 0%,#FF3B30 78%); display:flex; align-items:center; justify-content:center; font-size:42px; box-shadow:0 0 0 8px rgba(255,138,0,.12), 0 0 40px rgba(255,138,0,.4); }
+  .lu-label { font-size:12px; letter-spacing:3px; color:#FF8A00; font-weight:800; }
+  .lu-title { font-size:25px; font-weight:800; margin-top:6px; letter-spacing:-.4px; }
+  .lu-row { margin-top:18px; display:flex; align-items:center; justify-content:center; gap:14px; }
+  .lu-from { font-size:19px; color:#8E8E93; font-weight:700; text-decoration:line-through; font-variant-numeric:tabular-nums; }
+  .lu-arrow { color:#FF8A00; font-size:20px; }
+  .lu-to { font-size:30px; color:#fff; font-weight:800; font-variant-numeric:tabular-nums; }
+  .lu-to .u { font-size:16px; color:#8E8E93; font-weight:700; }
+  .lu-desc { font-size:13px; color:#c7c7cc; margin-top:14px; line-height:1.55; }
+  .lu-desc b { color:#fff; }
+  .lu-evi { margin-top:14px; background:#0f0f10; border:1px solid #232327; border-radius:12px; padding:10px 12px; font-size:11.5px; color:#8E8E93; line-height:1.5; text-align:left; }
+  .lu-evi b { color:#2BD96A; }
+  .lu-btns { margin-top:20px; display:flex; flex-direction:column; gap:9px; }
+  .lu-btn { height:50px; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .lu-btn.primary { background:#FF3B30; color:#fff; }
+  .lu-btn.ghost { background:transparent; color:#8E8E93; font-weight:600; font-size:13px; height:38px; }
+
+  /* 반짝이 입자 */
+  .spark { position:absolute; width:7px; height:7px; border-radius:2px; opacity:0; }
+  .s1{ left:30px; top:20px; background:#FF8A00; animation:spk 1s ease .1s; }
+  .s2{ right:34px; top:34px; background:#2BD96A; animation:spk 1.1s ease .25s; }
+  .s3{ left:54px; bottom:60px; background:#fff; animation:spk .9s ease .35s; }
+  .s4{ right:46px; bottom:80px; background:#FF3B30; animation:spk 1s ease .15s; }
+  .s5{ left:120px; top:8px; background:#FFb04a; animation:spk 1.05s ease .3s; }
+  @keyframes spk { 0%{opacity:0; transform:scale(0) rotate(0);} 30%{opacity:1; transform:scale(1.2) rotate(40deg);} 100%{opacity:0; transform:scale(.4) translateY(-16px) rotate(120deg);} }
+</style>
+</head>
+<body>
+  <div class="caption">인터랙션 — 백오프 마지막 세트 <b>55kg×11</b>(직전 10 갱신) 기록 → 스텝 체크·퀘스트 5/5 클리어, 백오프 총반복이 <b>30회 게이트</b>를 넘어 <b>레벨업(57.5kg 증량)</b> 연출.</div>
+  <div class="safe"></div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">벤치프레스<span class="sub">오늘의 퀘스트 · 2번째 종목</span></div>
+    <div class="timer">18:32</div>
+  </div>
+
+  <div class="quest">
+    <div class="qlabel">TODAY'S QUEST</div>
+    <h1>탑 무게 지키고 · 백오프 채우기</h1>
+    <div class="qgoal">백오프 총 반복 <b>29 → 31회</b> 달성. 오늘 퀘스트 목표를 모두 클리어했어요.</div>
+    <div class="qprog">
+      <div class="track">
+        <div class="seg done" style="width:40%"></div>
+        <div class="seg done" style="width:40%"></div>
+        <div class="seg flash" style="width:20%"></div>
+      </div>
+      <div class="ratio"><b>5</b>/5 클리어</div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <span class="dot"></span><span class="name">백오프</span>
+    <span class="axis">볼륨축 · 반복 쌓기</span>
+    <span class="line"></span>
+    <span class="count">3/3 ✓</span>
+  </div>
+
+  <div class="steps">
+    <!-- 방금 완료한 세트 -->
+    <div class="step justdone">
+      <div class="floatchip">+1 반복 · 직전 갱신</div>
+      <div class="mark">✓</div>
+      <div class="body">
+        <div class="srow"><span class="setno">백오프 3</span><span class="prev">지난 <span class="num">55×9</span></span><span class="goaltag cleared">갱신 ✓</span></div>
+        <div class="target"><span class="tw">55</span><span class="tx">kg ×</span><span class="tr">11</span></div>
+        <div class="delta">반복 9 → 11 · 오늘 백오프 31회</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 레벨업 오버레이 -->
+  <div class="levelup">
+    <div class="lu-card">
+      <span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span><span class="spark s4"></span><span class="spark s5"></span>
+      <div class="lu-ring">🔓</div>
+      <div class="lu-label">LEVEL UP — 게이트 통과</div>
+      <div class="lu-title">백오프 증량 해금</div>
+      <div class="lu-row">
+        <span class="lu-from">55kg</span>
+        <span class="lu-arrow">›</span>
+        <span class="lu-to">57.5<span class="u">kg</span></span>
+      </div>
+      <div class="lu-desc">3세트 모두 10회+를 채워 <b>볼륨 게이트 달성</b>. 다음 운동부터 백오프를 <b>57.5kg · 8회부터</b> 다시 쌓아요. 탑 62.5kg은 그대로 유지.</div>
+      <div class="lu-evi">근거 · 백오프 총반복 <b>2주 연속 상단(30↑)</b> · 같은 무게가 쉬워짐(반복 9→11). 단발이 아닌 추세라 증량을 켰어요.</div>
+      <div class="lu-btns">
+        <div class="lu-btn primary">좋아 — 다음 운동에 반영</div>
+        <div class="lu-btn ghost">이번엔 55kg 유지할게요</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
