@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>로깅·추적 — 기본</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:104px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; line-height:1; }
+  .nav .timer { font-size:14px; font-weight:700; color:#8E8E93; font-variant-numeric:tabular-nums; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+  .title { padding:4px 20px 2px; }
+  .title h1 { font-size:25px; font-weight:800; letter-spacing:-.5px; }
+  .title .sub { font-size:12px; color:#8E8E93; margin-top:3px; font-weight:600; display:flex; align-items:center; gap:6px; }
+  /* trust grade pill */
+  .grade { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800;
+    padding:3px 8px; border-radius:7px; letter-spacing:.4px; }
+  .grade-anchor { background:rgba(43,217,106,.15); color:#2BD96A; border:1px solid rgba(43,217,106,.4); }
+  .grade-machine { background:rgba(255,138,0,.15); color:#FF8A00; border:1px solid rgba(255,138,0,.4); }
+  /* machine setting chip bar */
+  .setbar { margin:13px 16px 2px; background:#161618; border-radius:14px; padding:11px 13px; }
+  .setbar .sh { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+  .setbar .sh .lbl { font-size:11px; color:#8E8E93; font-weight:700; letter-spacing:.3px; }
+  .setbar .sh .match { font-size:10px; font-weight:800; color:#2BD96A; display:flex; align-items:center; gap:4px; }
+  .setchips { display:flex; gap:7px; flex-wrap:wrap; }
+  .setchip { font-size:11px; font-weight:700; padding:6px 10px; border-radius:9px; background:#1C1C1E;
+    color:#C7C7CC; border:1px solid #2A2A2C; display:flex; align-items:center; gap:5px; }
+  .setchip .k { color:#6E6E73; font-weight:600; }
+  .setchip.edit { background:transparent; border:1px dashed #3A3A3C; color:#8E8E93; }
+  /* goal banner */
+  .banner { margin:12px 16px 4px; background:rgba(255,59,48,.12); border:1px solid rgba(255,59,48,.35);
+    border-radius:14px; padding:12px 15px; display:flex; align-items:center; justify-content:space-between; }
+  .banner .b-main { font-size:15px; font-weight:700; }
+  .banner .b-main b { color:#FF3B30; }
+  .banner .b-tag { font-size:11px; color:#8E8E93; margin-top:2px; }
+  /* sets */
+  .sets { margin:14px 16px 0; }
+  .col-head { display:flex; align-items:center; padding:0 6px 8px; font-size:11px; color:#8E8E93; font-weight:700; letter-spacing:.3px; }
+  .c-set { width:50px; }
+  .c-kg { flex:1; text-align:center; }
+  .c-rep { flex:1; text-align:center; }
+  .c-act { width:96px; text-align:center; }
+  .row { display:flex; align-items:center; background:#161618; border-radius:13px; padding:10px 6px; margin-bottom:9px; }
+  .row.done { background:rgba(43,217,106,.10); }
+  .row.active { border:1.5px solid #FF3B30; background:#1A1416; }
+  .badge { width:50px; display:flex; justify-content:center; }
+  .tag { font-size:10px; font-weight:800; padding:4px 7px; border-radius:7px; letter-spacing:.5px; }
+  .tag-top { background:#FF3B30; color:#FFF; }
+  .tag-back { background:#2A2A2C; color:#A8A8AD; }
+  .inp { flex:1; text-align:center; }
+  .inp .v { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .inp .v.pre { color:#FF6B61; }
+  .inp .v.empty { color:#48484A; }
+  .inp .prev { font-size:11px; color:#6E6E73; margin-top:2px; }
+  .act { width:96px; display:flex; justify-content:center; align-items:center; gap:5px; }
+  .tap { background:#FF3B30; color:#FFF; font-size:12px; font-weight:800; padding:8px 12px; border-radius:10px; }
+  .done-mark { width:28px; height:28px; border-radius:50%; background:#2BD96A; color:#06210F;
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:900; }
+  /* RIR */
+  .rir { margin:2px 6px 0 54px; }
+  .rir-lbl { font-size:12px; color:#6E6E73; margin-bottom:7px; font-weight:600; }
+  .chips { display:flex; gap:7px; flex-wrap:wrap; }
+  .chip { font-size:12px; font-weight:600; padding:7px 11px; border-radius:9px; background:#1C1C1E; color:#8E8E93; border:1px solid #2A2A2C; }
+  .chip.sel { background:rgba(255,59,48,.18); color:#FF6B61; border-color:#FF3B30; }
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:14px 16px 30px; }
+  .btn-done { display:block; width:100%; background:#FF3B30; color:#FFF; border:none; border-radius:15px; padding:16px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav">
+    <span class="back">‹</span>
+    <span class="timer">⏱ 휴식 1:24</span>
+    <span class="more">⋯</span>
+  </div>
+  <div class="title">
+    <h1>벤치프레스</h1>
+    <div class="sub">탑세트 + 백오프 <span class="grade grade-anchor">● ANCHOR · 무게 비교 가능</span></div>
+  </div>
+
+  <!-- machine setting chip bar -->
+  <div class="setbar">
+    <div class="sh">
+      <span class="lbl">머신·세팅</span>
+      <span class="match">✓ 지난 세팅과 일치</span>
+    </div>
+    <div class="setchips">
+      <span class="setchip"><span class="k">시트</span> 4</span>
+      <span class="setchip"><span class="k">핀</span> 6판</span>
+      <span class="setchip"><span class="k">그립</span> 와이드</span>
+      <span class="setchip edit">+ 변경</span>
+    </div>
+  </div>
+
+  <div class="banner">
+    <div>
+      <div class="b-main">오늘 백오프 <b>55kg 총 30회</b> · 남은 9회</div>
+      <div class="b-tag">탑 62.5kg 2세트 · 직전 27회 대비 +3</div>
+    </div>
+  </div>
+
+  <div class="sets">
+    <div class="col-head">
+      <span class="c-set">세트</span>
+      <span class="c-kg">kg</span>
+      <span class="c-rep">반복</span>
+      <span class="c-act">완료</span>
+    </div>
+
+    <!-- TOP done -->
+    <div class="row done">
+      <span class="badge"><span class="tag tag-top">TOP</span></span>
+      <span class="inp"><div class="v">62.5</div><div class="prev">직전 62.5×8</div></span>
+      <span class="inp"><div class="v">8</div><div class="prev">직전 8</div></span>
+      <span class="act"><span class="done-mark">✓</span></span>
+    </div>
+    <div class="row done">
+      <span class="badge"><span class="tag tag-top">TOP</span></span>
+      <span class="inp"><div class="v">62.5</div><div class="prev">직전 62.5×7</div></span>
+      <span class="inp"><div class="v">7</div><div class="prev">직전 7</div></span>
+      <span class="act"><span class="done-mark">✓</span></span>
+    </div>
+
+    <!-- BACKOFF done -->
+    <div class="row done">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v">55</div><div class="prev">직전 55×10</div></span>
+      <span class="inp"><div class="v">10</div><div class="prev">직전 10</div></span>
+      <span class="act"><span class="done-mark">✓</span></span>
+    </div>
+
+    <!-- BACKOFF active (goal prefilled, one-tap) -->
+    <div class="row active">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v pre">55</div><div class="prev">목표 (직전 55×10)</div></span>
+      <span class="inp"><div class="v pre">10</div><div class="prev">목표 (직전 10)</div></span>
+      <span class="act"><span class="tap">완료 ✓</span></span>
+    </div>
+
+    <!-- BACKOFF upcoming -->
+    <div class="row">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v empty">55</div><div class="prev">직전 55×9</div></span>
+      <span class="inp"><div class="v empty">9</div><div class="prev">직전 9</div></span>
+      <span class="act"><span class="done-mark" style="background:#2A2A2C;color:#48484A;">✓</span></span>
+    </div>
+
+    <div class="rir">
+      <div class="rir-lbl">노력도? (선택 — 마지막 백오프 세트)</div>
+      <div class="chips">
+        <span class="chip">여유 많음</span>
+        <span class="chip sel">2~3개 남음</span>
+        <span class="chip">거의 한계</span>
+        <span class="chip">실패</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn-done">운동 완료</button>
+  </div>
+</div>
+</body>
+</html>

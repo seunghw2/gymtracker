@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>운동 중 — UI/UX 집중형 (기본)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:120px;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+
+  /* nav — 얇게, 시선 뺏지 않음 */
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 4px; }
+  .nav .back { font-size:26px; color:#FF3B30; line-height:1; }
+  .nav .timer { font-size:13px; font-weight:700; color:#8E8E93; font-variant-numeric:tabular-nums;
+    background:#161618; padding:6px 12px; border-radius:20px; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+
+  /* 종목 + 미니 진행 점 (한 줄) */
+  .head { padding:6px 20px 0; display:flex; align-items:center; justify-content:space-between; }
+  .head h1 { font-size:22px; font-weight:800; letter-spacing:-.5px; }
+  .head .kind { font-size:11px; color:#8E8E93; font-weight:700; margin-top:2px; }
+  .head .kind b { color:#FF3B30; }
+
+  /* 미니맵: 전체 세트를 점으로 — 지금 위치 한눈에 */
+  .minimap { display:flex; align-items:center; gap:7px; margin:14px 20px 0; }
+  .ml { font-size:10px; color:#6E6E73; font-weight:800; letter-spacing:.5px; width:34px; }
+  .dots { display:flex; gap:6px; align-items:center; }
+  .dot { width:13px; height:13px; border-radius:50%; }
+  .dot.done { background:#2BD96A; }
+  .dot.now { width:15px; height:15px; background:#FF3B30; box-shadow:0 0 0 4px rgba(255,59,48,.25); }
+  .dot.todo { background:#2A2A2C; }
+  .sep { width:1px; height:16px; background:#2A2A2C; margin:0 3px; }
+
+  /* === 단일 초점 카드: 지금 칠 한 세트만 거대하게 === */
+  .focus { margin:18px 16px 0; background:#161618; border-radius:24px; padding:22px 20px 24px;
+    border:1px solid #232325; position:relative; overflow:hidden; }
+  .focus::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:#FF3B30; }
+  .focus .ftag-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .focus .ftag { font-size:11px; font-weight:900; letter-spacing:1px; color:#FF3B30; }
+  .focus .fseq { font-size:12px; color:#6E6E73; font-weight:700; }
+
+  /* 가장 큰 숫자 = 지금 칠 값 */
+  .big { display:flex; align-items:flex-end; gap:8px; margin-top:10px; }
+  .big .num { font-size:74px; font-weight:800; line-height:.9; letter-spacing:-2px;
+    font-variant-numeric:tabular-nums; }
+  .big .unit { font-size:24px; font-weight:800; color:#8E8E93; margin-bottom:10px; }
+  .big .x { font-size:40px; font-weight:300; color:#48484A; margin:0 2px 8px; }
+  .big .reps { font-size:74px; font-weight:800; line-height:.9; letter-spacing:-2px;
+    font-variant-numeric:tabular-nums; }
+
+  /* 직전값 = 회색 작게, "이겨야 할 숫자" */
+  .prev { margin-top:14px; display:flex; align-items:center; gap:8px; font-size:14px; }
+  .prev .pl { color:#6E6E73; font-weight:700; }
+  .prev .pv { color:#8E8E93; font-weight:700; font-variant-numeric:tabular-nums; }
+  .prev .delta { margin-left:auto; font-size:12px; font-weight:800; color:#2BD96A;
+    background:rgba(43,217,106,.14); padding:4px 9px; border-radius:8px; }
+
+  /* === 큰 완료 버튼: 화면 절반 빨강, 엄지 닿는 위치 === */
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E;
+    padding:14px 16px 30px; }
+  /* +/- 미세보정: 큰 숫자 바로 아래, 엄지 양옆 */
+  .nudge { display:flex; gap:10px; margin-bottom:12px; }
+  .nudge .grp { flex:1; display:flex; background:#161618; border-radius:14px; overflow:hidden; }
+  .nudge .glabel { font-size:11px; color:#6E6E73; font-weight:800; align-self:center;
+    padding-left:14px; width:46px; }
+  .nudge .pm { flex:1; text-align:center; font-size:24px; font-weight:700; color:#FF3B30; padding:13px 0; }
+  .nudge .pm.minus { color:#8E8E93; border-right:1px solid #232325; }
+  .btn-done { display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; background:#FF3B30; color:#FFF; border:none; border-radius:18px;
+    padding:20px; font-size:19px; font-weight:900; letter-spacing:-.3px; }
+  .btn-done .chk { font-size:22px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+
+  <div class="nav">
+    <span class="back">‹</span>
+    <span class="timer">⏱ 휴식 1:24</span>
+    <span class="more">⋯</span>
+  </div>
+
+  <div class="head">
+    <div>
+      <h1>벤치프레스</h1>
+      <div class="kind">탑세트 + 백오프 · <b>ANCHOR</b></div>
+    </div>
+  </div>
+
+  <!-- 전체 세트 한눈 미니맵: 탑 2(완) · 백오프 1완 + 지금 + 1남음 -->
+  <div class="minimap">
+    <span class="ml">탑</span>
+    <div class="dots">
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+    </div>
+    <span class="sep"></span>
+    <span class="ml" style="width:auto;">백오프</span>
+    <div class="dots">
+      <span class="dot done"></span>
+      <span class="dot now"></span>
+      <span class="dot todo"></span>
+    </div>
+  </div>
+
+  <!-- 지금 칠 한 세트: 화면의 유일한 초점 -->
+  <div class="focus">
+    <div class="ftag-row">
+      <span class="ftag">백오프 · 4번째 세트</span>
+      <span class="fseq">5세트 중 4</span>
+    </div>
+
+    <div class="big">
+      <span class="num">55</span><span class="unit">kg</span>
+      <span class="x">×</span>
+      <span class="reps">10</span>
+    </div>
+
+    <div class="prev">
+      <span class="pl">지난번</span>
+      <span class="pv">55 × 10</span>
+      <span class="delta">목표 그대로</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <!-- 엄지 미세보정: 큰 숫자가 살짝 어긋날 때만 -->
+    <div class="nudge">
+      <div class="grp">
+        <span class="glabel">반복</span>
+        <span class="pm minus">−</span>
+        <span class="pm">＋</span>
+      </div>
+    </div>
+    <button class="btn-done"><span class="chk">✓</span> 이 세트 완료</button>
+  </div>
+</div>
+</body>
+</html>

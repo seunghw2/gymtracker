@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>종합 균형 — 인터랙션 후</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:104px; }
+  .caption { background:#2BD96A; color:#06210F; font-size:12px; font-weight:800; text-align:center;
+    padding:7px 14px; letter-spacing:.2px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; line-height:1; }
+  .nav .timer { font-size:14px; font-weight:700; color:#FF3B30; font-variant-numeric:tabular-nums; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+  .title { padding:4px 20px 0; display:flex; align-items:baseline; justify-content:space-between; }
+  .title h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .title .grade { font-size:10px; font-weight:800; padding:3px 8px; border-radius:7px;
+    background:rgba(43,217,106,.15); color:#2BD96A; border:1px solid rgba(43,217,106,.4); }
+  .subline { padding:2px 20px 0; font-size:12px; color:#8E8E93; font-weight:600; }
+
+  /* progress toast (motivation feedback after set) */
+  .toast { margin:11px 16px 0; background:rgba(43,217,106,.13); border:1px solid rgba(43,217,106,.4);
+    border-radius:13px; padding:11px 13px; display:flex; align-items:center; gap:10px; }
+  .toast .ic { font-size:18px; }
+  .toast .tt { font-size:13px; font-weight:800; color:#2BD96A; }
+  .toast .ts { font-size:11px; color:#8E8E93; font-weight:600; margin-top:1px; }
+
+  .hero { margin:11px 16px 0; background:#161618; border-radius:16px; padding:14px 14px 13px; }
+  .hero-row { display:flex; gap:10px; }
+  .axis { flex:1; background:#0D0D0D; border-radius:13px; padding:11px 12px; }
+  .axis .ax-lbl { font-size:10px; font-weight:800; letter-spacing:.5px; margin-bottom:5px; display:flex; align-items:center; gap:5px; }
+  .axis.top .ax-lbl { color:#FF6B61; }
+  .axis.back .ax-lbl { color:#9A9AA0; }
+  .axis .dot { width:7px; height:7px; border-radius:50%; }
+  .axis.top .dot { background:#FF3B30; }
+  .axis.back .dot { background:#6E6E73; }
+  .axis .big { font-size:21px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1; }
+  .axis .big small { font-size:13px; font-weight:700; color:#8E8E93; }
+  .axis .why { font-size:11px; color:#8E8E93; margin-top:4px; font-weight:600; line-height:1.35; }
+  .gate { display:flex; align-items:center; gap:5px; margin-top:8px; }
+  .gate .gd { width:18px; height:5px; border-radius:3px; background:#2A2A2C; }
+  .gate .gd.on { background:#2BD96A; }
+  .gate .gd.flash { background:#2BD96A; box-shadow:0 0 0 2px rgba(43,217,106,.35); }
+  .gate .gtx { font-size:10px; color:#6E6E73; font-weight:700; margin-left:3px; }
+  .gate .gtx.hot { color:#2BD96A; }
+
+  .motiv { margin:10px 16px 0; display:flex; gap:9px; }
+  .mcard { flex:1; background:#161618; border-radius:12px; padding:9px 11px; }
+  .mcard .ml { font-size:10px; color:#8E8E93; font-weight:700; }
+  .mcard .mv { font-size:14px; font-weight:800; margin-top:2px; }
+  .mcard .mv .up { color:#2BD96A; font-size:11px; }
+  .mcard.bumped { border:1px solid rgba(43,217,106,.45); }
+
+  .sets { margin:13px 16px 0; }
+  .col-head { display:flex; align-items:center; padding:0 6px 7px; font-size:11px; color:#8E8E93; font-weight:700; }
+  .c-set { width:48px; }
+  .c-kg { flex:1; text-align:center; }
+  .c-rep { flex:1; text-align:center; }
+  .c-act { width:88px; text-align:center; }
+  .row { display:flex; align-items:center; background:#161618; border-radius:12px; padding:9px 6px; margin-bottom:8px; }
+  .row.done { background:rgba(43,217,106,.09); }
+  .row.justdone { background:rgba(43,217,106,.16); border:1px solid rgba(43,217,106,.4); }
+  .row.active { border:1.5px solid #FF3B30; background:#1A1416; }
+  .badge { width:48px; display:flex; justify-content:center; }
+  .tag { font-size:9px; font-weight:800; padding:3px 6px; border-radius:6px; letter-spacing:.4px; }
+  .tag-back { background:#2A2A2C; color:#A8A8AD; }
+  .inp { flex:1; text-align:center; }
+  .inp .v { font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .inp .v.pre { color:#FF6B61; }
+  .inp .prev { font-size:10.5px; color:#6E6E73; margin-top:1px; }
+  .act { width:88px; display:flex; justify-content:center; align-items:center; }
+  .tap { background:#FF3B30; color:#FFF; font-size:12px; font-weight:800; padding:7px 12px; border-radius:9px; }
+  .done-mark { width:26px; height:26px; border-radius:50%; background:#2BD96A; color:#06210F;
+    display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; }
+
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:13px 16px 30px; }
+  .btn-done { display:block; width:100%; background:#FF3B30; color:#FFF; border:none; border-radius:15px; padding:15px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="caption">백오프 4세트 "완료" 한 탭 → 진행 피드백(볼륨 +1·게이트 전진)과 다음 세트 자동 프리필이 동시에</div>
+  <div class="statusbar"><span>9:42</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav">
+    <span class="back">‹</span>
+    <span class="timer">⏱ 휴식 0:08</span>
+    <span class="more">⋯</span>
+  </div>
+  <div class="title">
+    <h1>벤치프레스</h1>
+    <span class="grade">● ANCHOR</span>
+  </div>
+  <div class="subline">탑세트 + 백오프 · 2번째 종목</div>
+
+  <!-- motivation feedback toast -->
+  <div class="toast">
+    <span class="ic">🟢</span>
+    <div>
+      <div class="tt">백오프 1세트 적립 · 가슴 15세트째</div>
+      <div class="ts">목표까지 1세트 — 같은 55kg를 RIR 2로 채우는 중</div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-row">
+      <div class="axis top">
+        <div class="ax-lbl"><span class="dot"></span>탑 · 강도축</div>
+        <div class="big">62.5<small>kg</small> × 8</div>
+        <div class="why">무게 유지 · 6회까지 채우면 증량</div>
+        <div class="gate"><span class="gd on"></span><span class="gd on"></span><span class="gd"></span><span class="gtx">증량까지 1세트</span></div>
+      </div>
+      <div class="axis back">
+        <div class="ax-lbl"><span class="dot"></span>백오프 · 볼륨축</div>
+        <div class="big">55<small>kg</small> 총 30</div>
+        <div class="why">반복 쌓기 · 남은 9회</div>
+        <div class="gate"><span class="gd on"></span><span class="gd on"></span><span class="gd on"></span><span class="gd flash"></span><span class="gtx hot">+1 적립</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="motiv">
+    <div class="mcard bumped"><div class="ml">이번 주 가슴</div><div class="mv">15세트 <span class="up">↑</span></div></div>
+    <div class="mcard"><div class="ml">같은 55kg가</div><div class="mv" style="color:#2BD96A;">쉬워짐 ↑</div></div>
+  </div>
+
+  <div class="sets">
+    <div class="col-head">
+      <span class="c-set">세트</span>
+      <span class="c-kg">kg</span>
+      <span class="c-rep">반복</span>
+      <span class="c-act">완료</span>
+    </div>
+    <!-- the set just completed -->
+    <div class="row justdone">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v">55</div><div class="prev">방금 기록 · 55×10</div></span>
+      <span class="inp"><div class="v">10</div><div class="prev">RIR 2</div></span>
+      <span class="act"><span class="done-mark">✓</span></span>
+    </div>
+    <!-- next set auto-prefilled & now active -->
+    <div class="row active">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v pre">55</div><div class="prev">자동 프리필 (직전 9)</div></span>
+      <span class="inp"><div class="v pre">9</div><div class="prev">한 탭 = 목표대로</div></span>
+      <span class="act"><span class="tap">완료 ✓</span></span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn-done">운동 완료</button>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>운동 중 — UI/UX 집중형 (인터랙션 후)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:120px;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+
+  /* 인터랙션 캡션 */
+  .caption { margin:0 16px 2px; background:rgba(255,138,0,.12); border:1px solid rgba(255,138,0,.4);
+    color:#FF8A00; font-size:12px; font-weight:700; padding:9px 13px; border-radius:11px;
+    text-align:center; }
+
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 4px; }
+  .nav .back { font-size:26px; color:#FF3B30; line-height:1; }
+  /* 휴식 타이머가 방금 리셋 — 빨강 강조로 "방금 완료" 피드백 */
+  .nav .timer { font-size:13px; font-weight:800; color:#FF6B61; font-variant-numeric:tabular-nums;
+    background:rgba(255,59,48,.14); padding:6px 12px; border-radius:20px; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+
+  .head { padding:6px 20px 0; display:flex; align-items:center; justify-content:space-between; }
+  .head h1 { font-size:22px; font-weight:800; letter-spacing:-.5px; }
+  .head .kind { font-size:11px; color:#8E8E93; font-weight:700; margin-top:2px; }
+  .head .kind b { color:#FF3B30; }
+
+  /* 미니맵: 방금 친 세트가 초록으로, 포커스 점이 마지막 칸으로 이동 */
+  .minimap { display:flex; align-items:center; gap:7px; margin:14px 20px 0; }
+  .ml { font-size:10px; color:#6E6E73; font-weight:800; letter-spacing:.5px; width:34px; }
+  .dots { display:flex; gap:6px; align-items:center; }
+  .dot { width:13px; height:13px; border-radius:50%; }
+  .dot.done { background:#2BD96A; }
+  .dot.justdone { background:#2BD96A; box-shadow:0 0 0 4px rgba(43,217,106,.22); }
+  .dot.now { width:15px; height:15px; background:#FF3B30; box-shadow:0 0 0 4px rgba(255,59,48,.25); }
+  .dot.todo { background:#2A2A2C; }
+  .sep { width:1px; height:16px; background:#2A2A2C; margin:0 3px; }
+
+  .focus { margin:18px 16px 0; background:#161618; border-radius:24px; padding:22px 20px 22px;
+    border:1px solid #232325; position:relative; overflow:hidden; }
+  .focus::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:#FF3B30; }
+  .focus .ftag-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .focus .ftag { font-size:11px; font-weight:900; letter-spacing:1px; color:#FF3B30; }
+  .focus .fseq { font-size:12px; color:#6E6E73; font-weight:700; }
+  .focus .lastpill { font-size:10px; font-weight:900; color:#FF8A00; background:rgba(255,138,0,.16);
+    padding:3px 8px; border-radius:6px; letter-spacing:.5px; }
+
+  .big { display:flex; align-items:flex-end; gap:8px; margin-top:10px; }
+  .big .num { font-size:74px; font-weight:800; line-height:.9; letter-spacing:-2px;
+    font-variant-numeric:tabular-nums; }
+  .big .unit { font-size:24px; font-weight:800; color:#8E8E93; margin-bottom:10px; }
+  .big .x { font-size:40px; font-weight:300; color:#48484A; margin:0 2px 8px; }
+  .big .reps { font-size:74px; font-weight:800; line-height:.9; letter-spacing:-2px;
+    font-variant-numeric:tabular-nums; }
+
+  .prev { margin-top:14px; display:flex; align-items:center; gap:8px; font-size:14px; }
+  .prev .pl { color:#6E6E73; font-weight:700; }
+  .prev .pv { color:#8E8E93; font-weight:700; font-variant-numeric:tabular-nums; }
+  .prev .delta { margin-left:auto; font-size:12px; font-weight:800; color:#8E8E93;
+    background:#232325; padding:4px 9px; border-radius:8px; }
+
+  /* 마지막 백오프 세트라 RIR 칩이 카드 안에 살짝 떠오름 — 시선 이동 0 */
+  .rir { margin-top:18px; padding-top:16px; border-top:1px solid #232325; }
+  .rir-lbl { font-size:12px; color:#8E8E93; font-weight:700; margin-bottom:9px; }
+  .rir-lbl b { color:#FFF; }
+  .chips { display:flex; gap:7px; }
+  .chip { flex:1; text-align:center; font-size:12px; font-weight:800; padding:11px 4px; border-radius:11px;
+    background:#1C1C1E; color:#8E8E93; border:1px solid #2A2A2C; }
+  .chip.sel { background:rgba(255,59,48,.18); color:#FF6B61; border-color:#FF3B30; }
+
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E;
+    padding:14px 16px 30px; }
+  .nudge { display:flex; gap:10px; margin-bottom:12px; }
+  .nudge .grp { flex:1; display:flex; background:#161618; border-radius:14px; overflow:hidden; }
+  .nudge .glabel { font-size:11px; color:#6E6E73; font-weight:800; align-self:center;
+    padding-left:14px; width:46px; }
+  .nudge .pm { flex:1; text-align:center; font-size:24px; font-weight:700; color:#FF3B30; padding:13px 0; }
+  .nudge .pm.minus { color:#8E8E93; border-right:1px solid #232325; }
+  .btn-done { display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; background:#FF3B30; color:#FFF; border:none; border-radius:18px;
+    padding:20px; font-size:19px; font-weight:900; letter-spacing:-.3px; }
+  .btn-done .chk { font-size:22px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+
+  <div class="caption">「이 세트 완료」 탭 직후 — 포커스가 마지막 세트로 이동, 휴식 타이머 리셋, RIR 칩 등장</div>
+
+  <div class="nav">
+    <span class="back">‹</span>
+    <span class="timer">⏱ 휴식 0:03</span>
+    <span class="more">⋯</span>
+  </div>
+
+  <div class="head">
+    <div>
+      <h1>벤치프레스</h1>
+      <div class="kind">탑세트 + 백오프 · <b>ANCHOR</b></div>
+    </div>
+  </div>
+
+  <!-- 방금 친 4번째 점이 초록으로, 포커스가 마지막 5번째 점으로 옮겨감 -->
+  <div class="minimap">
+    <span class="ml">탑</span>
+    <div class="dots">
+      <span class="dot done"></span>
+      <span class="dot done"></span>
+    </div>
+    <span class="sep"></span>
+    <span class="ml" style="width:auto;">백오프</span>
+    <div class="dots">
+      <span class="dot done"></span>
+      <span class="dot justdone"></span>
+      <span class="dot now"></span>
+    </div>
+  </div>
+
+  <!-- 포커스 카드가 마지막 세트로 교체됨 -->
+  <div class="focus">
+    <div class="ftag-row">
+      <span class="ftag">백오프 · 5번째 세트</span>
+      <span class="lastpill">마지막 세트</span>
+    </div>
+
+    <div class="big">
+      <span class="num">55</span><span class="unit">kg</span>
+      <span class="x">×</span>
+      <span class="reps">9</span>
+    </div>
+
+    <div class="prev">
+      <span class="pl">지난번</span>
+      <span class="pv">55 × 9</span>
+      <span class="delta">+1 노려보기</span>
+    </div>
+
+    <!-- 마지막 백오프 세트에서만 RIR이 같은 초점 안에 올라옴 -->
+    <div class="rir">
+      <div class="rir-lbl">끝나면 <b>노력도</b> 한 번만 (선택)</div>
+      <div class="chips">
+        <span class="chip">여유</span>
+        <span class="chip sel">2~3개</span>
+        <span class="chip">한계</span>
+        <span class="chip">실패</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="nudge">
+      <div class="grp">
+        <span class="glabel">반복</span>
+        <span class="pm minus">−</span>
+        <span class="pm">＋</span>
+      </div>
+    </div>
+    <button class="btn-done"><span class="chk">✓</span> 마지막 세트 완료</button>
+  </div>
+</div>
+</body>
+</html>

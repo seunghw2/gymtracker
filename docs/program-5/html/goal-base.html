@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>운동 중 (목표 달성 관점) — GymTracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000000; color:#FFFFFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:120px;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  /* nav */
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; line-height:1; }
+  .nav .timer { font-size:14px; font-weight:700; color:#8E8E93; font-variant-numeric:tabular-nums; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+  /* title */
+  .title { padding:4px 20px 2px; }
+  .title h1 { font-size:25px; font-weight:800; letter-spacing:-.5px; }
+  .title .sub { font-size:13px; color:#8E8E93; margin-top:3px; font-weight:600; }
+  .title .sub b { color:#2BD96A; }
+
+  /* ── 진행 적립 바 (오늘 누적 승리) ── */
+  .accrual { margin:14px 16px 2px; background:#111114; border:1px solid #1F1F22; border-radius:16px; padding:14px 16px; }
+  .accrual .ac-top { display:flex; align-items:baseline; justify-content:space-between; }
+  .accrual .ac-lbl { font-size:11px; color:#8E8E93; font-weight:800; letter-spacing:.5px; }
+  .accrual .ac-streak { font-size:12px; color:#FF8A00; font-weight:800; }
+  .accrual .ac-head { font-size:18px; font-weight:800; margin-top:6px; letter-spacing:-.3px; }
+  .accrual .ac-head b { color:#2BD96A; }
+  /* 주간 가슴 볼륨 진행바 */
+  .volbar-wrap { margin-top:11px; }
+  .volbar-meta { display:flex; justify-content:space-between; font-size:11px; color:#8E8E93; font-weight:700; margin-bottom:6px; }
+  .volbar-meta .now { color:#FFFFFF; }
+  .volbar { height:9px; background:#222226; border-radius:6px; overflow:hidden; position:relative; }
+  .volbar .fill { height:100%; background:linear-gradient(90deg,#1E9E4E,#2BD96A); border-radius:6px; width:80%; }
+  .volbar .pending { position:absolute; top:0; height:100%; width:6%; left:80%; background:repeating-linear-gradient(45deg,#2BD96A55,#2BD96A55 3px,transparent 3px,transparent 6px); }
+  .volbar-tip { font-size:11px; color:#6E6E73; margin-top:6px; font-weight:600; }
+  .volbar-tip b { color:#2BD96A; }
+
+  /* ── 세트 리스트: 각 행에 "이겨야 할 숫자" + 진행 델타 ── */
+  .sets { margin:18px 16px 0; }
+  .blk-lbl { font-size:11px; font-weight:800; letter-spacing:.6px; margin:2px 4px 9px; }
+  .blk-lbl.top { color:#FF6B61; }
+  .blk-lbl.back { color:#8E8E93; }
+
+  .row { display:flex; align-items:center; background:#161618; border-radius:14px; padding:12px 14px; margin-bottom:10px; position:relative; }
+  .row.done { background:#13201A; border:1px solid rgba(43,217,106,.25); }
+  .row.active { background:#1B1416; border:1px solid rgba(255,59,48,.55); }
+  .r-chk { width:30px; }
+  .circle { width:26px; height:26px; border-radius:50%; border:2px solid #48484A; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .circle.on { background:#2BD96A; border-color:#2BD96A; color:#06140C; font-weight:900; }
+  .circle.cur { border-color:#FF3B30; color:#FF3B30; font-weight:800; }
+  .r-mid { flex:1; padding:0 12px; }
+  .r-target { font-size:11px; color:#6E6E73; font-weight:700; }
+  .r-target b { color:#8E8E93; }
+  .r-now { font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:1px; }
+  .r-now.empty { color:#48484A; }
+  .r-now .unit { font-size:13px; color:#8E8E93; font-weight:700; }
+  .r-delta { text-align:right; min-width:62px; }
+  .d-pill { display:inline-block; font-size:12px; font-weight:800; padding:4px 9px; border-radius:9px; }
+  .d-win { background:rgba(43,217,106,.16); color:#2BD96A; }
+  .d-tie { background:#222226; color:#8E8E93; }
+  .d-go { background:rgba(255,59,48,.16); color:#FF6B61; }
+  .d-sub { font-size:10px; color:#6E6E73; margin-top:3px; font-weight:600; }
+
+  /* ── RIR (정체 주간의 숨은 승리) ── */
+  .rir { margin:4px 4px 0; }
+  .rir-lbl { font-size:12px; color:#6E6E73; margin-bottom:8px; font-weight:600; }
+  .rir-lbl b { color:#2BD96A; }
+  .chips { display:flex; gap:7px; }
+  .chip { flex:1; text-align:center; font-size:12px; font-weight:700; padding:9px 4px; border-radius:10px; background:#1C1C1E; color:#8E8E93; border:1px solid #2A2A2C; }
+  .chip.sel { background:rgba(43,217,106,.16); color:#2BD96A; border-color:#2BD96A; }
+
+  /* footer */
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:14px 16px 30px; }
+  .btn-set { display:block; width:100%; background:#FF3B30; color:#FFFFFF; border:none; border-radius:15px; padding:16px; font-size:16px; font-weight:800; }
+  .btn-set .hint { display:block; font-size:11px; font-weight:600; opacity:.85; margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+
+  <div class="nav">
+    <span class="back">‹</span>
+    <span class="timer">⏱ 휴식 1:24</span>
+    <span class="more">⋯</span>
+  </div>
+
+  <div class="title">
+    <h1>벤치프레스</h1>
+    <div class="sub">탑세트 + 백오프 · 이번 주 <b>3번째</b> 운동</div>
+  </div>
+
+  <!-- 오늘 적립한 승리 + 주간 볼륨 -->
+  <div class="accrual">
+    <div class="ac-top">
+      <span class="ac-lbl">오늘 쌓은 것</span>
+      <span class="ac-streak">🔥 5주 연속</span>
+    </div>
+    <div class="ac-head">직전보다 <b>+3회</b> · 잘 가고 있어요</div>
+    <div class="volbar-wrap">
+      <div class="volbar-meta"><span>이번 주 가슴 볼륨</span><span class="now">16 / 18세트</span></div>
+      <div class="volbar">
+        <div class="fill"></div>
+        <div class="pending"></div>
+      </div>
+      <div class="volbar-tip">남은 백오프 1세트 치면 <b>17세트</b> · 성장 구간 안</div>
+    </div>
+  </div>
+
+  <div class="sets">
+    <!-- TOP -->
+    <div class="blk-lbl top">탑세트 · 강도축</div>
+
+    <div class="row done">
+      <span class="r-chk"><span class="circle on">✓</span></span>
+      <span class="r-mid">
+        <div class="r-target">이겨야 할 숫자 <b>60 × 8</b></div>
+        <div class="r-now">62.5<span class="unit">kg</span> × 8</div>
+      </span>
+      <span class="r-delta">
+        <span class="d-pill d-win">무게 +2.5</span>
+        <div class="d-sub">탑 갱신</div>
+      </span>
+    </div>
+
+    <div class="row done">
+      <span class="r-chk"><span class="circle on">✓</span></span>
+      <span class="r-mid">
+        <div class="r-target">이겨야 할 숫자 <b>60 × 7</b></div>
+        <div class="r-now">62.5<span class="unit">kg</span> × 7</div>
+      </span>
+      <span class="r-delta">
+        <span class="d-pill d-win">무게 +2.5</span>
+        <div class="d-sub">반복 유지</div>
+      </span>
+    </div>
+
+    <!-- BACKOFF -->
+    <div class="blk-lbl back">백오프 · 볼륨축</div>
+
+    <div class="row done">
+      <span class="r-chk"><span class="circle on">✓</span></span>
+      <span class="r-mid">
+        <div class="r-target">이겨야 할 숫자 <b>55 × 10</b></div>
+        <div class="r-now">55<span class="unit">kg</span> × 11</div>
+      </span>
+      <span class="r-delta">
+        <span class="d-pill d-win">+1회</span>
+        <div class="d-sub">이김</div>
+      </span>
+    </div>
+
+    <div class="row done">
+      <span class="r-chk"><span class="circle on">✓</span></span>
+      <span class="r-mid">
+        <div class="r-target">이겨야 할 숫자 <b>55 × 10</b></div>
+        <div class="r-now">55<span class="unit">kg</span> × 10</div>
+      </span>
+      <span class="r-delta">
+        <span class="d-pill d-tie">동률</span>
+        <div class="d-sub">유지</div>
+      </span>
+    </div>
+
+    <div class="row active">
+      <span class="r-chk"><span class="circle cur">5</span></span>
+      <span class="r-mid">
+        <div class="r-target">이기면 끝! <b>55 × 9</b></div>
+        <div class="r-now empty">– <span class="unit">대기</span></div>
+      </span>
+      <span class="r-delta">
+        <span class="d-pill d-go">10이면 승</span>
+        <div class="d-sub">마지막</div>
+      </span>
+    </div>
+
+    <!-- RIR: 정체 주간의 숨은 승리 -->
+    <div class="rir">
+      <div class="rir-lbl">마지막 세트, 얼마나 힘들었어요? <b>(같은 무게가 쉬워지면 그것도 성장)</b></div>
+      <div class="chips">
+        <span class="chip">여유 많음</span>
+        <span class="chip sel">2~3개 남음</span>
+        <span class="chip">거의 한계</span>
+        <span class="chip">실패</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn-set">이 세트 기록 — 마지막!<span class="hint">10회면 오늘 직전 완파 · 가슴 17세트 적립</span></button>
+  </div>
+</div>
+</body>
+</html>
