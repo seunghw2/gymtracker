@@ -39,32 +39,37 @@
   .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; vertical-align:middle; }
   .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
 
-  /* === 2층 이중 게이지 — 볼륨축 마커 점등 === */
-  .gaugeline{ margin-top:11px; background:var(--card); border-radius:13px; padding:11px 13px 10px; border:1px solid rgba(255,255,255,.04); }
-  .gl-row{ display:flex; align-items:center; gap:10px; }
-  .gl-row + .gl-row{ margin-top:10px; }
-  .gl-tag{ width:72px; flex:none; font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; }
-  .gl-tag .dot{ width:7px; height:7px; border-radius:50%; }
-  .gl-tag.intensity .dot{ background:var(--red); } .gl-tag.intensity{ color:var(--red); }
-  .gl-tag.volume .dot{ background:var(--orange); } .gl-tag.volume{ color:var(--orange); }
-  .gl-bar{ flex:1; height:9px; border-radius:5px; background:var(--bg2); position:relative; overflow:visible; }
-  .gl-bar .f{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
-  .gl-bar.intensity .f{ background:linear-gradient(90deg,#C9322B,#E0544C); }
-  .gl-bar.volume .f{ background:linear-gradient(90deg,#C76E00,#E0883A); }
-  /* 채움 100% + 마커 점등 — 막대 끝이 볼륨축은 가득, 마커는 흰색 강 점등 */
-  .gl-bar.volume.full .f{ background:linear-gradient(90deg,#FF8A00,#FFB04D); box-shadow:0 0 9px rgba(255,138,0,.45); }
+  /* === 듀얼 게이지 (좌우 2카드) — 볼륨축 마커 점등 === */
+  .gauges{ display:flex; gap:10px; margin-top:12px; }
+  .gauge{ flex:1; min-width:0; background:var(--card); border-radius:15px; padding:12px 12px 13px; position:relative; border:1px solid rgba(255,255,255,.04); }
+  .gauge.active{ border:1px solid rgba(255,138,0,.5); box-shadow:0 0 0 1px rgba(255,138,0,.16); }
+  .gauge .axislabel{ display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:700; letter-spacing:.3px; white-space:nowrap; }
+  .gauge .axislabel .dot{ width:7px; height:7px; border-radius:50%; flex:none; }
+  .gauge.intensity .axislabel{ color:var(--red); } .gauge.intensity .axislabel .dot{ background:var(--red); }
+  .gauge.volume .axislabel{ color:var(--orange); } .gauge.volume .axislabel .dot{ background:var(--orange); }
+  .gauge .headline{ margin-top:8px; font-size:21px; font-weight:800; letter-spacing:-.4px; line-height:1.05; }
+  .gauge .headline span{ font-size:12px; font-weight:600; color:var(--gray); }
+  .gauge .goalline{ margin-top:3px; font-size:10.5px; color:var(--gray); }
+  .gauge .goalline b{ color:#fff; font-weight:600; }
+  .gauge .bar{ margin-top:11px; height:9px; border-radius:6px; background:var(--bg2); position:relative; overflow:visible; }
+  .gauge .bar .fill{ position:absolute; left:0; top:0; bottom:0; border-radius:6px; }
+  .gauge.intensity .bar .fill{ background:linear-gradient(90deg,#C9322B,#E0544C); }
+  .gauge.volume .bar .fill{ background:linear-gradient(90deg,#C76E00,#E0883A); }
+  /* 채움 100% + 마커 점등 */
+  .gauge.volume.full .bar .fill{ background:linear-gradient(90deg,#FF8A00,#FFB04D); box-shadow:0 0 9px rgba(255,138,0,.45); }
+  .gauge .bar .gate{ position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,.42); border-radius:2px; }
+  .gauge .bar .gate::after{ content:"🔒"; position:absolute; top:-13px; left:50%; transform:translateX(-50%); font-size:8px; opacity:.7; }
   /* 흰 게이트 마커 — 추세 충족 점등: 굵고 밝게 + 자물쇠 해제 */
-  .gl-bar .gate{ position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,.42); border-radius:2px; }
-  .gl-bar .gate::after{ content:"🔒"; position:absolute; top:-13px; left:50%; transform:translateX(-50%); font-size:8px; opacity:.7; }
-  .gl-bar .gate.lit{ width:3px; background:#fff; box-shadow:0 0 8px rgba(255,255,255,.85); animation:gatepop .5s ease; }
-  .gl-bar .gate.lit::after{ content:"🔓"; opacity:1; }
+  .gauge .bar .gate.lit{ width:3px; background:#fff; box-shadow:0 0 8px rgba(255,255,255,.85); animation:gatepop .5s ease; }
+  .gauge .bar .gate.lit::after{ content:"🔓"; opacity:1; }
   @keyframes gatepop{ 0%{ transform:scaleY(.4); filter:brightness(2.2);} 100%{ transform:scaleY(1); filter:brightness(1);} }
-  .gl-num{ width:60px; flex:none; text-align:right; font-size:11px; color:var(--gray); font-variant-numeric:tabular-nums; }
-  .gl-num b{ color:#fff; font-weight:700; }
-  .gl-num.full b{ color:var(--orange); }
-  .gl-legend{ margin-top:9px; padding-top:8px; border-top:1px solid rgba(255,255,255,.05); font-size:10px; color:#7c7c82; line-height:1.5; }
-  .gl-legend b{ color:#b9b9bf; font-weight:600; }
-  .gl-legend .mk{ color:#fff; }
+  .gauge .undertxt{ margin-top:8px; font-size:10px; color:#7c7c82; line-height:1.4; }
+  .gauge .undertxt b{ color:#b9b9bf; font-weight:600; }
+  .gauge.volume.full .undertxt b{ color:var(--orange); }
+  .turnbadge{ position:absolute; top:11px; right:11px; font-size:9px; font-weight:800; letter-spacing:.3px; background:var(--orange); color:#000; padding:2px 6px; border-radius:6px; }
+  .gauge-legend{ margin-top:9px; padding:0 2px; font-size:10px; color:#7c7c82; line-height:1.5; }
+  .gauge-legend b{ color:#b9b9bf; font-weight:600; }
+  .gauge-legend .mk{ color:#fff; }
 
   /* === 게이트 점등 인라인 칩 (풀스크린 폭죽 금지, 한 줄) === */
   .gatechip{ margin-top:11px; display:flex; align-items:flex-start; gap:9px; background:linear-gradient(120deg,rgba(255,138,0,.10),rgba(255,138,0,.03)); border:1px solid rgba(255,138,0,.38); border-radius:12px; padding:10px 12px; animation:chipin .4s ease; }
@@ -130,20 +135,25 @@
       <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · 종목 완료</div>
     </div>
 
-    <!-- 2층 게이지 — 볼륨축 마커 점등 -->
-    <div class="gaugeline">
-      <div class="gl-row">
-        <div class="gl-tag intensity"><span class="dot"></span>강도 · 탑</div>
-        <div class="gl-bar intensity"><div class="f" style="width:100%"></div><div class="gate" style="left:100%"></div></div>
-        <div class="gl-num">62.5<b>kg</b></div>
+    <!-- 듀얼 게이지 — 볼륨축 마커 점등 -->
+    <div class="gauges">
+      <div class="gauge intensity">
+        <div class="axislabel"><span class="dot"></span>강도축 · 탑세트</div>
+        <div class="headline">62.5<span>kg</span></div>
+        <div class="goalline">목표 <b>8회 유지</b> · 직전 8/7</div>
+        <div class="bar"><div class="fill" style="width:100%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt">유지 주차 · 강도축은 그대로</div>
       </div>
-      <div class="gl-row">
-        <div class="gl-tag volume"><span class="dot"></span>볼륨 · 백오프</div>
-        <div class="gl-bar volume full"><div class="f" style="width:100%"></div><div class="gate lit" style="left:100%"></div></div>
-        <div class="gl-num full"><b>33</b>/33</div>
+      <div class="gauge volume full active">
+        <div class="turnbadge">달성</div>
+        <div class="axislabel"><span class="dot"></span>볼륨축 · 백오프</div>
+        <div class="headline">33<span> / 33회</span></div>
+        <div class="goalline">직전 29 → <b>33회 채움</b></div>
+        <div class="bar"><div class="fill" style="width:100%"></div><div class="gate lit" style="left:100%"></div></div>
+        <div class="undertxt">증량 해금 🔓 · <b>랩업서 제안</b></div>
       </div>
-      <div class="gl-legend">막대 = <b>세션 목표</b> 채움 완료 · <span class="mk">흰 선 🔓</span> 점등 = 증량 해금선 돌파(<b>2주 추세 충족</b>)</div>
     </div>
+    <div class="gauge-legend">막대 = <b>세션 목표</b> 채움 완료 · <span class="mk">흰 선 🔓</span> 점등 = 증량 해금선 돌파(<b>2주 추세 충족</b>)</div>
 
     <!-- 게이트 점등 인라인 칩 (추세 강함 톤) -->
     <div class="gatechip">
