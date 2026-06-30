@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>하이브리드 B · 절제 위계 (인터랙션)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:100px;
+  }
+  .wrap{ padding:0 16px; }
+
+  .caption{ background:#0d0d0f; border-bottom:1px solid var(--line); padding:9px 16px; font-size:11px; color:var(--gray); line-height:1.45; }
+  .caption b{ color:#fff; }
+
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 16px 4px; }
+  .topbar .back{ color:var(--gray); font-size:26px; width:32px; }
+  .topbar .title{ font-size:14px; font-weight:600; }
+  .topbar .timer{ font-size:13px; color:var(--gray); width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+
+  .exhead{ padding:6px 0 2px; }
+  .exhead .name{ font-size:22px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub{ margin-top:3px; font-size:12px; color:var(--gray); }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; vertical-align:middle; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+
+  /* 게이지 한 줄 — 볼륨 만땅 */
+  .gaugeline{ margin-top:11px; background:var(--card); border-radius:13px; padding:11px 13px; border:1px solid rgba(255,255,255,.04); }
+  .gl-row{ display:flex; align-items:center; gap:10px; }
+  .gl-row + .gl-row{ margin-top:9px; }
+  .gl-tag{ width:64px; flex:none; font-size:10.5px; font-weight:700; display:flex; align-items:center; gap:5px; }
+  .gl-tag .dot{ width:7px; height:7px; border-radius:50%; }
+  .gl-tag.intensity .dot{ background:var(--red); } .gl-tag.intensity{ color:var(--red); }
+  .gl-tag.volume .dot{ background:var(--green); } .gl-tag.volume{ color:var(--green); }
+  .gl-bar{ flex:1; height:8px; border-radius:5px; background:var(--bg2); position:relative; overflow:hidden; }
+  .gl-bar .f{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
+  .gl-bar.intensity .f{ background:linear-gradient(90deg,#FF3B30,#FF6B61); }
+  .gl-bar.volume .f{ background:linear-gradient(90deg,#2BD96A,#7BE8A4); box-shadow:0 0 8px rgba(43,217,106,.5); }
+  .gl-bar .gate{ position:absolute; top:-2px; bottom:-2px; width:2px; background:rgba(255,255,255,.5); }
+  .gl-bar.volume.full{ animation:barpop .5s ease; }
+  @keyframes barpop{ 0%{filter:brightness(1.8);} 100%{filter:brightness(1);} }
+  .gl-num{ width:62px; flex:none; text-align:right; font-size:11px; color:var(--gray); font-variant-numeric:tabular-nums; }
+  .gl-num b{ color:#fff; font-weight:700; }
+  .gl-num.full b{ color:var(--green); }
+
+  /* 방금 친 세트 — 조용한 직전 갱신 표기 (큰 연출 없음) */
+  .justdid{ margin-top:11px; display:flex; align-items:center; gap:11px; background:var(--card); border-radius:13px; padding:11px 13px; border:1px solid rgba(43,217,106,.3); }
+  .justdid .idx{ width:25px; height:25px; border-radius:7px; flex:none; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--orange); background:rgba(255,138,0,.12); }
+  .justdid .vals{ flex:1; }
+  .justdid .nowv{ font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .justdid .nowv .unit{ font-size:11px; font-weight:600; color:var(--gray); }
+  .justdid .nowv .x{ color:#48484A; }
+  .justdid .prevv{ margin-top:2px; font-size:11px; color:var(--green); }
+  .justdid .check{ width:25px; height:25px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; background:var(--green); color:#000; }
+
+  /* === 종목 끝 = 증량 카드 (인라인, 절제) — 풀스크린 오버레이 없이 카드만 === */
+  .levelcard{ margin-top:13px; border-radius:17px; padding:15px 15px 14px; position:relative; overflow:hidden; background:linear-gradient(160deg,#11271a,#0c1a12); border:1px solid rgba(43,217,106,.4); animation:cardpop .5s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes cardpop{ 0%{transform:scale(.97); opacity:0;} 100%{transform:scale(1); opacity:1;} }
+  .levelcard .glow{ position:absolute; top:-40px; right:-30px; width:150px; height:150px; border-radius:50%; background:radial-gradient(circle,rgba(43,217,106,.2),transparent 70%); }
+  .levelcard .kick{ font-size:11px; font-weight:800; letter-spacing:1px; color:var(--green); display:flex; align-items:center; gap:7px; }
+  .levelcard .kick .lvl{ background:var(--green); color:#000; font-size:9px; padding:1px 6px; border-radius:5px; }
+  .levelcard .questline{ margin-top:8px; font-size:11px; color:var(--green); font-weight:600; }
+  .levelcard h2{ margin-top:9px; font-size:20px; font-weight:800; letter-spacing:-.3px; }
+  .levelcard h2 .from{ color:var(--gray); text-decoration:line-through; font-weight:700; }
+  .levelcard h2 .arrow{ color:var(--green); padding:0 4px; }
+  .levelcard h2 .to{ color:var(--green); }
+  .levelcard .why{ margin-top:8px; font-size:12px; line-height:1.45; color:#cfeede; }
+  .levelcard .why b{ color:#fff; font-weight:700; }
+  .levelcard .evi{ margin-top:10px; background:rgba(0,0,0,.3); border:1px solid rgba(43,217,106,.2); border-radius:11px; padding:9px 11px; font-size:11px; color:var(--gray); line-height:1.5; }
+  .levelcard .evi b{ color:var(--green); }
+  .levelcard .hold{ margin-top:9px; display:flex; gap:7px; align-items:flex-start; font-size:11px; color:var(--gray); line-height:1.45; }
+  .levelcard .hold .d{ width:7px; height:7px; border-radius:50%; background:var(--red); flex:none; margin-top:4px; }
+  .levelcard .hold b{ color:#fff; font-weight:600; }
+  .levelcard .lbtns{ margin-top:13px; display:flex; gap:8px; }
+  .levelcard .lbtn{ flex:1; height:44px; border-radius:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .levelcard .lbtn.primary{ background:var(--red); color:#fff; }
+  .levelcard .lbtn.ghost{ background:#0e0e0f; color:var(--gray); border:1px solid var(--line); font-weight:600; }
+
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">인터랙션: 마지막 백오프 <b>B3 = 55×10</b> 기록 → 볼륨 게이지 만땅 + 증량 게이트 통과. 절제형이라 풀스크린 폭죽 대신 <b>종목 끝에 증량 카드 하나만</b> 조용히 — 평범한 세트는 직전값만 회색으로, 대결·축하는 이 순간에만.</div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">41:03</div>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · 종목 완료</div>
+    </div>
+
+    <!-- 게이지 한 줄, 볼륨 만땅 -->
+    <div class="gaugeline">
+      <div class="gl-row">
+        <div class="gl-tag intensity"><span class="dot"></span>강도 · 탑</div>
+        <div class="gl-bar intensity"><div class="f" style="width:62%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num">62.5<b>kg</b></div>
+      </div>
+      <div class="gl-row">
+        <div class="gl-tag volume"><span class="dot"></span>볼륨 · 백오프</div>
+        <div class="gl-bar volume full"><div class="f" style="width:100%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num full"><b>33</b>/33 ✓</div>
+      </div>
+    </div>
+
+    <!-- 방금 친 세트 (조용한 갱신) -->
+    <div class="justdid">
+      <div class="idx">B3</div>
+      <div class="vals">
+        <div class="nowv">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회</span></div>
+        <div class="prevv">직전 55×9 · +1 갱신 · 총 33회 채움</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 종목 끝 증량 카드 (절제 — 인라인) -->
+    <div class="levelcard">
+      <div class="glow"></div>
+      <div class="kick"><span class="lvl">증량 해금</span> 백오프 볼륨 게이트 통과 · 오늘 퀘스트 완료</div>
+      <div class="questline">✓ 벤치프레스 5/5 세트 클리어 · 볼륨축 33/33 채움</div>
+      <h2><span class="from">백오프 55kg</span><span class="arrow">→</span><span class="to">57.5kg</span></h2>
+      <div class="why">3세트 모두 상단(총 33회)을 채웠어요. 다음 운동부터 <b>57.5kg · 8회부터</b> 다시 쌓습니다.</div>
+      <div class="evi">근거 · 백오프 <b>2주 연속 상단(30↑)</b> · 같은 무게가 쉬워짐(9→11). 단발이 아닌 추세라 증량을 켰어요.</div>
+      <div class="hold"><span class="d"></span><span><b>강도축(탑 62.5kg)은 유지</b> — 두 축을 같은 날 동시에 올리지 않아요.</span></div>
+      <div class="lbtns">
+        <div class="lbtn ghost">55kg 유지</div>
+        <div class="lbtn primary">다음 운동에 반영</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <button class="bigbtn">다음 종목 <span class="small">· 인클라인 덤벨</span></button>
+  </div>
+</body>
+</html>

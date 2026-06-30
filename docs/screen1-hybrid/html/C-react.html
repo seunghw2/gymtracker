@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>하이브리드 C · 통합 미니멀 (인터랙션)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white); overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:100px;
+  }
+  .wrap{ padding:0 16px; }
+
+  .caption{ background:#0d0d0f; border-bottom:1px solid var(--line); padding:9px 16px; font-size:11px; color:var(--gray); line-height:1.45; }
+  .caption b{ color:#fff; }
+
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 16px 4px; }
+  .topbar .back{ color:var(--gray); font-size:26px; width:32px; }
+  .topbar .title{ font-size:14px; font-weight:600; }
+  .topbar .timer{ font-size:13px; color:var(--gray); width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+
+  .head{ margin-top:8px; background:var(--card); border:1px solid rgba(255,255,255,.05); border-radius:16px; padding:14px 15px 13px; }
+  .head .top{ display:flex; align-items:flex-end; justify-content:space-between; }
+  .head .name{ font-size:23px; font-weight:800; letter-spacing:-.4px; }
+  .head .anchor{ font-size:9.5px; font-weight:700; color:var(--green); background:rgba(43,217,106,.13); padding:2px 7px; border-radius:6px; margin-bottom:3px; }
+  .head .axes{ margin-top:13px; display:flex; gap:18px; }
+  .axis{ flex:1; }
+  .axis .al{ font-size:10px; font-weight:700; display:flex; align-items:center; gap:5px; }
+  .axis .al .dot{ width:6px; height:6px; border-radius:50%; }
+  .axis.intensity .al{ color:var(--red); } .axis.intensity .al .dot{ background:var(--red); }
+  .axis.volume .al{ color:var(--green); } .axis.volume .al .dot{ background:var(--green); }
+  .axis .av{ margin-top:4px; font-size:17px; font-weight:800; letter-spacing:-.3px; font-variant-numeric:tabular-nums; }
+  .axis .av .u,.axis .av .sub{ font-size:11px; font-weight:600; color:var(--gray); }
+  .axis.volume .av{ color:var(--green); }
+  .axis .track{ margin-top:6px; height:5px; border-radius:3px; background:var(--bg2); overflow:hidden; }
+  .axis .track .f{ height:100%; border-radius:3px; }
+  .axis.intensity .track .f{ background:var(--red); }
+  .axis.volume .track .f{ background:linear-gradient(90deg,#2BD96A,#7BE8A4); box-shadow:0 0 7px rgba(43,217,106,.5); animation:barpop .5s ease; }
+  @keyframes barpop{ 0%{filter:brightness(1.8);} 100%{filter:brightness(1);} }
+  .axis .note{ margin-top:5px; font-size:10px; color:var(--gray); }
+  .axis.volume .note{ color:var(--green); }
+  .axis .note b{ color:#fff; font-weight:600; }
+  .axis.volume .note b{ color:var(--green); }
+
+  /* === 증량 스트립 (미니멀 핵심 연출) — 풀스크린 대신 슬림 카드 한 줄 === */
+  .levelstrip{ margin-top:11px; background:linear-gradient(160deg,#11271a,#0c1a12); border:1px solid rgba(43,217,106,.45); border-radius:14px; padding:12px 13px; position:relative; overflow:hidden; animation:slidein .45s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes slidein{ 0%{opacity:0; transform:translateY(-8px) scale(.98);} 100%{opacity:1; transform:translateY(0) scale(1);} }
+  .levelstrip .glow{ position:absolute; top:-30px; right:-20px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,rgba(43,217,106,.2),transparent 70%); }
+  .levelstrip .ls-top{ display:flex; align-items:center; gap:9px; }
+  .levelstrip .ico{ width:34px; height:34px; flex:none; border-radius:10px; background:radial-gradient(circle,#7BE8A4,#2BD96A); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .levelstrip .lt{ flex:1; }
+  .levelstrip .kick{ font-size:10px; font-weight:800; letter-spacing:.8px; color:var(--green); }
+  .levelstrip .h2{ font-size:16px; font-weight:800; margin-top:2px; }
+  .levelstrip .h2 .from{ color:var(--gray); text-decoration:line-through; font-weight:700; }
+  .levelstrip .h2 .arr{ color:var(--green); padding:0 3px; }
+  .levelstrip .h2 .to{ color:var(--green); }
+  .levelstrip .evi{ margin-top:9px; font-size:10.5px; color:#bfe5cf; line-height:1.45; }
+  .levelstrip .evi b{ color:#fff; font-weight:600; }
+  .levelstrip .hold{ color:var(--gray); }
+  .levelstrip .lbtns{ margin-top:11px; display:flex; gap:7px; }
+  .levelstrip .lbtn{ flex:1; height:40px; border-radius:11px; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .levelstrip .lbtn.primary{ background:var(--red); color:#fff; }
+  .levelstrip .lbtn.ghost{ background:#0e0e0f; color:var(--gray); border:1px solid var(--line); font-weight:600; }
+
+  /* 세트 리스트 (B3 done) */
+  .sets{ margin-top:13px; }
+  .seclab{ display:flex; align-items:center; gap:7px; margin:0 2px 7px; font-size:11px; font-weight:700; color:var(--gray); letter-spacing:.4px; }
+  .seclab .dt{ width:6px; height:6px; border-radius:50%; background:var(--orange); }
+  .seclab .ln{ flex:1; height:1px; background:rgba(255,255,255,.06); }
+  .row{ display:grid; grid-template-columns:24px 1fr auto 22px; align-items:center; gap:10px; padding:9px 13px; border-radius:11px; margin-bottom:6px; background:var(--card); border:1px solid rgba(255,255,255,.04); }
+  .row .ix{ font-size:11px; font-weight:800; color:var(--orange); }
+  .row .data{ display:flex; align-items:baseline; gap:8px; }
+  .row .prev{ font-size:12px; color:var(--gray); font-variant-numeric:tabular-nums; }
+  .row .arr{ font-size:10px; color:#48484d; }
+  .row .now{ font-size:16px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+  .row .now .u{ font-size:10px; font-weight:600; color:var(--gray); }
+  .row .mk{ font-size:10.5px; font-weight:700; color:var(--green); }
+  .row .ck{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; justify-self:end; background:var(--green); color:#000; }
+  .row.justdone{ border-color:rgba(43,217,106,.4); animation:rowpop .5s ease; }
+  @keyframes rowpop{ 0%{transform:scale(1);} 40%{transform:scale(1.015);} 100%{transform:scale(1);} }
+
+  /* 미니 토스트 */
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:90px; background:#15311c; border:1px solid rgba(43,217,106,.5); color:var(--green); font-size:11.5px; font-weight:700; padding:8px 13px; border-radius:11px; display:flex; align-items:center; gap:7px; box-shadow:0 10px 30px rgba(0,0,0,.5); animation:toastin 3s ease forwards; }
+  .toast .pill{ background:rgba(43,217,106,.18); border-radius:20px; padding:2px 7px; font-size:10.5px; }
+  @keyframes toastin{ 0%{opacity:0; transform:translate(-50%,8px);} 14%{opacity:1; transform:translate(-50%,0);} 82%{opacity:1;} 100%{opacity:0; transform:translate(-50%,-5px);} }
+
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .bigbtn{ width:100%; height:50px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">인터랙션: <b>B3 = 55×10</b> 기록 → 볼륨축이 헤더에서 초록으로 33/33 전환 + <b>증량 스트립</b> 한 줄이 위로 슬라이드. 통합 미니멀이라 풀스크린 폭죽 없이 <b>데이터가 계속 주인공</b> — 축하는 스트립+미니 토스트로만.</div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">41:03</div>
+  </div>
+
+  <div class="wrap">
+    <!-- 헤더: 볼륨축 초록 전환 -->
+    <div class="head">
+      <div class="top">
+        <div class="name">벤치프레스</div>
+        <div class="anchor">ANCHOR</div>
+      </div>
+      <div class="axes">
+        <div class="axis intensity">
+          <div class="al"><span class="dot"></span>강도 · 탑</div>
+          <div class="av">62.5<span class="u">kg</span> <span class="sub">×8 유지</span></div>
+          <div class="track"><div class="f" style="width:62%"></div></div>
+          <div class="note">증량까지 <b>탑 6/6</b></div>
+        </div>
+        <div class="axis volume">
+          <div class="al"><span class="dot"></span>볼륨 · 백오프</div>
+          <div class="av">33<span class="sub"> / 33회 ✓</span></div>
+          <div class="track"><div class="f" style="width:100%"></div></div>
+          <div class="note">직전 29 → <b>+4회 달성</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 증량 스트립 -->
+    <div class="levelstrip">
+      <div class="glow"></div>
+      <div class="ls-top">
+        <div class="ico">🔓</div>
+        <div class="lt">
+          <div class="kick">증량 해금 · 볼륨 게이트 통과 · 퀘스트 5/5</div>
+          <div class="h2"><span class="from">백오프 55kg</span><span class="arr">→</span><span class="to">57.5kg · 8회부터</span></div>
+        </div>
+      </div>
+      <div class="evi">근거 · 백오프 <b>2주 연속 상단(30↑)</b> · 같은 무게 쉬워짐(9→11). <span class="hold">강도축 탑 62.5kg은 동시 증량 금지 → 유지.</span></div>
+      <div class="lbtns">
+        <div class="lbtn ghost">55kg 유지</div>
+        <div class="lbtn primary">다음 운동에 반영</div>
+      </div>
+    </div>
+
+    <!-- 세트 리스트 (방금 친 B3) -->
+    <div class="sets">
+      <div class="seclab"><span class="dt"></span>백오프 · 볼륨축<span class="ln"></span>3/3 ✓</div>
+      <div class="row justdone">
+        <div class="ix">B3</div>
+        <div class="data"><span class="prev">55×9</span><span class="arr">→</span><span class="now">10<span class="u">회</span></span></div>
+        <div class="mk">+1 · 총33</div>
+        <div class="ck">✓</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast">
+    <span>🔓 볼륨 게이트 통과 · 백오프 증량 해금</span>
+    <span class="pill">🔥 4주</span>
+  </div>
+
+  <div class="bottombar">
+    <button class="bigbtn">다음 종목 <span class="small">· 인클라인 덤벨</span></button>
+  </div>
+</body>
+</html>

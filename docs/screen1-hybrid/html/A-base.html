@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>하이브리드 A · 충실 결합 (기본)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:150px;
+  }
+  .wrap{ padding:0 16px; }
+
+  /* 상단바 */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px 4px; }
+  .topbar .back{ color:var(--gray); font-size:26px; line-height:1; width:32px; }
+  .topbar .title{ font-size:14px; font-weight:600; }
+  .topbar .timer{ font-size:13px; color:var(--gray); font-variant-numeric:tabular-nums; width:60px; text-align:right; }
+
+  /* 종목 헤더 */
+  .exhead{ padding:8px 0 2px; }
+  .exhead .name{ font-size:24px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub{ margin-top:3px; font-size:12px; color:var(--gray); }
+  .exhead .sub b{ color:#fff; font-weight:600; }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; vertical-align:middle; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+
+  /* === 슬림 듀얼 게이지 === */
+  .gauges{ display:flex; gap:9px; margin-top:12px; }
+  .gauge{ flex:1; background:var(--card); border-radius:14px; padding:11px 12px 12px; position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.04); }
+  .gauge.active{ border:1px solid rgba(255,138,0,.5); }
+  .gauge .axislabel{ display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:700; letter-spacing:.3px; }
+  .gauge .axislabel .dot{ width:7px; height:7px; border-radius:50%; }
+  .gauge .axislabel .nm{ color:var(--gray); }
+  .gauge.intensity .axislabel .dot{ background:var(--red); }
+  .gauge.volume .axislabel .dot{ background:var(--orange); }
+  .gauge .headline{ margin-top:7px; font-size:18px; font-weight:800; letter-spacing:-.3px; }
+  .gauge .headline span{ font-size:11px; font-weight:600; color:var(--gray); }
+  .bar{ margin-top:9px; height:7px; border-radius:5px; background:var(--bg2); position:relative; overflow:hidden; }
+  .bar .fill{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
+  .gauge.intensity .bar .fill{ background:linear-gradient(90deg,#FF3B30,#FF6B61); }
+  .gauge.volume .bar .fill{ background:linear-gradient(90deg,#FF8A00,#FFB04D); }
+  .bar .gate{ position:absolute; top:-2px; bottom:-2px; width:2px; background:rgba(255,255,255,.5); }
+  .gauge .undertxt{ margin-top:6px; font-size:10px; color:var(--gray); }
+  .gauge .undertxt b{ color:#fff; font-weight:600; }
+  .turnbadge{ position:absolute; top:10px; right:10px; font-size:9px; font-weight:800; letter-spacing:.3px; background:var(--orange); color:#000; padding:2px 6px; border-radius:5px; }
+
+  /* 이번 주 축 한 줄 안내 */
+  .focusline{ margin-top:10px; font-size:11.5px; color:#FFD9A8; display:flex; align-items:center; gap:7px; padding:0 2px; }
+  .focusline .ic{ font-size:13px; }
+  .focusline b{ color:#fff; font-weight:700; }
+
+  /* === 세트 섹션 === */
+  .secttl{ margin:17px 2px 8px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--gray); display:flex; align-items:center; gap:7px; }
+  .secttl .dt{ width:7px; height:7px; border-radius:50%; }
+  .secttl .dt.top{ background:var(--red); } .secttl .dt.back{ background:var(--orange); }
+  .secttl .ln{ flex:1; height:1px; background:rgba(255,255,255,.06); }
+  .secttl .meta{ font-size:11px; font-weight:600; }
+  .secttl .meta.top{ color:var(--red); } .secttl .meta.back{ color:var(--orange); }
+
+  /* 세트행 — 직전(조용한 인라인 대결) + 오늘 */
+  .setrow{ display:flex; align-items:center; gap:11px; background:var(--card); border-radius:13px; padding:11px 13px; margin-bottom:8px; border:1px solid rgba(255,255,255,.04); position:relative; }
+  .setrow .idx{ width:26px; height:26px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:var(--gray); background:var(--bg2); }
+  .setrow.top .idx{ color:var(--red); background:rgba(255,59,48,.12); }
+  .setrow.back .idx{ color:var(--orange); background:rgba(255,138,0,.12); }
+  .setrow .vals{ flex:1; min-width:0; }
+  /* 직전→오늘 한 줄 (조용한 인라인 대결) */
+  .setrow .duelline{ display:flex; align-items:baseline; gap:7px; }
+  .setrow .prevv{ font-size:13px; color:var(--gray); font-variant-numeric:tabular-nums; }
+  .setrow .vs{ font-size:9px; font-weight:900; color:#48484d; letter-spacing:.5px; }
+  .setrow .nowv{ font-size:17px; font-weight:800; letter-spacing:-.2px; font-variant-numeric:tabular-nums; }
+  .setrow .nowv .unit{ font-size:11px; font-weight:600; color:var(--gray); }
+  .setrow .nowv .x{ color:#48484A; padding:0 1px; }
+  .setrow .tag{ font-size:11px; margin-top:3px; }
+  .setrow .tag.win{ color:var(--green); font-weight:600; }
+  .setrow .tag.tie{ color:var(--orange); font-weight:600; }
+  .setrow .tag.todo{ color:var(--gray); }
+  .setrow .tag .beat{ color:#fff; font-weight:600; }
+  .setrow .check{ width:27px; height:27px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; }
+  .setrow.done .check{ background:var(--green); color:#000; }
+  .setrow.done .nowv{ color:#fff; }
+  .setrow.tiewin .check{ background:var(--orange); color:#000; }
+  .setrow.pending .check{ border:2px solid #2c2c2e; color:transparent; }
+
+  /* 활성(지금 칠) 세트 — 입력행 펼침 */
+  .setrow.activeNow{ border:1px solid rgba(255,138,0,.5); background:#1a1611; flex-wrap:wrap; }
+  .setrow.activeNow::before{ content:"지금"; position:absolute; top:-8px; left:13px; font-size:9px; font-weight:800; background:var(--orange); color:#000; padding:1px 6px; border-radius:5px; }
+  .setrow.activeNow .nowv{ color:var(--orange); }
+  .inrow{ flex-basis:100%; margin-top:11px; padding-top:10px; border-top:1px dashed #332a1c; display:flex; align-items:center; gap:8px; }
+  .field{ flex:1; background:#0e0e0f; border:1px solid #2c2c30; border-radius:10px; padding:6px; text-align:center; }
+  .field .fl{ font-size:9px; color:var(--gray); }
+  .field .fv{ font-size:17px; font-weight:800; margin-top:1px; }
+  .field.focus{ border-color:var(--orange); background:#161008; }
+  .clearbtn{ background:var(--green); color:#04210e; font-weight:800; font-size:13px; border:none; border-radius:11px; padding:11px 13px; white-space:nowrap; }
+
+  /* RIR */
+  .rirrow{ margin:2px 2px 0; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .rirrow .lbl{ font-size:11px; color:var(--gray); }
+  .rirchip{ font-size:11px; font-weight:600; color:var(--gray); background:var(--card); border:1px solid rgba(255,255,255,.07); padding:5px 9px; border-radius:8px; }
+  .rirchip.sel{ color:#000; background:var(--orange); border-color:var(--orange); font-weight:700; }
+
+  /* === 하단 고정: 증량 게이트 진행 + 액션 === */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .gatebar{ background:#141416; border:1px solid #2a2118; border-radius:13px; padding:9px 12px; margin-bottom:9px; }
+  .gatebar .gtop{ display:flex; align-items:center; gap:7px; font-size:11px; }
+  .gatebar .lock{ font-size:12px; }
+  .gatebar .gt{ font-weight:700; color:var(--orange); }
+  .gatebar .gnum{ margin-left:auto; font-size:11px; font-weight:700; color:var(--orange); font-variant-numeric:tabular-nums; }
+  .gatebar .gtrack{ margin-top:7px; height:6px; border-radius:4px; background:var(--bg2); overflow:hidden; }
+  .gatebar .gfill{ height:100%; background:linear-gradient(90deg,#FF8A00,#FFB04A); border-radius:4px; }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">38:12</div>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · <b>탑 유지 · 백오프 반복 쌓기</b></div>
+    </div>
+
+    <!-- 슬림 듀얼 게이지 -->
+    <div class="gauges">
+      <div class="gauge intensity">
+        <div class="axislabel"><span class="dot"></span><span class="nm">강도축 · 탑</span></div>
+        <div class="headline">62.5<span>kg</span></div>
+        <div class="bar"><div class="fill" style="width:62%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt">증량까지 <b>탑 6/6</b> · 유지 주차</div>
+      </div>
+      <div class="gauge volume active">
+        <div class="turnbadge">이번 주 차례</div>
+        <div class="axislabel"><span class="dot"></span><span class="nm">볼륨축 · 백오프</span></div>
+        <div class="headline">29<span> / 33회</span></div>
+        <div class="bar"><div class="fill" style="width:74%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="undertxt">남은 <b>4회</b> · 채우면 57.5kg</div>
+      </div>
+    </div>
+    <div class="focusline"><span class="ic">🎯</span><span>이번 주는 <b>볼륨축 차례</b> — 탑은 그대로, 백오프 <b>직전 29 → 33회</b></span></div>
+
+    <!-- 탑세트 -->
+    <div class="secttl"><span class="dt top"></span>탑세트 · 강도축<span class="ln"></span><span class="meta top">62.5kg 유지</span></div>
+
+    <div class="setrow top done">
+      <div class="idx">T1</div>
+      <div class="vals">
+        <div class="duelline"><span class="prevv">직전 62.5×8</span><span class="vs">VS</span><span class="nowv">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></span></div>
+        <div class="tag win">동률 유지 · 강도 보존</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <div class="setrow top done">
+      <div class="idx">T2</div>
+      <div class="vals">
+        <div class="duelline"><span class="prevv">직전 62.5×7</span><span class="vs">VS</span><span class="nowv">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></span></div>
+        <div class="tag win">직전 +1 갱신</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 백오프 -->
+    <div class="secttl"><span class="dt back"></span>백오프 · 볼륨축<span class="ln"></span><span class="meta back">3세트 · 55kg</span></div>
+
+    <div class="setrow back done">
+      <div class="idx">B1</div>
+      <div class="vals">
+        <div class="duelline"><span class="prevv">직전 55×10</span><span class="vs">VS</span><span class="nowv">55<span class="unit">kg</span><span class="x">×</span>11<span class="unit">회</span></span></div>
+        <div class="tag win">직전 +1 갱신</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <div class="setrow back done">
+      <div class="idx">B2</div>
+      <div class="vals">
+        <div class="duelline"><span class="prevv">직전 55×10</span><span class="vs">VS</span><span class="nowv">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회</span></span></div>
+        <div class="tag todo">동률 유지</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 활성: 지금 칠 마지막 백오프 -->
+    <div class="setrow back activeNow pending">
+      <div class="idx">B3</div>
+      <div class="vals">
+        <div class="duelline"><span class="prevv">직전 55×9</span><span class="vs">VS</span><span class="nowv" style="color:var(--orange)">55<span class="unit">kg</span><span class="x">×</span>?<span class="unit">회</span></span></div>
+        <div class="tag todo"><b class="beat">10회면</b> 총 33회 — 볼륨 게이트 통과</div>
+      </div>
+      <div class="check">○</div>
+      <div class="inrow">
+        <div class="field"><div class="fl">무게 kg</div><div class="fv">55</div></div>
+        <div class="field focus"><div class="fl">반복</div><div class="fv">10</div></div>
+        <button class="clearbtn">이 세트 완료 →</button>
+      </div>
+    </div>
+
+    <div class="rirrow">
+      <span class="lbl">노력도? (선택)</span>
+      <span class="rirchip">여유</span>
+      <span class="rirchip sel">2~3 남음</span>
+      <span class="rirchip">거의 한계</span>
+    </div>
+  </div>
+
+  <!-- 하단: 증량 게이트 진행 + 액션 -->
+  <div class="bottombar">
+    <div class="gatebar">
+      <div class="gtop"><span class="lock">🔒</span><span class="gt">백오프 증량 게이트 — 55 → 57.5kg</span><span class="gnum">29 / 33</span></div>
+      <div class="gtrack"><div class="gfill" style="width:88%"></div></div>
+    </div>
+    <button class="bigbtn">B3 기록하기 <span class="small">· 볼륨 게이지 +1칸</span></button>
+  </div>
+</body>
+</html>
