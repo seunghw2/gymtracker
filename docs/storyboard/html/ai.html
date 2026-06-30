@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>AI 보조 + RIR — GymTracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000000; color:#FFFFFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; overflow:hidden;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; padding:8px 18px 6px; }
+  .nav .ttl { font-size:22px; font-weight:800; letter-spacing:-.4px; }
+  .nav .spark { color:#FF3B30; margin-right:7px; font-size:20px; }
+  /* dimmed content behind sheet */
+  .content { padding:10px 16px 0; filter:brightness(.5); }
+  /* AI card */
+  .ai-card { background:#161618; border-radius:18px; padding:18px; margin-bottom:12px; }
+  .ai-head { display:flex; align-items:center; gap:9px; margin-bottom:11px; }
+  .ai-avatar { width:30px; height:30px; border-radius:9px; background:#FF3B30; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:#fff; }
+  .ai-name { font-size:14px; font-weight:700; }
+  .ai-name small { color:#8E8E93; font-weight:500; font-size:11px; display:block; }
+  .ai-body { font-size:15px; line-height:1.5; }
+  .ai-body b { color:#FF8A00; }
+  .ai-act { margin-top:14px; display:flex; gap:9px; }
+  .ai-btn { flex:1; text-align:center; font-size:13px; font-weight:700; padding:11px; border-radius:11px; }
+  .ai-btn.primary { background:#FF3B30; color:#fff; }
+  .ai-btn.ghost { background:#0D0D0D; color:#C7C7CC; border:1px solid #2A2A2C; }
+  .ai-foot { font-size:11px; color:#6E6E73; margin-top:11px; }
+  .ai-card2 { background:#161618; border-radius:18px; padding:18px; }
+  .ai-card2 .ai-body { color:#C7C7CC; font-size:14px; }
+  /* overlay */
+  .scrim { position:absolute; inset:0; background:rgba(0,0,0,.55); }
+  /* bottom sheet */
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:#161618;
+    border-radius:24px 24px 0 0; padding:10px 18px 34px; }
+  .grab { width:38px; height:5px; border-radius:3px; background:#48484A; margin:0 auto 16px; }
+  .sheet h2 { font-size:19px; font-weight:800; text-align:center; }
+  .sheet .ssub { font-size:13px; color:#8E8E93; text-align:center; margin-top:6px; }
+  .sheet .ssub b { color:#FFFFFF; }
+  .rir-opts { margin-top:20px; display:flex; flex-direction:column; gap:11px; }
+  .rir-opt { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-radius:14px; background:#0D0D0D; border:1.5px solid #2A2A2C; }
+  .rir-opt.sel { border-color:#FF3B30; background:#19120F; }
+  .ro-left { display:flex; align-items:center; gap:13px; }
+  .ro-dot { width:13px; height:13px; border-radius:50%; }
+  .d-green { background:#2BD96A; }
+  .d-lime { background:#9BE15D; }
+  .d-orange { background:#FF8A00; }
+  .d-red { background:#FF3B30; }
+  .ro-name { font-size:16px; font-weight:700; }
+  .ro-sub { font-size:12px; color:#8E8E93; }
+  .ro-tag { font-size:12px; color:#8E8E93; font-weight:600; }
+  .ro-check { color:#FF3B30; font-size:20px; font-weight:800; }
+  .skip { text-align:center; color:#8E8E93; font-size:14px; font-weight:600; margin-top:18px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav"><span class="spark">✦</span><span class="ttl">AI 코치</span></div>
+
+  <!-- dimmed background content -->
+  <div class="content">
+    <div class="ai-card">
+      <div class="ai-head">
+        <div class="ai-avatar">✦</div>
+        <div class="ai-name">AI 코치<small>이번 주 분석 · 결정론 엔진 기반</small></div>
+      </div>
+      <div class="ai-body">이번 주 <b>가슴 볼륨이 목표보다 적어요</b> (12/16세트). 백오프 <b>한 세트 추가</b>를 추천해요. 직전 대비 반복은 잘 늘고 있어요.</div>
+      <div class="ai-act">
+        <span class="ai-btn primary">세트 추가</span>
+        <span class="ai-btn ghost">나중에</span>
+      </div>
+      <div class="ai-foot">처방은 진행 엔진이 계산 · AI는 이유만 설명</div>
+    </div>
+    <div class="ai-card2">
+      <div class="ai-head">
+        <div class="ai-avatar">✦</div>
+        <div class="ai-name">동기 한마디</div>
+      </div>
+      <div class="ai-body">벤치 탑세트 62.5kg×8 — 역대 최고 탑세트예요. 꾸준함이 그대로 숫자로 나오는 중.</div>
+    </div>
+  </div>
+
+  <!-- RIR bottom sheet -->
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>이번 세트 얼마나 힘들었나요?</h2>
+    <div class="ssub"><b>벤치프레스 · 백오프 3세트</b> · 55kg × 11</div>
+
+    <div class="rir-opts">
+      <div class="rir-opt">
+        <div class="ro-left"><span class="ro-dot d-green"></span>
+          <div><div class="ro-name">여유 많음</div><div class="ro-sub">4개 이상 더 가능</div></div></div>
+        <span class="ro-tag">RIR 4+</span>
+      </div>
+      <div class="rir-opt sel">
+        <div class="ro-left"><span class="ro-dot d-lime"></span>
+          <div><div class="ro-name">2~3개 남음</div><div class="ro-sub">근비대 최적 구간</div></div></div>
+        <span class="ro-check">✓</span>
+      </div>
+      <div class="rir-opt">
+        <div class="ro-left"><span class="ro-dot d-orange"></span>
+          <div><div class="ro-name">거의 한계</div><div class="ro-sub">1개 남음</div></div></div>
+        <span class="ro-tag">RIR 1</span>
+      </div>
+      <div class="rir-opt">
+        <div class="ro-left"><span class="ro-dot d-red"></span>
+          <div><div class="ro-name">실패</div><div class="ro-sub">더 못 들었음</div></div></div>
+        <span class="ro-tag">RIR 0</span>
+      </div>
+    </div>
+
+    <div class="skip">건너뛰기 (선택 입력)</div>
+  </div>
+</div>
+</body>
+</html>

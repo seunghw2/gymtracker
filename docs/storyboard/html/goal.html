@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>목표 / 진행 룰 — GymTracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000000; color:#FFFFFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:110px;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; line-height:1; }
+  .nav .ttl { font-size:16px; font-weight:700; }
+  .nav .sp { width:24px; }
+  /* head */
+  .head { padding:8px 20px 4px; }
+  .head .ex { font-size:13px; color:#8E8E93; font-weight:600; }
+  .head h1 { font-size:26px; font-weight:800; letter-spacing:-.5px; margin-top:2px; }
+  .head .desc { font-size:13px; color:#8E8E93; margin-top:8px; line-height:1.4; }
+  /* section */
+  .sec { padding:22px 20px 10px; font-size:13px; color:#8E8E93; font-weight:700; letter-spacing:.4px; }
+  /* options */
+  .opts { margin:0 16px; }
+  .opt { background:#161618; border-radius:16px; padding:16px; margin-bottom:11px; border:1.5px solid transparent; }
+  .opt.sel { border-color:#FF3B30; background:#19120F; }
+  .opt-top { display:flex; align-items:flex-start; justify-content:space-between; }
+  .opt-name { font-size:16px; font-weight:700; }
+  .opt-name .star { color:#FF8A00; font-size:12px; margin-left:6px; font-weight:600; }
+  .check { width:26px; height:26px; border-radius:50%; border:2px solid #3A3A3C; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .check.on { background:#FF3B30; border-color:#FF3B30; color:#fff; font-weight:800; font-size:15px; }
+  .opt-desc { font-size:13px; color:#A8A8AD; margin-top:8px; line-height:1.45; }
+  .trigger { margin-top:11px; background:#0D0D0D; border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:9px; }
+  .trigger .ti { font-size:14px; }
+  .trigger .tt { font-size:12px; color:#C7C7CC; font-weight:600; }
+  .trigger .tt b { color:#FF3B30; }
+  /* footer */
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:14px 16px 30px; }
+  .btn-save { display:block; width:100%; background:#FF3B30; color:#FFFFFF; border:none; border-radius:15px; padding:16px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+
+  <div class="nav"><span class="back">‹</span><span class="ttl">진행 룰 설정</span><span class="sp"></span></div>
+
+  <div class="head">
+    <div class="ex">종목</div>
+    <h1>벤치프레스</h1>
+    <div class="desc">이 종목의 무게·반복을 어떻게 늘려갈지 정합니다. 바벨 메인은 탑세트+백오프를 권장해요.</div>
+  </div>
+
+  <div class="sec">진행 방식</div>
+  <div class="opts">
+
+    <div class="opt sel">
+      <div class="opt-top">
+        <span class="opt-name">더블 프로그레션</span>
+        <span class="check on">✓</span>
+      </div>
+      <div class="opt-desc">정해진 반복 범위 안에서 먼저 반복을 채우고, 상단에 닿으면 무게를 올립니다. 가장 단순·안정적.</div>
+      <div class="trigger"><span class="ti">⤴</span><span class="tt">증량 트리거 — <b>전 세트 12회 달성 시 +2.5kg</b></span></div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-top">
+        <span class="opt-name">탑세트 + 백오프 <span class="star">★ 바벨 권장</span></span>
+        <span class="check"></span>
+      </div>
+      <div class="opt-desc">무거운 탑세트로 강도를, 가벼운 백오프 세트로 볼륨을 따로 쌓습니다. 강도·볼륨 분리 진행.</div>
+      <div class="trigger"><span class="ti">⤴</span><span class="tt">증량 트리거 — <b>탑세트 8회 2세션 연속 시 +2.5kg</b></span></div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-top">
+        <span class="opt-name">총 반복 목표</span>
+        <span class="check"></span>
+      </div>
+      <div class="opt-desc">세트 배분과 무관하게 "오늘 총 27회"처럼 합계만 채웁니다. 머신·고립에 적합.</div>
+      <div class="trigger"><span class="ti">⤴</span><span class="tt">증량 트리거 — <b>목표 총 반복 2세션 달성 시 +2kg</b></span></div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-top">
+        <span class="opt-name">RIR 자가조절</span>
+        <span class="check"></span>
+      </div>
+      <div class="opt-desc">반복 채움 대신 "여유(RIR)"가 늘면 증량. 노력도 입력이 켜져 있어야 동작합니다.</div>
+      <div class="trigger"><span class="ti">⤴</span><span class="tt">증량 트리거 — <b>같은 무게 RIR 2→3 여유 시 +2.5kg</b></span></div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="btn-save">저장</button>
+  </div>
+</div>
+</body>
+</html>

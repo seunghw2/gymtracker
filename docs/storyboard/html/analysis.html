@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>종목 분석 — GymTracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000000; color:#FFFFFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:96px;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; line-height:1; }
+  .nav .ttl { font-size:16px; font-weight:700; margin-left:8px; }
+  /* exercise header */
+  .ehead { padding:6px 20px 2px; }
+  .ehead h1 { font-size:27px; font-weight:800; letter-spacing:-.5px; }
+  .ehead .badges { margin-top:8px; display:flex; gap:7px; }
+  .b { font-size:11px; font-weight:700; padding:4px 9px; border-radius:7px; letter-spacing:.3px; }
+  .b-anchor { background:rgba(43,217,106,.15); color:#2BD96A; }
+  .b-rule { background:rgba(142,142,147,.18); color:#A8A8AD; }
+  /* headline */
+  .headline { margin:18px 16px 0; background:#161618; border-radius:18px; padding:20px; }
+  .headline .h-label { font-size:13px; color:#8E8E93; font-weight:600; }
+  .headline .h-main { font-size:30px; font-weight:800; margin-top:4px; display:flex; align-items:center; gap:8px; }
+  .headline .h-main .up { color:#2BD96A; font-size:22px; }
+  .headline .h-sub { font-size:13px; color:#2BD96A; margin-top:5px; font-weight:600; }
+  /* status pill */
+  .status { display:inline-block; margin-top:12px; font-size:12px; font-weight:700; padding:6px 11px; border-radius:8px; background:rgba(43,217,106,.15); color:#2BD96A; }
+  /* chart */
+  .sec { padding:24px 20px 12px; font-size:16px; font-weight:700; }
+  .chart-card { margin:0 16px; background:#161618; border-radius:18px; padding:20px 18px 14px; }
+  .bars { display:flex; align-items:flex-end; justify-content:space-between; height:140px; gap:10px; }
+  .col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .bar { width:100%; max-width:38px; border-radius:7px 7px 3px 3px; position:relative; }
+  .bar .n { position:absolute; top:-18px; left:0; right:0; text-align:center; font-size:11px; font-weight:700; color:#C7C7CC; }
+  .bar.cur { background:#2BD96A; }
+  .bar.past { background:#3A3A3C; }
+  .xlabel { font-size:11px; color:#8E8E93; margin-top:8px; font-weight:600; }
+  .chart-foot { display:flex; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid #232325; font-size:12px; color:#8E8E93; }
+  .chart-foot b { color:#fff; }
+  /* compare rows */
+  .cmp { margin:0 16px; background:#161618; border-radius:18px; padding:6px 18px; }
+  .crow { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid #232325; }
+  .crow:last-child { border-bottom:none; }
+  .c-l { font-size:14px; color:#8E8E93; font-weight:600; }
+  .c-r { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .c-r small { font-size:12px; color:#8E8E93; font-weight:500; }
+  .pr { color:#2BD96A; }
+  /* e1RM ref */
+  .ref { margin:14px 16px 0; background:#0D0D0D; border:1px solid #1C1C1E; border-radius:14px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .ref .r-l { font-size:12px; color:#8E8E93; font-weight:600; }
+  .ref .r-l .anchor { color:#2BD96A; }
+  .ref .r-v { font-size:18px; font-weight:800; color:#C7C7CC; }
+  .ref .r-v small { font-size:11px; color:#8E8E93; font-weight:500; }
+  /* tab bar */
+  .tabbar { position:fixed; bottom:0; width:390px; height:84px; background:#0D0D0D; border-top:1px solid #1C1C1E; display:flex; padding-top:10px; }
+  .tab { flex:1; text-align:center; font-size:10px; color:#8E8E93; font-weight:600; }
+  .tab .ic { font-size:22px; display:block; margin-bottom:3px; line-height:1; }
+  .tab.active { color:#FF3B30; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+
+  <div class="nav"><span class="back">‹</span><span class="ttl">종목 분석</span></div>
+
+  <div class="ehead">
+    <h1>벤치프레스</h1>
+    <div class="badges">
+      <span class="b b-anchor">ANCHOR · 무게 PR 신뢰</span>
+      <span class="b b-rule">탑세트+백오프</span>
+    </div>
+  </div>
+
+  <div class="headline">
+    <div class="h-label">이번 주 가슴 볼륨</div>
+    <div class="h-main">14세트 <span class="up">↑</span></div>
+    <div class="h-sub">4주 전 10세트 → 꾸준히 증가 중</div>
+    <span class="status">✅ GROWING — 볼륨↑ · 반복 개선</span>
+  </div>
+
+  <div class="sec">주별 볼륨 추세</div>
+  <div class="chart-card">
+    <div class="bars">
+      <div class="col"><div class="bar past" style="height:48%"><span class="n">10</span></div></div>
+      <div class="col"><div class="bar past" style="height:55%"><span class="n">11</span></div></div>
+      <div class="col"><div class="bar past" style="height:62%"><span class="n">12</span></div></div>
+      <div class="col"><div class="bar past" style="height:65%"><span class="n">12</span></div></div>
+      <div class="col"><div class="bar past" style="height:72%"><span class="n">13</span></div></div>
+      <div class="col"><div class="bar cur" style="height:88%"><span class="n">14</span></div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;">
+      <span class="xlabel">5주전</span><span class="xlabel">4주</span><span class="xlabel">3주</span>
+      <span class="xlabel">2주</span><span class="xlabel">지난주</span><span class="xlabel" style="color:#2BD96A">이번주</span>
+    </div>
+    <div class="chart-foot"><span>가슴 주간 hard 세트</span><span>4주 추세 <b>+4세트</b></span></div>
+  </div>
+
+  <div class="sec">직전 / 최고 비교</div>
+  <div class="cmp">
+    <div class="crow">
+      <span class="c-l">직전 세션</span>
+      <span class="c-r">60kg · 24회 <small>(탑 8+7)</small></span>
+    </div>
+    <div class="crow">
+      <span class="c-l">오늘 기록</span>
+      <span class="c-r pr">62.5kg · 26회 ↑</span>
+    </div>
+    <div class="crow">
+      <span class="c-l">역대 최고 탑세트</span>
+      <span class="c-r pr">62.5kg × 8 · PR</span>
+    </div>
+  </div>
+
+  <div class="ref">
+    <div class="r-l">근력 참고 e1RM <span class="anchor">· ANCHOR 신뢰</span></div>
+    <div class="r-v">117kg <small>추정</small></div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab"><span class="ic">●</span>홈</div>
+    <div class="tab"><span class="ic">▤</span>기록</div>
+    <div class="tab active"><span class="ic">◫</span>분석</div>
+    <div class="tab"><span class="ic">✦</span>AI</div>
+    <div class="tab"><span class="ic">☰</span>설정</div>
+  </div>
+</div>
+</body>
+</html>

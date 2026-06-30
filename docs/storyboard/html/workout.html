@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>운동 중 — GymTracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000000; color:#FFFFFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:96px;
+  }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  /* nav */
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; line-height:1; }
+  .nav .timer { font-size:14px; font-weight:700; color:#8E8E93; font-variant-numeric:tabular-nums; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+  /* title */
+  .title { padding:4px 20px 2px; }
+  .title h1 { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+  .title .sub { font-size:13px; color:#8E8E93; margin-top:3px; font-weight:600; }
+  .title .sub b { color:#2BD96A; }
+  /* goal banner */
+  .banner { margin:14px 16px 4px; background:rgba(255,59,48,.12); border:1px solid rgba(255,59,48,.35);
+    border-radius:14px; padding:13px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .banner .b-main { font-size:15px; font-weight:700; }
+  .banner .b-main b { color:#FF3B30; }
+  .banner .b-tag { font-size:11px; color:#8E8E93; margin-top:2px; }
+  .banner .chev { color:#8E8E93; font-size:18px; }
+  /* set table */
+  .sets { margin:16px 16px 0; }
+  .col-head { display:flex; align-items:center; padding:0 4px 8px; font-size:11px; color:#8E8E93; font-weight:700; letter-spacing:.3px; }
+  .c-set { width:54px; }
+  .c-kg { flex:1; text-align:center; }
+  .c-rep { flex:1; text-align:center; }
+  .c-chk { width:46px; text-align:center; }
+  .row { display:flex; align-items:center; background:#161618; border-radius:13px; padding:11px 4px; margin-bottom:9px; }
+  .row.done { background:rgba(43,217,106,.10); }
+  .badge { width:54px; display:flex; justify-content:center; }
+  .tag { font-size:10px; font-weight:800; padding:4px 8px; border-radius:7px; letter-spacing:.5px; }
+  .tag-top { background:#FF3B30; color:#FFFFFF; }
+  .tag-back { background:#2A2A2C; color:#A8A8AD; }
+  .inp { flex:1; text-align:center; }
+  .inp .v { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .inp .v.empty { color:#48484A; }
+  .inp .prev { font-size:11px; color:#6E6E73; margin-top:2px; }
+  .chk { width:46px; display:flex; justify-content:center; }
+  .circle { width:28px; height:28px; border-radius:50%; border:2px solid #48484A; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .circle.on { background:#FF3B30; border-color:#FF3B30; color:#fff; font-weight:800; }
+  /* RIR chip */
+  .rir { margin:2px 4px 0 58px; }
+  .rir-lbl { font-size:12px; color:#6E6E73; margin-bottom:7px; font-weight:600; }
+  .chips { display:flex; gap:7px; flex-wrap:wrap; }
+  .chip { font-size:12px; font-weight:600; padding:7px 12px; border-radius:9px; background:#1C1C1E; color:#8E8E93; border:1px solid #2A2A2C; }
+  .chip.sel { background:rgba(255,59,48,.18); color:#FF6B61; border-color:#FF3B30; }
+  /* add set */
+  .add { margin:14px 16px 0; text-align:center; color:#FF3B30; font-size:14px; font-weight:700; padding:12px; border:1px dashed #3A2020; border-radius:13px; }
+  /* footer */
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:14px 16px 30px; }
+  .btn-done { display:block; width:100%; background:#FF3B30; color:#FFFFFF; border:none; border-radius:15px; padding:16px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+
+  <div class="nav">
+    <span class="back">‹</span>
+    <span class="timer">⏱ 휴식 1:24</span>
+    <span class="more">⋯</span>
+  </div>
+
+  <div class="title">
+    <h1>벤치프레스</h1>
+    <div class="sub">탑세트 + 백오프 · <b>ANCHOR</b> 종목</div>
+  </div>
+
+  <div class="banner">
+    <div>
+      <div class="b-main">오늘 <b>60kg 총 27회</b> · 남은 8회</div>
+      <div class="b-tag">탑세트 기준 · 직전 24회 대비 +3</div>
+    </div>
+    <span class="chev">›</span>
+  </div>
+
+  <div class="sets">
+    <div class="col-head">
+      <span class="c-set">세트</span>
+      <span class="c-kg">kg</span>
+      <span class="c-rep">반복</span>
+      <span class="c-chk">완료</span>
+    </div>
+
+    <!-- TOP SETS -->
+    <div class="row done">
+      <span class="badge"><span class="tag tag-top">TOP</span></span>
+      <span class="inp"><div class="v">62.5</div><div class="prev">이전 60×8</div></span>
+      <span class="inp"><div class="v">8</div><div class="prev">이전 8</div></span>
+      <span class="chk"><span class="circle on">✓</span></span>
+    </div>
+    <div class="row done">
+      <span class="badge"><span class="tag tag-top">TOP</span></span>
+      <span class="inp"><div class="v">62.5</div><div class="prev">이전 60×7</div></span>
+      <span class="inp"><div class="v">7</div><div class="prev">이전 7</div></span>
+      <span class="chk"><span class="circle on">✓</span></span>
+    </div>
+
+    <!-- BACKOFF SETS -->
+    <div class="row done">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v">55</div><div class="prev">이전 55×10</div></span>
+      <span class="inp"><div class="v">11</div><div class="prev">이전 10</div></span>
+      <span class="chk"><span class="circle on">✓</span></span>
+    </div>
+    <div class="row">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v empty">55</div><div class="prev">이전 55×10</div></span>
+      <span class="inp"><div class="v empty">–</div><div class="prev">이전 10</div></span>
+      <span class="chk"><span class="circle"></span></span>
+    </div>
+    <div class="row">
+      <span class="badge"><span class="tag tag-back">BACK</span></span>
+      <span class="inp"><div class="v empty">55</div><div class="prev">이전 55×9</div></span>
+      <span class="inp"><div class="v empty">–</div><div class="prev">이전 9</div></span>
+      <span class="chk"><span class="circle"></span></span>
+    </div>
+
+    <!-- RIR (optional, last working set) -->
+    <div class="rir">
+      <div class="rir-lbl">노력도? (선택 — 마지막 백오프 세트)</div>
+      <div class="chips">
+        <span class="chip">여유 많음</span>
+        <span class="chip sel">2~3개 남음</span>
+        <span class="chip">거의 한계</span>
+        <span class="chip">실패</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="add">+ 세트 추가</div>
+
+  <div class="footer">
+    <button class="btn-done">운동 완료</button>
+  </div>
+</div>
+</body>
+</html>

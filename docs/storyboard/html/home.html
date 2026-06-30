@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>홈 — GymTracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000000; display:flex; justify-content:center; }
+  .phone {
+    width:390px; min-height:844px; background:#000000; color:#FFFFFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:96px;
+  }
+  /* status bar */
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; align-items:center; }
+  /* header */
+  .hdr { padding:8px 20px 4px; }
+  .hdr .date { font-size:13px; color:#8E8E93; font-weight:600; letter-spacing:.3px; }
+  .hdr h1 { font-size:28px; font-weight:800; margin-top:2px; letter-spacing:-.5px; }
+  /* section title */
+  .sec { padding:22px 20px 10px; display:flex; align-items:baseline; justify-content:space-between; }
+  .sec h2 { font-size:18px; font-weight:700; }
+  .sec .hint { font-size:12px; color:#8E8E93; }
+  /* volume card */
+  .card { background:#161618; border-radius:18px; margin:0 16px; padding:18px 18px 14px; }
+  .vol-row { padding:11px 0; border-bottom:1px solid #232325; }
+  .vol-row:last-child { border-bottom:none; }
+  .vol-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .vol-name { font-size:15px; font-weight:600; }
+  .vol-num { font-size:13px; font-weight:600; }
+  .vol-num b { font-size:15px; }
+  .muted { color:#8E8E93; }
+  .ok { color:#2BD96A; }
+  .warn { color:#FF8A00; }
+  .bar { height:8px; border-radius:5px; background:#2A2A2C; overflow:hidden; }
+  .bar > span { display:block; height:100%; border-radius:5px; }
+  .fill-ok { background:#2BD96A; }
+  .fill-warn { background:#FF8A00; }
+  .vol-tag { font-size:11px; margin-top:6px; }
+  /* today exercise cards */
+  .ex { background:#161618; border-radius:16px; margin:0 16px 10px; padding:15px 16px; }
+  .ex-head { display:flex; align-items:center; justify-content:space-between; }
+  .ex-name { font-size:16px; font-weight:700; }
+  .tier { font-size:10px; font-weight:700; padding:3px 7px; border-radius:6px; letter-spacing:.4px; }
+  .tier-anchor { background:rgba(43,217,106,.15); color:#2BD96A; }
+  .tier-machine { background:rgba(142,142,147,.18); color:#A8A8AD; }
+  .ex-rows { margin-top:11px; display:flex; gap:10px; }
+  .ex-col { flex:1; background:#0D0D0D; border-radius:11px; padding:10px 12px; }
+  .ex-col .lbl { font-size:11px; color:#8E8E93; font-weight:600; margin-bottom:3px; }
+  .ex-col .val { font-size:15px; font-weight:700; }
+  .ex-col.goal .val { color:#FF3B30; }
+  .ex-note { font-size:12px; color:#8E8E93; margin-top:9px; }
+  /* start button */
+  .start-wrap { padding:18px 16px 6px; }
+  .btn-start { display:block; width:100%; background:#FF3B30; color:#FFFFFF; border:none;
+    border-radius:16px; padding:17px; font-size:17px; font-weight:800; letter-spacing:.2px; }
+  /* tab bar */
+  .tabbar { position:fixed; bottom:0; width:390px; height:84px; background:#0D0D0D;
+    border-top:1px solid #1C1C1E; display:flex; padding-top:10px; }
+  .tab { flex:1; text-align:center; font-size:10px; color:#8E8E93; font-weight:600; }
+  .tab .ic { font-size:22px; display:block; margin-bottom:3px; line-height:1; }
+  .tab.active { color:#FF3B30; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ &nbsp;⌃&nbsp; ▮▮◌</span></div>
+
+  <div class="hdr">
+    <div class="date">6월 30일 화요일</div>
+    <h1>오늘도 한 세트 더</h1>
+  </div>
+
+  <div class="sec">
+    <h2>이번 주 볼륨</h2>
+    <span class="hint">성장 구간 10–20세트</span>
+  </div>
+
+  <div class="card">
+    <div class="vol-row">
+      <div class="vol-top">
+        <span class="vol-name">가슴</span>
+        <span class="vol-num ok"><b>12</b> / 16세트</span>
+      </div>
+      <div class="bar"><span class="fill-ok" style="width:75%"></span></div>
+      <div class="vol-tag ok">양호 — 4세트만 더 채우면 목표</div>
+    </div>
+    <div class="vol-row">
+      <div class="vol-top">
+        <span class="vol-name">등</span>
+        <span class="vol-num warn"><b>9</b> / 14세트</span>
+      </div>
+      <div class="bar"><span class="fill-warn" style="width:64%"></span></div>
+      <div class="vol-tag warn">부족 — 5세트 부족, 한 종목 추가 추천</div>
+    </div>
+    <div class="vol-row">
+      <div class="vol-top">
+        <span class="vol-name">하체</span>
+        <span class="vol-num warn"><b>8</b> / 14세트</span>
+      </div>
+      <div class="bar"><span class="fill-warn" style="width:57%"></span></div>
+      <div class="vol-tag warn">부족 — 6세트 부족</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>오늘 할 종목</h2>
+    <span class="hint">밀기 데이 · 3종목</span>
+  </div>
+
+  <div class="ex">
+    <div class="ex-head">
+      <span class="ex-name">벤치프레스</span>
+      <span class="tier tier-anchor">ANCHOR</span>
+    </div>
+    <div class="ex-rows">
+      <div class="ex-col">
+        <div class="lbl">직전 기록</div>
+        <div class="val muted">60kg · 총 24회</div>
+      </div>
+      <div class="ex-col goal">
+        <div class="lbl">오늘 목표</div>
+        <div class="val">60kg · 총 27회</div>
+      </div>
+    </div>
+    <div class="ex-note">탑세트 + 백오프 · 반복 +3 채우면 다음은 +2.5kg</div>
+  </div>
+
+  <div class="ex">
+    <div class="ex-head">
+      <span class="ex-name">인클라인 덤벨프레스</span>
+      <span class="tier tier-anchor">ANCHOR</span>
+    </div>
+    <div class="ex-rows">
+      <div class="ex-col">
+        <div class="lbl">직전 기록</div>
+        <div class="val muted">22kg · 3×10</div>
+      </div>
+      <div class="ex-col goal">
+        <div class="lbl">오늘 목표</div>
+        <div class="val">22kg · 3×12</div>
+      </div>
+    </div>
+    <div class="ex-note">더블 프로그레션 · 12회 도달 시 +2kg</div>
+  </div>
+
+  <div class="ex">
+    <div class="ex-head">
+      <span class="ex-name">케이블 플라이</span>
+      <span class="tier tier-machine">가변 머신</span>
+    </div>
+    <div class="ex-rows">
+      <div class="ex-col">
+        <div class="lbl">직전 기록</div>
+        <div class="val muted">15kg · 3×15</div>
+      </div>
+      <div class="ex-col goal">
+        <div class="lbl">오늘 목표</div>
+        <div class="val">볼륨 3세트 적립</div>
+      </div>
+    </div>
+    <div class="ex-note">머신 가변 — 무게 비교 대신 부위 볼륨으로 판정</div>
+  </div>
+
+  <div class="start-wrap">
+    <button class="btn-start">운동 시작</button>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab active"><span class="ic">●</span>홈</div>
+    <div class="tab"><span class="ic">▤</span>기록</div>
+    <div class="tab"><span class="ic">◫</span>분석</div>
+    <div class="tab"><span class="ic">✦</span>AI</div>
+    <div class="tab"><span class="ic">☰</span>설정</div>
+  </div>
+</div>
+</body>
+</html>
