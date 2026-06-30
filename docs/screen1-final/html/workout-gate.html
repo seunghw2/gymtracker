@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>운동 중 · 최종 (게이트 점등 순간)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:118px;
+  }
+  .wrap{ padding:0 16px; }
+
+  .caption{ background:#0d0d0f; border-bottom:1px solid var(--line); padding:9px 16px; font-size:11px; color:var(--gray); line-height:1.45; }
+  .caption b{ color:#fff; }
+
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 2px; }
+  .topbar .back{ color:var(--gray); font-size:26px; width:32px; }
+  .topbar .title{ font-size:14px; font-weight:600; }
+  .topbar .timer{ font-size:13px; color:var(--gray); width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+  .progress{ padding:2px 16px 0; display:flex; align-items:center; gap:8px; }
+  .progress .ptxt{ font-size:11px; color:var(--gray); }
+  .progress .pdots{ display:flex; gap:4px; }
+  .progress .pdots i{ width:5px; height:5px; border-radius:50%; background:#2c2c2e; }
+  .progress .pdots i.on{ background:var(--gray); }
+  .progress .pdots i.cur{ background:#fff; }
+
+  .exhead{ padding:7px 0 2px; }
+  .exhead .name{ font-size:24px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub{ margin-top:3px; font-size:12px; color:var(--gray); }
+  .exhead .sub b{ color:#fff; font-weight:600; }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; vertical-align:middle; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+
+  /* === 2층 이중 게이지 — 볼륨축 마커 점등 === */
+  .gaugeline{ margin-top:11px; background:var(--card); border-radius:13px; padding:11px 13px 10px; border:1px solid rgba(255,255,255,.04); }
+  .gl-row{ display:flex; align-items:center; gap:10px; }
+  .gl-row + .gl-row{ margin-top:10px; }
+  .gl-tag{ width:72px; flex:none; font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .gl-tag .dot{ width:7px; height:7px; border-radius:50%; }
+  .gl-tag.intensity .dot{ background:var(--red); } .gl-tag.intensity{ color:var(--red); }
+  .gl-tag.volume .dot{ background:var(--orange); } .gl-tag.volume{ color:var(--orange); }
+  .gl-bar{ flex:1; height:9px; border-radius:5px; background:var(--bg2); position:relative; overflow:visible; }
+  .gl-bar .f{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
+  .gl-bar.intensity .f{ background:linear-gradient(90deg,#C9322B,#E0544C); }
+  .gl-bar.volume .f{ background:linear-gradient(90deg,#C76E00,#E0883A); }
+  /* 채움 100% + 마커 점등 — 막대 끝이 볼륨축은 가득, 마커는 흰색 강 점등 */
+  .gl-bar.volume.full .f{ background:linear-gradient(90deg,#FF8A00,#FFB04D); box-shadow:0 0 9px rgba(255,138,0,.45); }
+  /* 흰 게이트 마커 — 추세 충족 점등: 굵고 밝게 + 자물쇠 해제 */
+  .gl-bar .gate{ position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,.42); border-radius:2px; }
+  .gl-bar .gate::after{ content:"🔒"; position:absolute; top:-13px; left:50%; transform:translateX(-50%); font-size:8px; opacity:.7; }
+  .gl-bar .gate.lit{ width:3px; background:#fff; box-shadow:0 0 8px rgba(255,255,255,.85); animation:gatepop .5s ease; }
+  .gl-bar .gate.lit::after{ content:"🔓"; opacity:1; }
+  @keyframes gatepop{ 0%{ transform:scaleY(.4); filter:brightness(2.2);} 100%{ transform:scaleY(1); filter:brightness(1);} }
+  .gl-num{ width:60px; flex:none; text-align:right; font-size:11px; color:var(--gray); font-variant-numeric:tabular-nums; }
+  .gl-num b{ color:#fff; font-weight:700; }
+  .gl-num.full b{ color:var(--orange); }
+  .gl-legend{ margin-top:9px; padding-top:8px; border-top:1px solid rgba(255,255,255,.05); font-size:10px; color:#7c7c82; line-height:1.5; }
+  .gl-legend b{ color:#b9b9bf; font-weight:600; }
+  .gl-legend .mk{ color:#fff; }
+
+  /* === 게이트 점등 인라인 칩 (풀스크린 폭죽 금지, 한 줄) === */
+  .gatechip{ margin-top:11px; display:flex; align-items:flex-start; gap:9px; background:linear-gradient(120deg,rgba(255,138,0,.10),rgba(255,138,0,.03)); border:1px solid rgba(255,138,0,.38); border-radius:12px; padding:10px 12px; animation:chipin .4s ease; }
+  @keyframes chipin{ 0%{ opacity:0; transform:translateY(-4px);} 100%{ opacity:1; transform:translateY(0);} }
+  .gatechip .ic{ width:22px; height:22px; border-radius:7px; flex:none; display:flex; align-items:center; justify-content:center; font-size:12px; background:rgba(255,138,0,.18); }
+  .gatechip .body{ flex:1; min-width:0; }
+  .gatechip .ttl{ font-size:12px; font-weight:700; color:#fff; }
+  .gatechip .ttl .trend{ font-size:9px; font-weight:800; letter-spacing:.3px; color:#000; background:var(--orange); padding:1px 6px; border-radius:5px; margin-left:6px; vertical-align:middle; }
+  .gatechip .desc{ margin-top:3px; font-size:11px; color:#c9a577; line-height:1.45; }
+  .gatechip .desc b{ color:#fff; font-weight:600; }
+  .gatechip .defer{ margin-top:5px; font-size:10.5px; color:var(--gray); }
+  .gatechip .defer b{ color:#FFD9A8; font-weight:600; }
+
+  /* === 세트 섹션 === */
+  .secttl{ margin:16px 2px 8px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--gray); display:flex; align-items:center; gap:7px; }
+  .secttl .dt{ width:7px; height:7px; border-radius:50%; }
+  .secttl .dt.top{ background:var(--red); } .secttl .dt.back{ background:var(--orange); }
+  .secttl .ln{ flex:1; height:1px; background:rgba(255,255,255,.06); }
+  .secttl .meta{ font-size:11px; font-weight:600; }
+  .secttl .meta.top{ color:var(--red); } .secttl .meta.back{ color:var(--orange); }
+
+  .setrow{ display:flex; align-items:center; gap:11px; background:var(--card); border-radius:13px; padding:11px 13px; margin-bottom:7px; border:1px solid rgba(255,255,255,.04); }
+  .setrow .idx{ width:25px; height:25px; border-radius:7px; flex:none; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--gray); background:var(--bg2); }
+  .setrow.top .idx{ color:var(--red); } .setrow.back .idx{ color:var(--orange); }
+  .setrow .vals{ flex:1; min-width:0; }
+  .setrow .nowv{ font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .setrow .nowv .unit{ font-size:11px; font-weight:600; color:var(--gray); }
+  .setrow .nowv .x{ color:#48484A; padding:0 1px; }
+  .setrow .prevv{ margin-top:2px; font-size:11px; color:var(--gray); }
+  .setrow .prevv .up{ color:var(--green); }
+  .setrow .check{ width:25px; height:25px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; }
+  .setrow.done .check{ background:var(--green); color:#000; }
+  .setrow.done .nowv{ color:#fff; }
+  /* 방금 친 게이트 채운 세트 — 조용한 강조(주황 테두리만, 폭죽 없음) */
+  .setrow.justdid{ border:1px solid rgba(255,138,0,.45); background:#1a1611; }
+  .setrow.justdid .idx{ color:var(--orange); background:rgba(255,138,0,.14); }
+  .setrow.justdid .prevv{ color:var(--orange); }
+
+  /* === 종목 완료 — 다음 종목 버튼으로 전환되는 하단 === */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .gatehint{ text-align:center; font-size:10.5px; color:var(--gray); margin-bottom:9px; }
+  .gatehint b{ color:var(--orange); font-weight:700; }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">게이트 점등 순간 — 마지막 백오프 <b>B3=55×10</b> 기록 → 세션 목표 33회 채움 + 추세까지 충족. 풀스크린 폭죽 없이 <b>게이트 마커 점등 🔓 + 인라인 칩 한 줄</b>만. 증량은 지금 적용하지 않고 <b>세션 끝 랩업으로 미룬다</b>.</div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">41:03</div>
+  </div>
+  <div class="progress">
+    <span class="ptxt">2 / 5 종목 · 벤치 완료</span>
+    <span class="pdots"><i class="on"></i><i class="cur"></i><i></i><i></i><i></i></span>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · 종목 완료</div>
+    </div>
+
+    <!-- 2층 게이지 — 볼륨축 마커 점등 -->
+    <div class="gaugeline">
+      <div class="gl-row">
+        <div class="gl-tag intensity"><span class="dot"></span>강도 · 탑</div>
+        <div class="gl-bar intensity"><div class="f" style="width:100%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num">62.5<b>kg</b></div>
+      </div>
+      <div class="gl-row">
+        <div class="gl-tag volume"><span class="dot"></span>볼륨 · 백오프</div>
+        <div class="gl-bar volume full"><div class="f" style="width:100%"></div><div class="gate lit" style="left:100%"></div></div>
+        <div class="gl-num full"><b>33</b>/33</div>
+      </div>
+      <div class="gl-legend">막대 = <b>세션 목표</b> 채움 완료 · <span class="mk">흰 선 🔓</span> 점등 = 증량 해금선 돌파(<b>2주 추세 충족</b>)</div>
+    </div>
+
+    <!-- 게이트 점등 인라인 칩 (추세 강함 톤) -->
+    <div class="gatechip">
+      <div class="ic">🔓</div>
+      <div class="body">
+        <div class="ttl">백오프 상단 도달 · 33회 채움<span class="trend">추세 강함</span></div>
+        <div class="desc"><b>2주 연속</b> 상단(30↑)에 같은 무게가 쉬워졌어요(9→10). 단발이 아닌 추세라 증량 자격 충족.</div>
+        <div class="defer">→ 지금 올리지 않고 <b>세션 끝 랩업에서 55 → 57.5kg 증량 제안</b></div>
+      </div>
+    </div>
+
+    <!-- 탑세트 -->
+    <div class="secttl"><span class="dt top"></span>탑세트 · 강도축<span class="ln"></span><span class="meta top">62.5kg 유지</span></div>
+    <div class="setrow top done">
+      <div class="idx">T1</div>
+      <div class="vals">
+        <div class="nowv">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></div>
+        <div class="prevv">직전 62.5×8 · 동률 유지</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+    <div class="setrow top done">
+      <div class="idx">T2</div>
+      <div class="vals">
+        <div class="nowv">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></div>
+        <div class="prevv">직전 62.5×7 · <span class="up">+1 갱신</span></div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 백오프 -->
+    <div class="secttl"><span class="dt back"></span>백오프 · 볼륨축<span class="ln"></span><span class="meta back">3세트 · 55kg</span></div>
+    <div class="setrow back done">
+      <div class="idx">B1</div>
+      <div class="vals">
+        <div class="nowv">55<span class="unit">kg</span><span class="x">×</span>11<span class="unit">회</span></div>
+        <div class="prevv">직전 55×10 · <span class="up">+1 갱신</span></div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+    <div class="setrow back done">
+      <div class="idx">B2</div>
+      <div class="vals">
+        <div class="nowv">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회</span></div>
+        <div class="prevv">직전 55×10 · 동률</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+    <!-- 방금 친 마지막 세트 — 게이트 채운 세트(조용한 주황 강조) -->
+    <div class="setrow back done justdid">
+      <div class="idx">B3</div>
+      <div class="vals">
+        <div class="nowv">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회</span></div>
+        <div class="prevv">직전 55×9 · +1 갱신 · 총 33회 채움</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div class="gatehint">증량 해금 🔓 · <b>적용은 세션 끝 랩업에서 일괄</b> · 강도축(탑)은 유지</div>
+    <button class="bigbtn">다음 종목 <span class="small">· 인클라인 덤벨</span></button>
+  </div>
+</body>
+</html>

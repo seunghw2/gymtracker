@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>데일리 랩업 · 축하 (1/2)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:110px; position:relative; overflow-x:hidden;
+  }
+  .cap{ text-align:center; font-size:11px; color:var(--gray); padding:10px 16px 0; }
+  .wrap{ padding:0 16px; }
+
+  /* 상단: 진행 점 + 닫기 */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 2px; }
+  .topbar .dots{ display:flex; gap:6px; }
+  .topbar .dots i{ width:18px; height:4px; border-radius:2px; background:#2c2c2e; display:block; }
+  .topbar .dots i.on{ background:var(--white); }
+  .topbar .skip{ font-size:12px; color:var(--gray); }
+
+  /* 글로우 헤더 */
+  .hero{ text-align:center; padding:26px 16px 6px; position:relative; }
+  .hero .ring{ width:78px; height:78px; border-radius:50%; margin:0 auto 16px;
+    display:flex; align-items:center; justify-content:center; font-size:34px;
+    background:radial-gradient(circle at 50% 35%, rgba(43,217,106,.30), rgba(43,217,106,.06) 60%, transparent 72%);
+    box-shadow:0 0 0 1px rgba(43,217,106,.25), 0 0 38px rgba(43,217,106,.22); }
+  .hero .kicker{ font-size:11px; font-weight:800; letter-spacing:1.5px; color:var(--green); }
+  .hero .head{ margin-top:8px; font-size:27px; font-weight:800; letter-spacing:-.6px; line-height:1.18; }
+  .hero .head b{ color:var(--green); }
+  .hero .sub{ margin-top:8px; font-size:12.5px; color:var(--gray); line-height:1.5; }
+  .hero .sub b{ color:#fff; font-weight:600; }
+
+  /* 요약 스탯 3칸 */
+  .stats{ display:flex; gap:9px; margin:20px 0 6px; }
+  .stat{ flex:1; background:var(--card); border:1px solid rgba(255,255,255,.05); border-radius:14px; padding:13px 8px 12px; text-align:center; }
+  .stat .n{ font-size:23px; font-weight:800; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .stat .n.g{ color:var(--green); } .stat .n.o{ color:var(--orange); }
+  .stat .l{ margin-top:3px; font-size:10.5px; color:var(--gray); }
+
+  /* 하이라이트 스토리 카드 */
+  .secttl{ margin:22px 2px 9px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--gray); }
+  .story{ background:var(--card); border:1px solid rgba(255,255,255,.05); border-radius:16px; overflow:hidden; }
+  .row{ display:flex; align-items:flex-start; gap:12px; padding:14px 14px; }
+  .row + .row{ border-top:1px solid var(--line); }
+  .row .ic{ width:34px; height:34px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center; font-size:17px; }
+  .row.gate .ic{ background:rgba(255,138,0,.14); }
+  .row.pr   .ic{ background:rgba(43,217,106,.14); }
+  .row .body{ flex:1; min-width:0; }
+  .row .top{ display:flex; align-items:center; gap:7px; }
+  .row .ex{ font-size:15px; font-weight:800; letter-spacing:-.2px; }
+  .row .badge{ font-size:9px; font-weight:800; padding:2px 7px; border-radius:6px; letter-spacing:.2px; }
+  .row.gate .badge{ background:var(--orange); color:#000; }
+  .row.pr   .badge{ background:rgba(43,217,106,.16); color:var(--green); }
+  .row .desc{ margin-top:4px; font-size:12px; color:var(--gray); line-height:1.5; }
+  .row .desc b{ color:#fff; font-weight:700; }
+  .row .desc .up{ color:var(--green); font-weight:700; }
+  .row .desc .arw{ color:var(--orange); font-weight:700; }
+
+  /* 추세 톤 (결정 1) */
+  .trend{ margin-top:6px; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; }
+  .trend.strong{ color:var(--green); }
+  .trend.strong::before{ content:"▲▲"; font-size:8px; letter-spacing:-1px; }
+  .trend.once{ color:var(--orange); }
+  .trend.once::before{ content:"▲"; font-size:9px; }
+  .trend .note{ color:var(--gray); font-weight:500; }
+
+  /* 하단 고정 액션 */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:12px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 32%); }
+  .nextline{ text-align:center; font-size:10.5px; color:var(--gray); margin-bottom:9px; }
+  .nextline b{ color:#fff; font-weight:600; }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--white); color:#000; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+</style>
+</head>
+<body>
+  <div class="cap">데일리 랩업 1/2 — 세션 종료 직후, 오늘의 신기록·게이트를 모아 축하</div>
+
+  <div class="topbar">
+    <div class="dots"><i class="on"></i><i></i></div>
+    <div class="skip">건너뛰기</div>
+  </div>
+
+  <div class="hero">
+    <div class="ring">🔥</div>
+    <div class="kicker">DAILY WRAP-UP · 가슴</div>
+    <div class="head">좋은 날이었어요.<br><b>증량 게이트</b> 하나 열렸습니다.</div>
+    <div class="sub">오늘 <b>벤치프레스 백오프</b>가 목표 볼륨을 채웠고,<br><b>인클라인 덤벨</b>에서 신기록을 1개 갱신했어요.</div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><div class="n">3</div><div class="l">한 운동</div></div>
+      <div class="stat"><div class="n g">2</div><div class="l">신기록</div></div>
+      <div class="stat"><div class="n o">1</div><div class="l">게이트 통과</div></div>
+    </div>
+
+    <div class="secttl">오늘의 하이라이트</div>
+    <div class="story">
+
+      <div class="row gate">
+        <div class="ic">🔓</div>
+        <div class="body">
+          <div class="top"><span class="ex">벤치프레스</span><span class="badge">게이트 통과</span></div>
+          <div class="desc">백오프 볼륨 <b>33회</b> 달성 — <span class="arw">55 → 57.5kg</span> 증량이 열렸어요.</div>
+          <div class="trend strong">추세 강함 <span class="note">· 2주 연속 목표 도달</span></div>
+        </div>
+      </div>
+
+      <div class="row pr">
+        <div class="ic">📈</div>
+        <div class="body">
+          <div class="top"><span class="ex">인클라인 덤벨</span><span class="badge">신기록</span></div>
+          <div class="desc">탑세트 <b>24kg×9</b> — 직전 8회에서 <span class="up">+1회 갱신</span>.</div>
+        </div>
+      </div>
+
+      <div class="row pr">
+        <div class="ic">⚡</div>
+        <div class="body">
+          <div class="top"><span class="ex">벤치프레스</span><span class="badge">신기록</span></div>
+          <div class="desc">탑세트 <b>62.5kg×8/8</b> — 두 세트 모두 채워 <span class="up">강도 보존</span>.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div class="nextline">이어서 <b>종목별 증량 처리</b> — 어디를 올릴지 정합니다</div>
+    <button class="bigbtn">계속 →</button>
+  </div>
+</body>
+</html>

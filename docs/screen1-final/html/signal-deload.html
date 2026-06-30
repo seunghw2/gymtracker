@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>신호 카드 · 단계적 정체 대응 (경량 → 디로드 고려)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:120px;
+  }
+  .wrap{ padding:0 16px; }
+
+  .caption{ font-size:11px; color:var(--gray); text-align:center; padding:9px 16px 3px; line-height:1.4; }
+  .caption b{ color:#fff; font-weight:600; }
+
+  /* 상단바 (운동 중 맥락) */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 16px 4px; }
+  .topbar .back{ color:var(--gray); font-size:26px; width:32px; }
+  .topbar .title{ font-size:14px; font-weight:600; }
+  .topbar .timer{ font-size:13px; color:var(--gray); width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* 종목 헤더 */
+  .exhead{ padding:8px 0 2px; }
+  .exhead .name{ font-size:25px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub{ margin-top:3px; font-size:12px; color:var(--gray); }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; vertical-align:middle; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+
+  /* 게이지 한 줄 압축 (정체 상태 — 게이트 미점등) */
+  .gaugeline{ margin-top:12px; background:var(--card); border-radius:13px; padding:11px 13px; border:1px solid rgba(255,255,255,.04); }
+  .gl-row{ display:flex; align-items:center; gap:10px; }
+  .gl-row + .gl-row{ margin-top:9px; }
+  .gl-tag{ width:72px; flex:none; font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .gl-tag .dot{ width:7px; height:7px; border-radius:50%; }
+  .gl-tag.intensity .dot{ background:var(--red); } .gl-tag.intensity{ color:var(--red); }
+  .gl-tag.volume .dot{ background:var(--orange); } .gl-tag.volume{ color:var(--orange); }
+  .gl-bar{ flex:1; height:8px; border-radius:5px; background:var(--bg2); position:relative; overflow:hidden; }
+  .gl-bar .f{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
+  .gl-bar.intensity .f{ background:linear-gradient(90deg,#FF3B30,#FF6B61); }
+  .gl-bar.volume .f{ background:linear-gradient(90deg,#FF8A00,#FFB04D); }
+  .gl-bar .gate{ position:absolute; top:-2px; bottom:-2px; width:2px; background:rgba(255,255,255,.5); }
+  .gl-num{ width:62px; flex:none; text-align:right; font-size:11px; color:var(--gray); font-variant-numeric:tabular-nums; }
+  .gl-num b{ color:#fff; font-weight:700; }
+
+  /* 정체 요약 한 줄 */
+  .stallline{ margin-top:9px; padding:0 2px; font-size:11.5px; color:#C7C7CC; display:flex; align-items:center; gap:6px; }
+  .stallline .ic{ font-size:12px; }
+  .stallline b{ color:#fff; font-weight:700; }
+
+  /* === 신호 카드 섹션 === */
+  .secttl{ margin:18px 2px 9px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--gray); display:flex; align-items:center; gap:7px; }
+  .secttl .ln{ flex:1; height:1px; background:rgba(255,255,255,.06); }
+
+  /* 단계 사다리 라벨 */
+  .ladder{ display:flex; align-items:center; gap:6px; margin:0 2px 11px; font-size:10px; color:var(--gray); }
+  .ladder .step{ display:flex; align-items:center; gap:5px; }
+  .ladder .num{ width:15px; height:15px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800; }
+  .ladder .step.now .num{ background:var(--orange); color:#000; }
+  .ladder .step.now{ color:#fff; font-weight:700; }
+  .ladder .step.next .num{ border:1px dashed #4a4a4f; color:var(--gray); }
+  .ladder .arr{ color:#3a3a3e; }
+
+  /* 1차 경량 신호 카드 (진행 중·추천) */
+  .signal{ background:var(--card); border-radius:15px; padding:13px 14px; margin-bottom:10px; border:1px solid rgba(255,255,255,.05); position:relative; }
+  .signal.primary{ border:1px solid rgba(255,138,0,.4); background:#161310; }
+  .signal .shead{ display:flex; align-items:center; gap:9px; }
+  .signal .sic{ width:30px; height:30px; border-radius:9px; flex:none; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .signal.primary .sic{ background:rgba(255,138,0,.15); }
+  .signal .stitle{ flex:1; min-width:0; }
+  .signal .st1{ font-size:14px; font-weight:800; letter-spacing:-.2px; }
+  .signal .st2{ margin-top:2px; font-size:10.5px; color:var(--gray); }
+  .signal .stag{ flex:none; font-size:9px; font-weight:800; padding:3px 7px; border-radius:6px; }
+  .signal .stag.reco{ background:var(--orange); color:#000; }
+  .signal .stag.opt{ background:rgba(142,142,147,.16); color:#c7c7cc; }
+  .signal .sbody{ margin-top:10px; font-size:12px; color:#C7C7CC; line-height:1.5; }
+  .signal .sbody b{ color:#fff; font-weight:700; }
+  .signal .sactions{ margin-top:12px; display:flex; gap:8px; }
+  .signal .sbtn{ flex:1; height:42px; border:none; border-radius:11px; font-size:12.5px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .signal .sbtn.go{ background:var(--orange); color:#000; }
+  .signal .sbtn.alt{ background:#0e0e0f; border:1px solid #2c2c30; color:#c7c7cc; }
+  .signal .sbtn.ghost{ background:transparent; border:1px solid #2c2c30; color:var(--gray); }
+
+  /* 디로드 고려 카드 (신호만·선택형, 자동 처방 아님) */
+  .signal.deload{ border:1px solid #3a2c14; }
+  .signal.deload .sic{ background:rgba(255,138,0,.10); }
+  .signal.deload .auto-note{ margin-top:11px; font-size:10px; color:#6d6d72; display:flex; align-items:center; gap:6px; padding-top:9px; border-top:1px dashed #2a2a2e; }
+  .signal.deload .auto-note .nb{ font-size:8.5px; font-weight:800; color:#8E8E93; background:rgba(142,142,147,.14); padding:2px 6px; border-radius:5px; flex:none; }
+  .signal .reasons{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+  .signal .rrow{ display:flex; align-items:center; gap:8px; font-size:11px; color:var(--gray); }
+  .signal .rrow .rdot{ width:5px; height:5px; border-radius:50%; background:#48484d; flex:none; }
+  .signal .rrow b{ color:#fff; font-weight:600; }
+
+  /* 하단 고정 — 운동 계속 */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">운동 중 화면 · 단계적 정체 대응(결정 6) — 1차 <b>경량 신호(세트+1·보조종목)</b>를 추천으로, 그 아래 <b>'디로드 고려'</b>는 자동 처방 아닌 선택형으로.</div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">41:30</div>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · 두 축 모두 정체</div>
+    </div>
+
+    <!-- 게이지 (게이트 미점등 — 정체) -->
+    <div class="gaugeline">
+      <div class="gl-row">
+        <div class="gl-tag intensity"><span class="dot"></span>강도 · 탑</div>
+        <div class="gl-bar intensity"><div class="f" style="width:60%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num">62.5<b>kg</b></div>
+      </div>
+      <div class="gl-row">
+        <div class="gl-tag volume"><span class="dot"></span>볼륨 · 백오프</div>
+        <div class="gl-bar volume"><div class="f" style="width:67%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num"><b>30</b>/33</div>
+      </div>
+    </div>
+    <div class="stallline"><span class="ic">⚠️</span><span>탑·백오프 <b>둘 다 3세션째 제자리</b> — 무게·반복·RIR 어디서도 안 움직였어요</span></div>
+
+    <div class="secttl">정체 신호 · 단계적 처방<span class="ln"></span></div>
+
+    <!-- 단계 사다리 -->
+    <div class="ladder">
+      <div class="step now"><span class="num">1</span>경량 처방</div>
+      <span class="arr">→</span>
+      <div class="step next"><span class="num">2</span>디로드 고려</div>
+      <span class="arr">→</span>
+      <div class="step next"><span class="num">3</span>감량</div>
+    </div>
+
+    <!-- 1차 경량 신호 (추천) -->
+    <div class="signal primary">
+      <div class="shead">
+        <div class="sic">🪜</div>
+        <div class="stitle">
+          <div class="st1">먼저 가볍게 — 세트 +1 · 보조종목</div>
+          <div class="st2">1단계 · 디로드 전에 흔드는 가장 작은 변화</div>
+        </div>
+        <div class="stag reco">추천</div>
+      </div>
+      <div class="sbody">백오프에 <b>한 세트 더(4세트)</b> 얹거나, 가슴 <b>보조종목 1개</b>를 추가해 자극을 바꿔봐요. 정체 첫 구간엔 이게 가장 안전해요.</div>
+      <div class="sactions">
+        <button class="sbtn go">백오프 +1세트</button>
+        <button class="sbtn alt">보조종목 추가</button>
+      </div>
+    </div>
+
+    <!-- 디로드 고려 (신호만·선택형) -->
+    <div class="signal deload">
+      <div class="shead">
+        <div class="sic">🌙</div>
+        <div class="stitle">
+          <div class="st1">디로드 고려 — 이번 주 가볍게 갈까요?</div>
+          <div class="st2">2단계 · 누적 피로가 쌓였을 수 있어요</div>
+        </div>
+        <div class="stag opt">선택</div>
+      </div>
+      <div class="reasons">
+        <div class="rrow"><span class="rdot"></span>두 축 <b>3세션 연속 정체</b></div>
+        <div class="rrow"><span class="rdot"></span>최근 노력도 <b>'거의 한계' 누적</b></div>
+        <div class="rrow"><span class="rdot"></span>수면·컨디션은 앱이 모르는 부분 — <b>본인 판단</b></div>
+      </div>
+      <div class="sactions">
+        <button class="sbtn alt">이번 주 -10%로 가볍게</button>
+        <button class="sbtn ghost">아직 괜찮아요</button>
+      </div>
+      <div class="auto-note"><span class="nb">자동 아님</span><span>앱이 강제로 무게를 내리지 않아요 · 실행은 항상 본인 선택</span></div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <button class="bigbtn">오늘 운동 계속 <span class="small">· 신호는 나중에</span></button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>데일리 랩업 · 종목별 증량 (2/2)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:128px;
+  }
+  .cap{ text-align:center; font-size:11px; color:var(--gray); padding:10px 16px 0; }
+  .wrap{ padding:0 16px; }
+
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 2px; }
+  .topbar .dots{ display:flex; gap:6px; }
+  .topbar .dots i{ width:18px; height:4px; border-radius:2px; background:#2c2c2e; display:block; }
+  .topbar .dots i.on{ background:var(--white); }
+  .topbar .skip{ font-size:12px; color:var(--gray); }
+
+  .head{ padding:8px 0 2px; }
+  .head .t{ font-size:23px; font-weight:800; letter-spacing:-.4px; }
+  .head .s{ margin-top:4px; font-size:12px; color:var(--gray); line-height:1.5; }
+  .head .s b{ color:#fff; font-weight:600; }
+
+  /* 종목 카드 */
+  .card{ margin-top:13px; background:var(--card); border:1px solid rgba(255,255,255,.05); border-radius:16px; padding:14px 14px 13px; }
+  .card.on{ border-color:rgba(255,138,0,.45); background:#17130d; }
+  .chead{ display:flex; align-items:center; gap:8px; }
+  .chead .nm{ font-size:16px; font-weight:800; letter-spacing:-.2px; }
+  .pill{ display:inline-block; font-size:9px; font-weight:800; padding:2px 7px; border-radius:6px; letter-spacing:.2px; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+  .pill.machine{ background:rgba(255,255,255,.08); color:var(--gray); }
+  .pill.variable{ background:rgba(142,142,147,.16); color:var(--gray); }
+  .chead .axis{ margin-left:auto; font-size:10.5px; font-weight:700; }
+  .chead .axis.top{ color:var(--red); } .chead .axis.back{ color:var(--orange); }
+
+  /* 오늘 수행 요약 */
+  .summary{ margin-top:9px; font-size:12px; color:var(--gray); line-height:1.55; }
+  .summary b{ color:#fff; font-weight:600; }
+  .summary .up{ color:var(--green); font-weight:700; }
+
+  /* 증량 제안 토글 블록 */
+  .propose{ margin-top:11px; padding-top:11px; border-top:1px solid var(--line); display:flex; align-items:center; gap:11px; }
+  .propose .pinfo{ flex:1; min-width:0; }
+  .propose .pdelta{ font-size:15px; font-weight:800; letter-spacing:-.2px; }
+  .propose .pdelta .arw{ color:var(--orange); }
+  .propose .pdelta .seg{ font-size:11px; font-weight:700; color:var(--gray); }
+  .propose .pwhy{ margin-top:3px; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; }
+  .pwhy.strong{ color:var(--green); } .pwhy.strong::before{ content:"▲▲"; font-size:8px; letter-spacing:-1px; }
+  .pwhy.once{ color:var(--orange); } .pwhy.once::before{ content:"▲"; font-size:9px; }
+  .pwhy .note{ color:var(--gray); font-weight:500; }
+
+  /* iOS 스위치 */
+  .sw{ width:50px; height:30px; border-radius:16px; background:#3a3a3c; position:relative; flex:none; transition:.15s; }
+  .sw::after{ content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; transition:.15s; }
+  .sw.on{ background:var(--green); } .sw.on::after{ left:23px; }
+
+  /* 적용시 다음 무게 미리보기 (토글 ON일 때) */
+  .applied{ margin-top:10px; background:#0e0e0f; border:1px solid rgba(255,138,0,.25); border-radius:10px; padding:8px 11px; font-size:11.5px; color:#FFD9A8; display:flex; align-items:center; gap:7px; }
+  .applied .ic{ font-size:12px; } .applied b{ color:#fff; font-weight:700; }
+
+  /* 유지(증량 없음) 안내 */
+  .holdline{ margin-top:11px; padding-top:11px; border-top:1px solid var(--line); font-size:11.5px; color:var(--gray); display:flex; align-items:center; gap:7px; }
+  .holdline .ic{ font-size:12px; }
+  .holdline b{ color:#fff; font-weight:600; }
+
+  /* VARIABLE 판정 제외 (결정 7) */
+  .vexcl{ margin-top:10px; background:#0e0e0f; border:1px solid var(--line); border-radius:10px; padding:9px 11px; }
+  .vexcl .vbadge{ font-size:9px; font-weight:800; color:var(--gray); background:rgba(142,142,147,.18); padding:2px 7px; border-radius:6px; }
+  .vexcl .vtxt{ margin-top:6px; font-size:11.5px; color:var(--gray); line-height:1.5; }
+  .vexcl .vtxt .vol{ color:var(--green); font-weight:700; }
+  .vexcl .vref{ margin-top:4px; font-size:11px; color:#5d5d63; }
+
+  /* 우선순위 근거 (결정 5) */
+  .ruleline{ margin:16px 2px 2px; font-size:10.5px; color:var(--gray); line-height:1.5; display:flex; gap:7px; }
+  .ruleline .ic{ flex:none; }
+  .ruleline b{ color:#fff; font-weight:600; }
+
+  /* 하단 확정 */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:11px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .preview{ text-align:center; font-size:11px; color:var(--gray); margin-bottom:9px; line-height:1.5; }
+  .preview b{ color:var(--orange); font-weight:700; }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--green); color:#04210e; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.8; color:#04210e; }
+</style>
+</head>
+<body>
+  <div class="cap">데일리 랩업 2/2 — 종목별 증량 일괄 토글, 켜면 다음 세션 목표에 즉시 반영</div>
+
+  <div class="topbar">
+    <div class="dots"><i></i><i class="on"></i></div>
+    <div class="skip">건너뛰기</div>
+  </div>
+
+  <div class="wrap">
+    <div class="head">
+      <div class="t">증량 정리 · 가슴</div>
+      <div class="s">올릴 종목만 켜세요. 켜면 <b>다음 세션 목표가 즉시 갱신</b>됩니다 — 예고가 아니라 확정.</div>
+    </div>
+
+    <!-- 1. 벤치프레스 (ANCHOR) — 백오프 증량 제안, 토글 ON -->
+    <div class="card on">
+      <div class="chead">
+        <span class="nm">벤치프레스</span>
+        <span class="pill anchor">ANCHOR</span>
+        <span class="axis back">백오프 · 볼륨</span>
+      </div>
+      <div class="summary">탑 <b>62.5×8/8</b> 유지 · 백오프 <b>55kg 11/10/12</b> — 총 <b>33회</b>로 목표 채움 <span class="up">게이트 통과</span></div>
+
+      <div class="propose">
+        <div class="pinfo">
+          <div class="pdelta">백오프 <span class="seg">55</span> <span class="arw">→</span> 57.5<span class="seg">kg</span></div>
+          <div class="pwhy strong">추세 강함 <span class="note">· 2주 연속 도달, 올릴 때</span></div>
+        </div>
+        <div class="sw on"></div>
+      </div>
+
+      <div class="applied"><span class="ic">⚡</span><span>다음 가슴날 백오프가 <b>57.5kg</b>로 시작합니다 · 탑은 62.5kg 유지</span></div>
+    </div>
+
+    <!-- 2. 인클라인 덤벨 (MAIN_MACHINE) — 단발, 유지 권장 / 토글 OFF -->
+    <div class="card">
+      <div class="chead">
+        <span class="nm">인클라인 덤벨</span>
+        <span class="pill machine">MACHINE</span>
+        <span class="axis top">탑 · 강도</span>
+      </div>
+      <div class="summary">탑 <b>24kg×9</b> — 직전 8회 <span class="up">+1 갱신</span> · 백오프 20kg 12/12/10</div>
+
+      <div class="propose">
+        <div class="pinfo">
+          <div class="pdelta">탑 <span class="seg">24</span> <span class="arw">→</span> 26<span class="seg">kg</span></div>
+          <div class="pwhy once">단발 <span class="note">· 이번에 처음 도달, 한 주 더 다지기 추천</span></div>
+        </div>
+        <div class="sw"></div>
+      </div>
+
+      <div class="holdline"><span class="ic">🌱</span><span><b>유지 권장</b> — 다음에 24kg를 한 번 더 채우면 자신 있게 올려요</span></div>
+    </div>
+
+    <!-- 3. 케이블 플라이 (VARIABLE) — 판정 제외, 토글 없음 (결정 7) -->
+    <div class="card">
+      <div class="chead">
+        <span class="nm">케이블 플라이</span>
+        <span class="pill variable">VARIABLE</span>
+        <span class="axis back" style="color:var(--gray)">보조 볼륨</span>
+      </div>
+      <div class="summary">3세트 15/14/14회 — 볼륨 목표 <span class="up">달성</span></div>
+
+      <div class="vexcl">
+        <span class="vbadge">머신 다를 수 있음 · 판정 제외</span>
+        <div class="vtxt">기구 세팅이 매번 달라 무게로는 증량을 판정하지 않아요. <span class="vol">볼륨(반복) 달성</span>만 기록합니다.</div>
+        <div class="vref">시작값 참고 · 약 15kg 근처</div>
+      </div>
+    </div>
+
+    <!-- 우선순위 근거 (결정 5) -->
+    <div class="ruleline"><span class="ic">ℹ️</span><span>벤치는 <b>ANCHOR</b>라 강도(탑) 우선이지만 이번 주는 탑이 유지 구간 — 그래서 <b>백오프 볼륨</b>만 올립니다. 한 주에 한 축만.</span></div>
+  </div>
+
+  <div class="bottombar">
+    <div class="preview">다음 가슴날 미리보기 · <b>벤치 백오프 57.5kg</b> · 인클라인 24kg 유지</div>
+    <button class="bigbtn">다음 세션에 반영 <span class="small">· 1종목 증량</span></button>
+  </div>
+</body>
+</html>

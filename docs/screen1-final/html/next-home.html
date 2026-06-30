@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>다음 운동일 홈 · 즉시 갱신된 무게</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:110px;
+  }
+  .wrap{ padding:0 16px; }
+
+  /* 상단 캡션 */
+  .caption{ font-size:11px; color:var(--gray); text-align:center; padding:9px 16px 3px; line-height:1.4; }
+  .caption b{ color:#fff; font-weight:600; }
+
+  /* === 지난 세션 마무리 배너 (자동 마감 사후 진입) === */
+  .resumebar{ margin:8px 16px 0; background:#15110b; border:1px solid #3a2c14; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; }
+  .resumebar .ic{ font-size:16px; flex:none; }
+  .resumebar .txt{ flex:1; min-width:0; }
+  .resumebar .t1{ font-size:12px; font-weight:700; color:var(--orange); }
+  .resumebar .t2{ font-size:10.5px; color:var(--gray); margin-top:2px; }
+  .resumebar .go{ flex:none; font-size:11px; font-weight:700; color:#000; background:var(--orange); padding:6px 11px; border-radius:9px; }
+
+  /* 헤더 */
+  .home-head{ padding:14px 0 2px; }
+  .home-head .day{ font-size:12px; color:var(--gray); font-weight:600; }
+  .home-head .ttl{ font-size:27px; font-weight:800; letter-spacing:-.5px; margin-top:2px; }
+  .home-head .meta{ margin-top:5px; font-size:12px; color:var(--gray); }
+  .home-head .meta b{ color:#fff; font-weight:600; }
+
+  /* === 오늘의 퀘스트 헤더 === */
+  .questhead{ margin:18px 2px 9px; display:flex; align-items:center; gap:8px; }
+  .questhead .qic{ font-size:15px; }
+  .questhead .qttl{ font-size:14px; font-weight:800; letter-spacing:-.2px; }
+  .questhead .qmeta{ margin-left:auto; font-size:11px; color:var(--gray); font-weight:600; }
+
+  /* 종목 퀘스트 카드 */
+  .qcard{ background:var(--card); border-radius:15px; padding:13px 14px; margin-bottom:10px; border:1px solid rgba(255,255,255,.04); position:relative; }
+  .qcard .qtop{ display:flex; align-items:flex-start; gap:10px; }
+  .qcard .qname{ flex:1; min-width:0; }
+  .qcard .qnm{ font-size:17px; font-weight:800; letter-spacing:-.3px; }
+  .qcard .qsub{ margin-top:3px; font-size:11px; color:var(--gray); }
+  .pill{ display:inline-block; font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; vertical-align:middle; letter-spacing:.2px; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+  .pill.machine{ background:rgba(142,142,147,.16); color:#c7c7cc; }
+  .pill.variable{ background:rgba(142,142,147,.12); color:#8E8E93; }
+
+  /* 목표 무게 칩 (새 무게 강조) */
+  .qtarget{ flex:none; text-align:right; }
+  .qtarget .tw{ font-size:21px; font-weight:800; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .qtarget .tw .u{ font-size:11px; font-weight:600; color:var(--gray); }
+  .qtarget .tx{ font-size:11px; color:var(--gray); margin-top:1px; }
+
+  /* '새 무게' 변경 줄 — 랩업에서 갱신됨 */
+  .newline{ margin-top:10px; padding-top:9px; border-top:1px dashed #2a2a2e; display:flex; align-items:center; gap:7px; font-size:11.5px; }
+  .newline .nic{ font-size:12px; }
+  .newline.up{ color:var(--orange); }
+  .newline.up b{ color:#fff; font-weight:700; }
+  .newline .from{ color:var(--gray); text-decoration:line-through; }
+  .newline .keep{ color:var(--gray); }
+  .newline .keep b{ color:#fff; font-weight:600; }
+  /* 1탭 되돌리기 */
+  .undo{ margin-left:auto; font-size:10.5px; font-weight:700; color:var(--gray); background:#0e0e0f; border:1px solid #2c2c30; padding:5px 9px; border-radius:8px; }
+
+  .varnote{ margin-top:9px; font-size:10.5px; color:#6d6d72; display:flex; align-items:center; gap:6px; }
+  .badge-excl{ font-size:8.5px; font-weight:800; color:#8E8E93; background:rgba(142,142,147,.14); padding:2px 6px; border-radius:5px; }
+
+  /* === 시작 버튼 (하단 고정) === */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 32%); }
+  .vol-hint{ text-align:center; font-size:10.5px; color:var(--gray); margin-bottom:9px; }
+  .vol-hint b{ color:var(--orange); font-weight:700; }
+  .bigbtn{ width:100%; height:54px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">다음 운동일 홈 — 랩업에서 켠 증량이 <b>오늘의 퀘스트에 즉시 반영</b>(벤치 백오프 57.5kg). 상단 배너는 지난 세션이 자동 마감됐을 때만(예시 노출).</div>
+
+  <!-- 지난 세션 마무리 (자동 마감 사후 진입) -->
+  <div class="resumebar">
+    <div class="ic">⏱️</div>
+    <div class="txt">
+      <div class="t1">지난 세션 마무리</div>
+      <div class="t2">6/28 가슴 세션이 자동 마감됐어요 · 랩업·증량 처리가 남았어요</div>
+    </div>
+    <div class="go">열기</div>
+  </div>
+
+  <div class="wrap">
+    <div class="home-head">
+      <div class="day">6월 30일 화요일 · 푸시 데이</div>
+      <div class="ttl">오늘의 운동 · 가슴</div>
+      <div class="meta">종목 <b>3</b> · 예상 <b>42분</b> · 목표 볼륨 <b>가슴 14세트</b></div>
+    </div>
+
+    <div class="questhead">
+      <div class="qic">⚔️</div>
+      <div class="qttl">오늘의 퀘스트</div>
+      <div class="qmeta">직전 대비 갱신 2</div>
+    </div>
+
+    <!-- 벤치프레스: 백오프 증량 즉시 반영 -->
+    <div class="qcard">
+      <div class="qtop">
+        <div class="qname">
+          <div class="qnm">벤치프레스</div>
+          <div class="qsub"><span class="pill anchor">ANCHOR</span> &nbsp;탑 62.5kg×8 · 백오프 3세트</div>
+        </div>
+        <div class="qtarget">
+          <div class="tw">57.5<span class="u">kg</span></div>
+          <div class="tx">백오프 시작</div>
+        </div>
+      </div>
+      <div class="newline up">
+        <span class="nic">⬆️</span>
+        <span>백오프 <span class="from">55</span> → <b>57.5kg</b>로 올림 · 지난 게이트 통과</span>
+        <span class="undo">유지로 되돌리기</span>
+      </div>
+    </div>
+
+    <!-- 인클라인 덤벨: 탑 유지 -->
+    <div class="qcard">
+      <div class="qtop">
+        <div class="qname">
+          <div class="qnm">인클라인 덤벨프레스</div>
+          <div class="qsub"><span class="pill machine">MAIN</span> &nbsp;탑 22.5kg · 백오프 18kg 3세트</div>
+        </div>
+        <div class="qtarget">
+          <div class="tw">22.5<span class="u">kg</span></div>
+          <div class="tx">탑 유지</div>
+        </div>
+      </div>
+      <div class="newline keep">
+        <span class="nic">→</span>
+        <span>이번엔 <b>반복 쌓기 주차</b> · 백오프 직전 26 → <b>30회</b> 목표</span>
+      </div>
+    </div>
+
+    <!-- 케이블 플라이: VARIABLE -->
+    <div class="qcard">
+      <div class="qtop">
+        <div class="qname">
+          <div class="qnm">케이블 플라이</div>
+          <div class="qsub"><span class="pill variable">VARIABLE</span> &nbsp;3세트 · 펌핑 마무리</div>
+        </div>
+        <div class="qtarget">
+          <div class="tw" style="color:#8E8E93">15<span class="u">kg</span></div>
+          <div class="tx">시작값 참고</div>
+        </div>
+      </div>
+      <div class="varnote">
+        <span class="badge-excl">판정 제외</span>
+        <span>머신 세팅이 다를 수 있어요 · 무게는 참고만, PR·게이트엔 안 들어가요</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div class="vol-hint">오늘 목표를 다 채우면 <b>벤치 백오프 게이트 32 → 36회</b>로 한 칸 더</div>
+    <button class="bigbtn">운동 시작 <span class="small">· 벤치프레스부터</span></button>
+  </div>
+</body>
+</html>

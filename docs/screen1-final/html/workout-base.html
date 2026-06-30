@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>운동 중 · 최종 (평범한 진행)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+  :root{
+    --bg:#000; --bg2:#0D0D0D; --card:#161618; --line:#262629;
+    --red:#FF3B30; --white:#fff; --gray:#8E8E93; --green:#2BD96A; --orange:#FF8A00;
+  }
+  html,body{ background:var(--bg); }
+  body{
+    width:390px; margin:0 auto; min-height:844px; color:var(--white);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    padding-bottom:118px;
+  }
+  .wrap{ padding:0 16px; }
+
+  .caption{ background:#0d0d0f; border-bottom:1px solid var(--line); padding:9px 16px; font-size:11px; color:var(--gray); line-height:1.45; }
+  .caption b{ color:#fff; }
+
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 2px; }
+  .topbar .back{ color:var(--gray); font-size:26px; width:32px; }
+  .topbar .title{ font-size:14px; font-weight:600; }
+  .topbar .timer{ font-size:13px; color:var(--gray); width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+  /* 세션 진행률 — 회색 텍스트만 (색 경쟁 회피) */
+  .progress{ padding:2px 16px 0; display:flex; align-items:center; gap:8px; }
+  .progress .ptxt{ font-size:11px; color:var(--gray); }
+  .progress .pdots{ display:flex; gap:4px; }
+  .progress .pdots i{ width:5px; height:5px; border-radius:50%; background:#2c2c2e; }
+  .progress .pdots i.on{ background:var(--gray); }
+  .progress .pdots i.cur{ background:#fff; }
+
+  .exhead{ padding:7px 0 2px; }
+  .exhead .name{ font-size:24px; font-weight:800; letter-spacing:-.4px; }
+  .exhead .sub{ margin-top:3px; font-size:12px; color:var(--gray); }
+  .exhead .sub b{ color:#fff; font-weight:600; }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; vertical-align:middle; }
+  .pill.anchor{ background:rgba(43,217,106,.14); color:var(--green); }
+
+  /* === 2층 이중 게이지: 막대=세션 채움 / 흰 마커=추세 해금선 === */
+  .gaugeline{ margin-top:11px; background:var(--card); border-radius:13px; padding:11px 13px 10px; border:1px solid rgba(255,255,255,.04); }
+  .gl-row{ display:flex; align-items:center; gap:10px; }
+  .gl-row + .gl-row{ margin-top:10px; }
+  .gl-tag{ width:72px; flex:none; font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .gl-tag .dot{ width:7px; height:7px; border-radius:50%; }
+  .gl-tag.intensity .dot{ background:var(--red); } .gl-tag.intensity{ color:var(--red); }
+  .gl-tag.volume .dot{ background:var(--orange); } .gl-tag.volume{ color:var(--orange); }
+  .gl-bar{ flex:1; height:9px; border-radius:5px; background:var(--bg2); position:relative; overflow:visible; }
+  .gl-bar .f{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
+  .gl-bar.intensity .f{ background:linear-gradient(90deg,#C9322B,#E0544C); }
+  .gl-bar.volume .f{ background:linear-gradient(90deg,#C76E00,#E0883A); }
+  /* 흰 게이트 마커 — 추세 해금선. 아직 점등 전: 가는 회백색 선 + 작은 자물쇠 */
+  .gl-bar .gate{ position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,.42); border-radius:2px; }
+  .gl-bar .gate::after{ content:"🔒"; position:absolute; top:-13px; left:50%; transform:translateX(-50%); font-size:8px; opacity:.7; }
+  .gl-num{ width:60px; flex:none; text-align:right; font-size:11px; color:var(--gray); font-variant-numeric:tabular-nums; }
+  .gl-num b{ color:#fff; font-weight:700; }
+  /* 2층 의미 보조 한 줄 */
+  .gl-legend{ margin-top:9px; padding-top:8px; border-top:1px solid rgba(255,255,255,.05); font-size:10px; color:#7c7c82; line-height:1.5; }
+  .gl-legend b{ color:#b9b9bf; font-weight:600; }
+  .gl-legend .mk{ color:#fff; }
+
+  .focusline{ margin-top:9px; padding:0 2px; font-size:11.5px; color:#FFD9A8; }
+  .focusline b{ color:#fff; font-weight:700; }
+
+  /* === 세트 섹션 === */
+  .secttl{ margin:17px 2px 8px; font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--gray); display:flex; align-items:center; gap:7px; }
+  .secttl .dt{ width:7px; height:7px; border-radius:50%; }
+  .secttl .dt.top{ background:var(--red); } .secttl .dt.back{ background:var(--orange); }
+  .secttl .ln{ flex:1; height:1px; background:rgba(255,255,255,.06); }
+  .secttl .meta{ font-size:11px; font-weight:600; }
+  .secttl .meta.top{ color:var(--red); } .secttl .meta.back{ color:var(--orange); }
+
+  /* 완료/대기 세트 — 평범, 직전값은 조용히 회색 (연출 0) */
+  .setrow{ display:flex; align-items:center; gap:11px; background:var(--card); border-radius:13px; padding:11px 13px; margin-bottom:7px; border:1px solid rgba(255,255,255,.04); }
+  .setrow .idx{ width:25px; height:25px; border-radius:7px; flex:none; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--gray); background:var(--bg2); }
+  .setrow.top .idx{ color:var(--red); } .setrow.back .idx{ color:var(--orange); }
+  .setrow .vals{ flex:1; min-width:0; }
+  .setrow .nowv{ font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .setrow .nowv .unit{ font-size:11px; font-weight:600; color:var(--gray); }
+  .setrow .nowv .x{ color:#48484A; padding:0 1px; }
+  .setrow .prevv{ margin-top:2px; font-size:11px; color:var(--gray); }
+  .setrow .prevv .up{ color:var(--green); }
+  .setrow .check{ width:25px; height:25px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; }
+  .setrow.done .check{ background:var(--green); color:#000; }
+  .setrow.done .nowv{ color:#fff; }
+  .setrow.pending{ opacity:.7; }
+  .setrow.pending .check{ border:2px solid #2c2c2e; color:transparent; }
+  .setrow.pending .nowv{ color:#5d5d63; }
+
+  /* === 지금 칠 세트만 대결 강조 카드 === */
+  .duel{ margin:7px 0 8px; background:#191416; border:1px solid #44292a; border-radius:15px; padding:13px 14px 14px; position:relative; box-shadow:0 0 0 1px rgba(255,59,48,.16), 0 8px 22px rgba(0,0,0,.4); }
+  .duel::before{ content:"지금 칠 세트"; position:absolute; top:-8px; left:14px; font-size:9px; font-weight:800; background:var(--red); color:#fff; padding:2px 7px; border-radius:5px; }
+  .duel .vsrow{ display:grid; grid-template-columns:1fr 34px 1fr; align-items:stretch; margin-top:2px; }
+  .duel .side{ padding:2px 2px; }
+  .duel .side .role{ font-size:10px; font-weight:700; color:var(--gray); letter-spacing:.3px; }
+  .duel .side .who{ font-size:9px; color:#5d5d63; }
+  .duel .side .val{ font-size:22px; font-weight:800; letter-spacing:-.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .duel .side .val .u{ font-size:11px; font-weight:600; color:var(--gray); }
+  .duel .side .reps{ font-size:12px; color:var(--gray); margin-top:1px; }
+  .duel .prev .val{ color:var(--gray); }
+  .duel .today{ text-align:right; }
+  .duel .today .val{ color:#fff; }
+  .duel .vs{ display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .duel .vs .k{ font-size:10px; font-weight:900; color:#48484d; letter-spacing:1px; }
+  .duel .vs .ln{ width:1px; flex:1; background:var(--line); margin:3px 0; }
+  .duel .target{ margin-top:9px; font-size:11.5px; color:var(--gray); }
+  .duel .target b{ color:#fff; font-weight:700; }
+  .inrow{ margin-top:11px; padding-top:11px; border-top:1px dashed #332024; display:flex; align-items:center; gap:8px; }
+  .field{ flex:1; background:#0e0e0f; border:1px solid #2c2c30; border-radius:10px; padding:6px; text-align:center; }
+  .field .fl{ font-size:9px; color:var(--gray); }
+  .field .fv{ font-size:17px; font-weight:800; margin-top:1px; }
+  .field.focus{ border-color:var(--red); background:#160e0e; }
+  .clearbtn{ background:var(--green); color:#04210e; font-weight:800; font-size:13px; border:none; border-radius:11px; padding:11px 13px; white-space:nowrap; }
+
+  .rirrow{ margin:2px 2px 0; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .rirrow .lbl{ font-size:11px; color:var(--gray); }
+  .rirchip{ font-size:11px; font-weight:600; color:var(--gray); background:var(--card); border:1px solid rgba(255,255,255,.07); padding:5px 9px; border-radius:8px; }
+  .rirchip.sel{ color:#000; background:var(--orange); border-color:var(--orange); font-weight:700; }
+
+  /* 하단 — 게이트 한 줄 + 액션 */
+  .bottombar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:390px; padding:10px 16px 24px; background:linear-gradient(180deg,rgba(0,0,0,0),#000 30%); }
+  .gatehint{ text-align:center; font-size:10.5px; color:var(--gray); margin-bottom:9px; }
+  .gatehint b{ color:var(--orange); font-weight:700; }
+  .bigbtn{ width:100%; height:52px; border:none; border-radius:14px; background:var(--red); color:#fff; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .bigbtn .small{ font-size:11px; font-weight:600; opacity:.85; }
+</style>
+</head>
+<body>
+  <div class="caption">평범한 진행 중 — 마지막 백오프 <b>B3</b> 차례. 상단 2층 게이지: 막대는 <b>이번 세션 목표 대비</b>로 차오르고, 흰 게이트 마커(증량 해금선)는 <b>추세 충족 전이라 자물쇠 상태</b>. 지금 칠 세트만 대결 카드, 나머지는 직전값만 회색.</div>
+
+  <div class="topbar">
+    <div class="back">‹</div>
+    <div class="title">오늘의 운동 · 가슴</div>
+    <div class="timer">38:12</div>
+  </div>
+  <div class="progress">
+    <span class="ptxt">2 / 5 종목</span>
+    <span class="pdots"><i class="on"></i><i class="cur"></i><i></i><i></i><i></i></span>
+  </div>
+
+  <div class="wrap">
+    <div class="exhead">
+      <div class="name">벤치프레스</div>
+      <div class="sub"><span class="pill anchor">ANCHOR</span> &nbsp;탑세트+백오프 · <b>탑 유지 · 백오프 반복 쌓기</b></div>
+    </div>
+
+    <!-- 2층 이중 게이지 -->
+    <div class="gaugeline">
+      <div class="gl-row">
+        <div class="gl-tag intensity"><span class="dot"></span>강도 · 탑</div>
+        <div class="gl-bar intensity"><div class="f" style="width:100%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num">62.5<b>kg</b></div>
+      </div>
+      <div class="gl-row">
+        <div class="gl-tag volume"><span class="dot"></span>볼륨 · 백오프</div>
+        <div class="gl-bar volume"><div class="f" style="width:70%"></div><div class="gate" style="left:100%"></div></div>
+        <div class="gl-num"><b>23</b>/33</div>
+      </div>
+      <div class="gl-legend">막대 = <b>이번 세션 목표</b> 채움 · <span class="mk">흰 선 🔒</span> = 증량 해금선(<b>2주 추세</b> 충족 시 점등)</div>
+    </div>
+    <div class="focusline">이번 주는 <b>볼륨축 차례</b> — 탑은 그대로, 백오프 직전 29 → 33회 목표.</div>
+
+    <!-- 탑세트 (강도축) -->
+    <div class="secttl"><span class="dt top"></span>탑세트 · 강도축<span class="ln"></span><span class="meta top">62.5kg 유지</span></div>
+
+    <div class="setrow top done">
+      <div class="idx">T1</div>
+      <div class="vals">
+        <div class="nowv">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></div>
+        <div class="prevv">직전 62.5×8 · 동률 유지</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+    <div class="setrow top done">
+      <div class="idx">T2</div>
+      <div class="vals">
+        <div class="nowv">62.5<span class="unit">kg</span><span class="x">×</span>8<span class="unit">회</span></div>
+        <div class="prevv">직전 62.5×7 · <span class="up">+1 갱신</span></div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 백오프 (볼륨축) -->
+    <div class="secttl"><span class="dt back"></span>백오프 · 볼륨축<span class="ln"></span><span class="meta back">3세트 · 55kg</span></div>
+
+    <div class="setrow back done">
+      <div class="idx">B1</div>
+      <div class="vals">
+        <div class="nowv">55<span class="unit">kg</span><span class="x">×</span>11<span class="unit">회</span></div>
+        <div class="prevv">직전 55×10 · <span class="up">+1 갱신</span></div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+    <div class="setrow back done">
+      <div class="idx">B2</div>
+      <div class="vals">
+        <div class="nowv">55<span class="unit">kg</span><span class="x">×</span>10<span class="unit">회</span></div>
+        <div class="prevv">직전 55×10 · 동률</div>
+      </div>
+      <div class="check">✓</div>
+    </div>
+
+    <!-- 지금 칠 세트만 대결 강조 -->
+    <div class="duel">
+      <div class="vsrow">
+        <div class="side prev">
+          <div class="role">직전의 나 <span class="who">(이겨야 할 숫자)</span></div>
+          <div class="val">55<span class="u">kg</span></div>
+          <div class="reps">9회</div>
+        </div>
+        <div class="vs"><div class="ln"></div><div class="k">VS</div><div class="ln"></div></div>
+        <div class="side today">
+          <div class="role" style="text-align:right">오늘의 나 · B3</div>
+          <div class="val">55<span class="u">kg</span></div>
+          <div class="reps" style="text-align:right; color:#5d5d63">— 회</div>
+        </div>
+      </div>
+      <div class="target">직전 9회 → <b>10회 넘기면 세션 목표 33회 채움</b> · 증량은 추세 보고 랩업에서 판단</div>
+      <div class="inrow">
+        <div class="field"><div class="fl">무게 kg</div><div class="fv">55</div></div>
+        <div class="field focus"><div class="fl">반복</div><div class="fv">10</div></div>
+        <button class="clearbtn">이 세트 완료 →</button>
+      </div>
+    </div>
+
+    <div class="rirrow">
+      <span class="lbl">마지막 노력도? (선택)</span>
+      <span class="rirchip">여유</span>
+      <span class="rirchip sel">2~3 남음</span>
+      <span class="rirchip">거의 한계</span>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <div class="gatehint">세션 목표 <b>23 / 33회</b> · 이 세트로 채움 · 증량 해금은 추세 충족 시</div>
+    <button class="bigbtn">B3 기록하기 <span class="small">· 볼륨 막대 +1칸</span></button>
+  </div>
+</body>
+</html>
