@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>방안 B — 진행 내러티브 + 코멘트</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:40px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .nav .ttl { font-size:16px; font-weight:700; margin-left:8px; }
+  .tagline { font-size:12px; color:#8E8E93; padding:4px 20px 6px; }
+
+  .ehead { padding:6px 20px 2px; }
+  .ehead h1 { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+
+  /* narrative headline card */
+  .story { margin:14px 16px 0; background:#161618; border-radius:20px; padding:20px; }
+  .story .eyebrow { font-size:12px; color:#8E8E93; font-weight:700; letter-spacing:.4px; }
+  .story h2 { font-size:22px; font-weight:800; line-height:1.3; margin-top:6px; letter-spacing:-.3px; }
+  .story h2 b { color:#2BD96A; }
+  .story .narr { font-size:14px; color:#C7C7CC; line-height:1.55; margin-top:12px; }
+  .story .narr b { color:#FFF; }
+  .story .narr .up { color:#2BD96A; font-weight:700; }
+  .quote { margin-top:14px; padding-left:13px; border-left:3px solid #FF3B30;
+    font-size:13px; color:#A8A8AD; font-style:italic; line-height:1.5; }
+
+  /* timeline */
+  .sec { padding:22px 20px 8px; font-size:15px; font-weight:700; }
+  .tl { margin:0 16px; position:relative; padding-left:6px; }
+  .tl-item { display:flex; gap:14px; padding-bottom:4px; }
+  .tl-line { display:flex; flex-direction:column; align-items:center; }
+  .tl-node { width:13px; height:13px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+  .tl-node.now { background:#2BD96A; box-shadow:0 0 0 4px rgba(43,217,106,.18); }
+  .tl-node.pr { background:#FF3B30; }
+  .tl-node.past { background:#3A3A3C; }
+  .tl-bar { width:2px; flex:1; background:#232325; margin:3px 0; }
+  .tl-body { padding-bottom:18px; flex:1; }
+  .tl-when { font-size:11px; color:#8E8E93; font-weight:600; }
+  .tl-what { font-size:14px; font-weight:600; margin-top:2px; }
+  .tl-cmt { font-size:12px; color:#8E8E93; margin-top:3px; line-height:1.45; }
+  .tl-cmt.green { color:#2BD96A; }
+  .tag { display:inline-block; font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px;
+    margin-left:6px; vertical-align:middle; }
+  .tag-pr { background:rgba(255,59,48,.18); color:#FF6B61; }
+
+  /* next chapter */
+  .next { margin:12px 16px 0; background:rgba(255,59,48,.10); border:1px solid rgba(255,59,48,.30);
+    border-radius:16px; padding:16px; }
+  .next .nl { font-size:12px; color:#FF8A00; font-weight:700; }
+  .next .nt { font-size:15px; font-weight:700; margin-top:5px; line-height:1.4; }
+  .next .nt b { color:#FF3B30; }
+  .note { font-size:11px; color:#6E6E73; text-align:center; padding:18px 24px 0; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav"><span class="back">‹</span><span class="ttl">벤치프레스 · 성장 일지</span></div>
+  <div class="tagline">방안 B · 분석 화면을 "숫자"가 아닌 "이야기"로 — 느린 진행도 서사로 보임</div>
+
+  <div class="ehead"><h1>벤치프레스</h1></div>
+
+  <!-- NARRATIVE HEADLINE -->
+  <div class="story">
+    <div class="eyebrow">지난 6주 이야기</div>
+    <h2>조용하지만 <b>분명히</b><br>강해지고 있어요</h2>
+    <div class="narr">
+      6주 전엔 가슴 주간 <b>10세트</b>로 시작했죠. 지금은 <span class="up">14세트(+4)</span>.
+      무게는 그대로 60kg인데 같은 무게가 <b>점점 쉬워지고</b> 있어요 —
+      이건 다음 증량이 가까워졌다는 신호예요.
+    </div>
+    <div class="quote">"PR이 안 떠도 괜찮아요. 같은 무게를 더 편하게 드는 게
+    근비대에선 진짜 진행이에요. 숫자는 따라옵니다."</div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="sec">지나온 길</div>
+  <div class="tl">
+    <div class="tl-item">
+      <div class="tl-line"><div class="tl-node now"></div><div class="tl-bar"></div></div>
+      <div class="tl-body">
+        <div class="tl-when">이번 주</div>
+        <div class="tl-what">탑 62.5kg×8 · 백오프 55kg 33회<span class="tag tag-pr">PR</span></div>
+        <div class="tl-cmt green">역대 최고 탑세트. 4주 연속 볼륨 증가 — 성장 곡선 위.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-line"><div class="tl-node past"></div><div class="tl-bar"></div></div>
+      <div class="tl-body">
+        <div class="tl-when">2주 전</div>
+        <div class="tl-what">같은 60kg가 "거의 한계"→"2~3개 남음"으로</div>
+        <div class="tl-cmt">무게 정체처럼 보였지만, 체감 난이도가 내려갔어요. 곧 터질 신호.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-line"><div class="tl-node pr"></div><div class="tl-bar"></div></div>
+      <div class="tl-body">
+        <div class="tl-when">4주 전</div>
+        <div class="tl-what">백오프 한 세트 추가 (3→4세트)</div>
+        <div class="tl-cmt">이 결정이 지금 볼륨 +4의 출발점이었어요.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-line"><div class="tl-node past"></div></div>
+      <div class="tl-body">
+        <div class="tl-when">6주 전 · 시작점</div>
+        <div class="tl-what">가슴 주간 10세트 · 60kg 24회</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEXT CHAPTER -->
+  <div class="next">
+    <div class="nl">▸ 다음 이야기</div>
+    <div class="nt">탑세트가 <b>62.5kg 6/6</b>까지 차면, 다음 장은 <b>65kg</b>으로 넘어갑니다. 두세 세션 남았어요.</div>
+  </div>
+
+  <div class="note">코멘트·서사는 동기용 — 처방 숫자(62.5→65kg)는 엔진이 계산.<br>AI는 엔진이 정한 사실을 사람 말로 옮길 뿐이에요.</div>
+</div>
+</body>
+</html>

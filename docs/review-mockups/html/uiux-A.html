@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>uiux-A · 미니멀 집중형 (운동 중)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px 0 40px; font-family:-apple-system,"SF Pro Text",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; line-height:1.5; }
+  .cap b { color:#FF3B30; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF; position:relative; padding-bottom:120px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:6px 18px 2px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .nav .ttl { font-size:14px; font-weight:700; color:#8E8E93; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+
+  /* ── 단 하나의 거대한 "지금 이 세트" 카드 ── */
+  .focus { margin:10px 16px 0; background:#161618; border-radius:24px; padding:24px 22px 22px; }
+  .f-tag { display:inline-block; font-size:12px; font-weight:800; letter-spacing:.5px; padding:5px 11px; border-radius:8px; background:#FF3B30; color:#fff; }
+  .f-tag.back { background:#2A2A2C; color:#A8A8AD; }
+  .f-ex { font-size:15px; color:#8E8E93; font-weight:700; margin-top:14px; }
+  .f-set { font-size:13px; color:#6E6E73; font-weight:600; margin-top:2px; }
+  /* 거대한 목표 숫자 — 0.5초에 읽힘 */
+  .f-big { display:flex; align-items:baseline; gap:14px; margin-top:14px; }
+  .f-big .kg { font-size:64px; font-weight:800; line-height:.9; letter-spacing:-2px; }
+  .f-big .unit { font-size:22px; font-weight:700; color:#8E8E93; }
+  .f-big .x { font-size:40px; font-weight:700; color:#48484A; }
+  .f-big .rep { font-size:64px; font-weight:800; line-height:.9; color:#FF3B30; letter-spacing:-2px; }
+  .f-prev { font-size:14px; color:#8E8E93; font-weight:600; margin-top:14px; }
+  .f-prev b { color:#C7C7CC; }
+  /* 한 손 도달 — 큰 완료 버튼 */
+  .f-done { margin-top:20px; display:flex; gap:10px; }
+  .f-check { flex:1; background:#FF3B30; color:#fff; border:none; border-radius:16px; padding:18px; font-size:18px; font-weight:800; }
+  .f-edit { width:64px; background:#0D0D0D; color:#C7C7CC; border:1px solid #2A2A2C; border-radius:16px; font-size:22px; }
+
+  /* ── 진행 점들(미니맵): 나머지 세트는 점만 ── */
+  .dots { display:flex; align-items:center; justify-content:center; gap:9px; margin:22px 0 4px; }
+  .dot { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .dot .d { width:13px; height:13px; border-radius:50%; }
+  .dot .d.done { background:#FF3B30; }
+  .dot .d.now { background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.18); }
+  .dot .d.next { background:#2A2A2C; }
+  .dot .lab { font-size:9px; font-weight:800; color:#6E6E73; letter-spacing:.4px; }
+  .dot .lab.t { color:#FF6B61; }
+  .prog-sub { text-align:center; font-size:12px; color:#8E8E93; margin-top:8px; }
+  .prog-sub b { color:#fff; }
+
+  /* RIR — 같은 큰 톤, 마지막 세트에만 */
+  .rir { margin:20px 16px 0; }
+  .rir-lbl { font-size:12px; color:#6E6E73; font-weight:600; text-align:center; margin-bottom:9px; }
+  .rir-row { display:flex; gap:8px; }
+  .rir-row .c { flex:1; text-align:center; font-size:13px; font-weight:700; padding:13px 0; border-radius:12px; background:#1C1C1E; color:#8E8E93; border:1px solid #2A2A2C; }
+  .rir-row .c.sel { background:rgba(255,59,48,.18); color:#FF6B61; border-color:#FF3B30; }
+
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:12px 16px 30px; display:flex; gap:10px; align-items:center; }
+  .f-next { flex:1; background:#0D0D0D; color:#8E8E93; border:1px solid #2A2A2C; border-radius:14px; padding:15px; font-size:14px; font-weight:700; text-align:center; }
+  .f-fin { flex:1; background:#1C1C1E; color:#fff; border:none; border-radius:14px; padding:15px; font-size:15px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="cap"><b>A · 미니멀 집중형</b> — 표 전체를 버리고, "지금 칠 한 세트"만 거대하게. 나머지 세트는 하단 점(미니맵)으로 축약. 목표 무게×반복을 64px로 띄워 0.5초·팔 뻗은 거리에서 읽히게. 완료=화면 절반 버튼. 트레이드오프: 전체 세트 표를 동시에 못 봄(편집은 한 단계 깊이).</div>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav"><span class="back">‹</span><span class="ttl">벤치프레스 · 휴식 1:24</span><span class="more">⋯</span></div>
+
+  <div class="focus">
+    <span class="f-tag back">BACKOFF</span>
+    <div class="f-ex">4번째 세트 · 백오프</div>
+    <div class="f-big">
+      <span class="kg">55</span><span class="unit">kg</span>
+      <span class="x">×</span>
+      <span class="rep">10</span>
+    </div>
+    <div class="f-prev">지난번 <b>55kg × 10</b> · 같은 무게로 한 번 더</div>
+    <div class="f-done">
+      <button class="f-check">✓ 완료</button>
+      <button class="f-edit">✎</button>
+    </div>
+  </div>
+
+  <div class="dots">
+    <div class="dot"><span class="d done"></span><span class="lab t">탑</span></div>
+    <div class="dot"><span class="d done"></span><span class="lab t">탑</span></div>
+    <div class="dot"><span class="d done"></span><span class="lab">백</span></div>
+    <div class="dot"><span class="d now"></span><span class="lab">백</span></div>
+    <div class="dot"><span class="d next"></span><span class="lab">백</span></div>
+  </div>
+  <div class="prog-sub">백오프 <b>2 / 3</b> · 탑세트 <b>완료</b> · 오늘 총 <b>24 / 27회</b></div>
+
+  <div class="rir">
+    <div class="rir-lbl">마지막 세트 노력도? (선택)</div>
+    <div class="rir-row">
+      <span class="c">여유</span>
+      <span class="c sel">2~3 남음</span>
+      <span class="c">거의 한계</span>
+      <span class="c">실패</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="f-next">↑ 전체 세트 보기</span>
+    <button class="f-fin">운동 완료</button>
+  </div>
+</div>
+</body>
+</html>

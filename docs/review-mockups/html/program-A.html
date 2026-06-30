@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>방안 A — 처방 카드 (왜+다음 한 칸)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:18px; padding:24px 0 60px; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; font-weight:600; letter-spacing:.3px; }
+  .cap b { color:#FF8A00; }
+  .frame { width:390px; background:#000; color:#FFF; border-radius:22px; overflow:hidden; border:1px solid #1C1C1E; }
+  .title { padding:16px 20px 4px; }
+  .title h1 { font-size:22px; font-weight:800; letter-spacing:-.5px; }
+  .title .sub { font-size:12px; color:#8E8E93; margin-top:3px; font-weight:600; }
+
+  /* 처방 카드 (핵심) */
+  .rx { margin:16px 16px 0; background:#161618; border-radius:18px; padding:0; overflow:hidden; }
+  .rx-head { padding:15px 18px 13px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #232325; }
+  .rx-head .lbl { font-size:12px; color:#8E8E93; font-weight:700; letter-spacing:.4px; }
+  .rx-head .verdict { font-size:12px; font-weight:800; padding:5px 10px; border-radius:8px; background:rgba(255,138,0,.16); color:#FF8A00; }
+
+  /* 두 축 처방 행 */
+  .axis { padding:15px 18px; display:flex; align-items:flex-start; gap:13px; border-bottom:1px solid #1E1E20; }
+  .axis:last-of-type { border-bottom:none; }
+  .axis .ic { width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; }
+  .ic-top { background:#FF3B30; color:#fff; }
+  .ic-back { background:#2A2A2C; color:#A8A8AD; }
+  .axis .body { flex:1; }
+  .axis .a-name { font-size:13px; color:#8E8E93; font-weight:700; }
+  .axis .a-rx { font-size:18px; font-weight:800; margin-top:3px; letter-spacing:-.3px; }
+  .axis .a-rx .hold { color:#8E8E93; }
+  .axis .a-rx .go { color:#FF3B30; }
+  .axis .a-why { font-size:12px; color:#A8A8AD; margin-top:6px; line-height:1.45; }
+  .axis .a-why b { color:#2BD96A; font-weight:700; }
+  /* 게이트 진행 점 */
+  .gate { display:flex; gap:5px; margin-top:9px; align-items:center; }
+  .gate .dot { width:22px; height:6px; border-radius:3px; background:#2A2A2C; }
+  .gate .dot.fill { background:#2BD96A; }
+  .gate .dot.pend { background:#3A3A3C; }
+  .gate .gtxt { font-size:11px; color:#6E6E73; margin-left:6px; font-weight:600; }
+
+  .rx-foot { padding:13px 18px; background:#0D0D0D; display:flex; align-items:center; gap:8px; }
+  .rx-foot .badge { font-size:11px; font-weight:700; color:#FF8A00; background:rgba(255,138,0,.14); padding:4px 9px; border-radius:7px; }
+  .rx-foot .ftxt { font-size:12px; color:#8E8E93; font-weight:600; }
+
+  .guard { margin:11px 16px 0; background:rgba(255,138,0,.10); border:1px solid rgba(255,138,0,.32); border-radius:13px; padding:12px 15px; display:flex; gap:10px; align-items:flex-start; }
+  .guard .gi { font-size:16px; }
+  .guard .gtx { font-size:12px; color:#FFB454; line-height:1.45; font-weight:600; }
+  .guard .gtx b { color:#FF8A00; }
+
+  .start { margin:18px 16px 16px; }
+  .btn { display:block; width:100%; background:#FF3B30; color:#fff; border:none; border-radius:15px; padding:15px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+  <div class="cap">방안 A — <b>처방 카드 강화</b>: 엔진의 판정을 "탑/백오프 2축 × (다음 한 칸 + 왜 + 게이트 진행)"으로 한 카드에. 운동 시작 전 종목 카드를 탭하면 펼쳐짐.</div>
+
+  <div class="frame">
+    <div class="title">
+      <h1>벤치프레스</h1>
+      <div class="sub">탑세트 + 백오프 · ANCHOR · 가슴</div>
+    </div>
+
+    <div class="rx">
+      <div class="rx-head">
+        <span class="lbl">오늘의 처방</span>
+        <span class="verdict">백오프 채우는 중</span>
+      </div>
+
+      <!-- 탑세트 축 -->
+      <div class="axis">
+        <span class="ic ic-top">탑</span>
+        <div class="body">
+          <div class="a-name">강도축 — 탑세트</div>
+          <div class="a-rx"><span class="hold">62.5kg × 8 유지</span></div>
+          <div class="a-why">지난 탑 8/7, <b>마지막 2~3개 남김</b>으로 끝냄 → 아직 여유 부족. 8/8 채우면 다음에 65kg.</div>
+          <div class="gate">
+            <span class="dot fill"></span><span class="dot pend"></span>
+            <span class="gtxt">증량까지 8회 한 세트 더</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 백오프 축 -->
+      <div class="axis">
+        <span class="ic ic-back">백</span>
+        <div class="body">
+          <div class="a-name">볼륨축 — 백오프</div>
+          <div class="a-rx">55kg <span class="go">총 31회 노리기</span></div>
+          <div class="a-why">지난 55kg 총 29회(10/10/9). <b>+2회</b>면 진행. 세 세트 모두 10 채우면 다음 57.5kg.</div>
+          <div class="gate">
+            <span class="dot fill"></span><span class="dot fill"></span><span class="dot pend"></span>
+            <span class="gtxt">30회 → 목표 31회</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rx-foot">
+        <span class="badge">한 번에 한 축</span>
+        <span class="ftxt">이번 주는 백오프 반복부터. 탑 무게는 다음 주.</span>
+      </div>
+    </div>
+
+    <div class="guard">
+      <span class="gi">⚠️</span>
+      <span class="gtx">백오프 무게는 탑의 <b>88%로 자동 고정</b>(55kg)이에요. 즉흥으로 낮추면 비교가 깨져 "총 반복"이 거품이 됩니다.</span>
+    </div>
+
+    <div class="start">
+      <button class="btn">이 처방으로 시작</button>
+    </div>
+  </div>
+</body>
+</html>

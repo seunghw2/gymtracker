@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>uiux-C · 인라인 체크 + 스텝퍼 (운동 중)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px 0 40px; font-family:-apple-system,"SF Pro Text",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; line-height:1.5; }
+  .cap b { color:#FF3B30; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF; position:relative; padding-bottom:96px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:6px 18px 2px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .nav .timer { font-size:14px; font-weight:700; color:#8E8E93; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+  .title { padding:4px 20px 0; display:flex; align-items:baseline; gap:10px; }
+  .title h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .title .pill { font-size:11px; font-weight:700; color:#8E8E93; background:#1C1C1E; padding:3px 8px; border-radius:7px; }
+
+  /* 진행 막대 */
+  .pbar { margin:12px 16px 0; }
+  .pbar .track { height:6px; background:#1C1C1E; border-radius:4px; overflow:hidden; }
+  .pbar .track > span { display:block; height:100%; background:#FF3B30; border-radius:4px; width:48%; }
+  .pbar .ptxt { display:flex; justify-content:space-between; margin-top:7px; font-size:11px; color:#8E8E93; font-weight:600; }
+  .pbar .ptxt b { color:#fff; }
+
+  .sets { margin:14px 16px 0; }
+  /* 활성 행: 인라인 스텝퍼 노출 */
+  .row { background:#161618; border-radius:14px; margin-bottom:9px; padding:12px 14px; }
+  .row.done { background:rgba(43,217,106,.07); padding:11px 14px; }
+  .r-top { display:flex; align-items:center; }
+  .tag { font-size:10px; font-weight:800; padding:4px 8px; border-radius:7px; letter-spacing:.4px; margin-right:11px; }
+  .tag-top { background:#FF3B30; color:#fff; }
+  .tag-back { background:#2A2A2C; color:#A8A8AD; }
+  /* 완료행 요약 */
+  .sum { flex:1; font-size:17px; font-weight:800; }
+  .sum .u { font-size:13px; color:#8E8E93; font-weight:600; }
+  .sum .delta { font-size:11px; font-weight:800; color:#2BD96A; margin-left:8px; }
+  .undo { font-size:18px; color:#2BD96A; }
+  /* 활성행 prev */
+  .r-prev { font-size:12px; color:#6E6E73; font-weight:600; margin-left:auto; }
+  .r-prev b { color:#9B9BA0; }
+
+  /* 인라인 스텝퍼 */
+  .stepper { display:flex; gap:10px; margin-top:13px; }
+  .field { flex:1; }
+  .field .fl { font-size:11px; color:#8E8E93; font-weight:700; margin-bottom:6px; text-align:center; }
+  .ctrl { display:flex; align-items:center; background:#0D0D0D; border-radius:13px; border:1px solid #2A2A2C; overflow:hidden; }
+  .ctrl button { width:46px; height:54px; background:none; border:none; color:#FF3B30; font-size:26px; font-weight:700; }
+  .ctrl .num { flex:1; text-align:center; font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .ctrl button:active { background:#1C1C1E; }
+  /* 큰 완료 버튼 인라인 */
+  .logbtn { margin-top:13px; width:100%; background:#FF3B30; color:#fff; border:none; border-radius:13px; padding:16px; font-size:16px; font-weight:800; }
+
+  /* 다음 미리보기(접힌) */
+  .next-mini { display:flex; align-items:center; opacity:.55; }
+  .next-mini .tag { margin-right:11px; }
+  .next-mini .nm { flex:1; font-size:15px; font-weight:700; color:#C7C7CC; }
+  .next-mini .nm .u { font-size:12px; color:#6E6E73; font-weight:600; }
+
+  .rir { margin:6px 16px 0; background:#161618; border-radius:14px; padding:13px 14px; }
+  .rir-lbl { font-size:11px; color:#6E6E73; font-weight:600; margin-bottom:8px; }
+  .chips { display:flex; gap:7px; }
+  .chip { flex:1; text-align:center; font-size:12px; font-weight:700; padding:9px 0; border-radius:9px; background:#0D0D0D; color:#8E8E93; border:1px solid #2A2A2C; }
+  .chip.sel { background:rgba(255,59,48,.18); color:#FF6B61; border-color:#FF3B30; }
+
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:13px 16px 30px; }
+  .btn-done { display:block; width:100%; background:#1C1C1E; color:#fff; border:none; border-radius:15px; padding:16px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="cap"><b>C · 인라인 스텝퍼형</b> — 표 구조는 유지하되, <b>활성 세트만 펼쳐 +/− 스텝퍼를 인라인</b>으로. 직전값에서 한 손 엄지로 +1만 톡. 키패드·바텀시트 없이 그 자리에서 입력→큰 빨강 "세트 기록". 완료한 세트는 한 줄로 접혀 위로 쌓이고(요약+delta), 다음 세트는 흐리게 미리보기. 트레이드오프: 한 번에 한 세트만 입력 활성.</div>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav"><span class="back">‹</span><span class="timer">⏱ 휴식 1:24</span><span class="more">⋯</span></div>
+  <div class="title"><h1>벤치프레스</h1><span class="pill">탑+백오프</span></div>
+
+  <div class="pbar">
+    <div class="track"><span></span></div>
+    <div class="ptxt"><span>세트 <b>3 / 5</b></span><span>오늘 총 <b>24 / 27회</b></span></div>
+  </div>
+
+  <div class="sets">
+    <!-- 완료 세트: 접힘 -->
+    <div class="row done">
+      <div class="r-top">
+        <span class="tag tag-top">TOP</span>
+        <span class="sum">62.5<span class="u">kg</span> × 8 <span class="delta">PR ↑</span></span>
+        <span class="undo">↺</span>
+      </div>
+    </div>
+    <div class="row done">
+      <div class="r-top">
+        <span class="tag tag-top">TOP</span>
+        <span class="sum">62.5<span class="u">kg</span> × 7</span>
+        <span class="undo">↺</span>
+      </div>
+    </div>
+    <div class="row done">
+      <div class="r-top">
+        <span class="tag tag-back">BACK</span>
+        <span class="sum">55<span class="u">kg</span> × 11 <span class="delta">+1</span></span>
+        <span class="undo">↺</span>
+      </div>
+    </div>
+
+    <!-- 활성 세트: 스텝퍼 펼침 -->
+    <div class="row">
+      <div class="r-top">
+        <span class="tag tag-back">BACK</span>
+        <span class="r-prev">지난 <b>55kg × 10</b> · +1 추천</span>
+      </div>
+      <div class="stepper">
+        <div class="field">
+          <div class="fl">무게 (kg)</div>
+          <div class="ctrl"><button>−</button><span class="num">55</span><button>+</button></div>
+        </div>
+        <div class="field">
+          <div class="fl">반복</div>
+          <div class="ctrl"><button>−</button><span class="num">10</span><button>+</button></div>
+        </div>
+      </div>
+      <button class="logbtn">✓ 이 세트 기록</button>
+    </div>
+
+    <!-- 다음 세트: 미리보기 -->
+    <div class="row">
+      <div class="next-mini">
+        <span class="tag tag-back">BACK</span>
+        <span class="nm">55<span class="u">kg</span> × 9 <span class="u">(지난 기준)</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rir">
+    <div class="rir-lbl">마지막 백오프 세트 노력도? (선택)</div>
+    <div class="chips">
+      <span class="chip">여유</span>
+      <span class="chip sel">2~3 남음</span>
+      <span class="chip">거의 한계</span>
+      <span class="chip">실패</span>
+    </div>
+  </div>
+
+  <div class="footer"><button class="btn-done">운동 완료</button></div>
+</div>
+</body>
+</html>

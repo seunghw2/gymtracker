@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>방안 C — 정체 대응 액션 카드</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:40px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; padding:8px 18px 6px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .nav .ttl { font-size:16px; font-weight:700; margin-left:8px; }
+  .tagline { font-size:12px; color:#8E8E93; padding:4px 20px 6px; }
+
+  /* plateau banner */
+  .plateau { margin:12px 16px 0; background:rgba(255,138,0,.12); border:1px solid rgba(255,138,0,.40);
+    border-radius:18px; padding:18px; }
+  .pl-head { display:flex; align-items:center; gap:11px; }
+  .pl-ic { font-size:26px; }
+  .pl-t { font-size:17px; font-weight:800; }
+  .pl-t small { display:block; font-size:12px; color:#FF8A00; font-weight:600; margin-top:2px; }
+  .pl-body { font-size:13px; color:#D8D8DC; line-height:1.5; margin-top:12px; }
+  .pl-body b { color:#FFF; }
+  .pl-evi { margin-top:11px; display:flex; gap:8px; }
+  .evi { flex:1; background:#0D0D0D; border-radius:10px; padding:9px 10px; text-align:center; }
+  .evi .ev-n { font-size:15px; font-weight:800; }
+  .evi .ev-l { font-size:10px; color:#8E8E93; font-weight:600; margin-top:2px; }
+  .evi .flat { color:#FF8A00; }
+
+  /* reassurance */
+  .calm { margin:12px 16px 0; font-size:12px; color:#8E8E93; line-height:1.5; padding:0 4px; }
+  .calm b { color:#C7C7CC; }
+
+  /* action cards */
+  .sec { padding:20px 20px 8px; font-size:15px; font-weight:700; }
+  .sec small { color:#8E8E93; font-weight:500; font-size:12px; margin-left:6px; }
+  .acts { margin:0 16px; }
+  .act { background:#161618; border-radius:16px; padding:16px; margin-bottom:11px;
+    border:1.5px solid transparent; }
+  .act.rec { border-color:#FF3B30; }
+  .act-top { display:flex; align-items:center; justify-content:space-between; }
+  .act-name { font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .act-ic { font-size:18px; }
+  .rec-badge { font-size:10px; font-weight:800; color:#FFF; background:#FF3B30;
+    padding:3px 8px; border-radius:7px; letter-spacing:.3px; }
+  .act-desc { font-size:13px; color:#A8A8AD; margin-top:9px; line-height:1.5; }
+  .act-desc b { color:#FFF; }
+  .act-cta { margin-top:13px; display:flex; align-items:center; gap:10px; }
+  .act-btn { font-size:13px; font-weight:700; padding:10px 16px; border-radius:11px; }
+  .act-btn.primary { background:#FF3B30; color:#FFF; }
+  .act-btn.ghost { background:#0D0D0D; color:#C7C7CC; border:1px solid #2A2A2C; }
+  .act-meta { font-size:11px; color:#6E6E73; }
+
+  .note { font-size:11px; color:#6E6E73; text-align:center; padding:18px 24px 0; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav"><span class="back">‹</span><span class="ttl">오버헤드 프레스</span></div>
+  <div class="tagline">방안 C · 정체를 감지하면 "좌절" 대신 "고를 수 있는 행동"으로 — 이탈 방지</div>
+
+  <!-- PLATEAU DETECTED -->
+  <div class="plateau">
+    <div class="pl-head">
+      <span class="pl-ic">🧭</span>
+      <div class="pl-t">잠깐 멈춤이 감지됐어요<small>정체 ≠ 실패 · 흔한 구간이에요</small></div>
+    </div>
+    <div class="pl-body">
+      3주째 <b>40kg에서 무게도 반복도</b> 안 움직였어요. 하지만 마지막 세트 노력도는
+      "거의 한계"로 일정 — <b>후퇴는 아니에요.</b> 자극을 살짝 바꿔줄 때예요.
+    </div>
+    <div class="pl-evi">
+      <div class="evi"><div class="ev-n flat">3주</div><div class="ev-l">무게 정체</div></div>
+      <div class="evi"><div class="ev-n flat">10회</div><div class="ev-l">반복 멈춤</div></div>
+      <div class="evi"><div class="ev-n">RIR 1</div><div class="ev-l">노력 유지</div></div>
+    </div>
+  </div>
+
+  <div class="calm">
+    중급자에게 정체는 <b>실력이 아니라 신호</b>예요. 아래 중 하나만 골라도 보통 1~2주 안에 다시 움직입니다.
+  </div>
+
+  <!-- ACTION CARDS -->
+  <div class="sec">돌파 카드<small>엔진이 이 종목에 맞춰 정렬</small></div>
+  <div class="acts">
+
+    <div class="act rec">
+      <div class="act-top">
+        <span class="act-name"><span class="act-ic">➕</span>백오프 한 세트 추가</span>
+        <span class="rec-badge">1순위 추천</span>
+      </div>
+      <div class="act-desc">머신·고립·정체의 가장 흔한 출구. 주간 볼륨을 직접 +1세트 올려 <b>무게 안 올리고도</b> 자극을 늘려요. 채워지면 그때 무게로 환산.</div>
+      <div class="act-cta">
+        <span class="act-btn primary">다음 운동에 적용</span>
+        <span class="act-meta">목표 세트 3 → 4</span>
+      </div>
+    </div>
+
+    <div class="act">
+      <div class="act-top">
+        <span class="act-name"><span class="act-ic">🔁</span>보조 종목으로 약점 공략</span>
+      </div>
+      <div class="act-desc">같은 부위 다른 각도(예: <b>아놀드 프레스</b>)로 정체된 근육을 우회 자극. 메인이 다시 움직일 길을 터줘요.</div>
+      <div class="act-cta">
+        <span class="act-btn ghost">보조 종목 보기</span>
+      </div>
+    </div>
+
+    <div class="act">
+      <div class="act-top">
+        <span class="act-name"><span class="act-ic">📉</span>5~10% 내려 다시 쌓기</span>
+      </div>
+      <div class="act-desc">무게를 <b>36kg</b>으로 잠깐 내려 반복·폼을 채운 뒤 재상승. 후퇴가 아니라 도움닫기예요.</div>
+      <div class="act-cta">
+        <span class="act-btn ghost">40 → 36kg 적용</span>
+      </div>
+    </div>
+
+    <div class="act">
+      <div class="act-top">
+        <span class="act-name"><span class="act-ic">🛌</span>이번 주 디로드</span>
+      </div>
+      <div class="act-desc">3주 연속 정체 + 피로면 회복이 답일 수 있어요. 볼륨 절반으로 한 주 쉬어가고 다음 주 재도전.</div>
+      <div class="act-cta">
+        <span class="act-btn ghost">디로드 주 만들기</span>
+        <span class="act-meta">선택 — 피로할 때만</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note">정체 판정·돌파 숫자는 엔진이 2~3주 추세로 계산.<br>"하락"이라 단정하지 않고, 고를 행동만 제시해요.</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>방안 A — 주간 미션 + 스트릭</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    position:relative; padding-bottom:40px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .hdr { padding:8px 20px 4px; }
+  .hdr .date { font-size:13px; color:#8E8E93; font-weight:600; }
+  .hdr h1 { font-size:26px; font-weight:800; margin-top:2px; letter-spacing:-.5px; }
+  .tagline { font-size:12px; color:#8E8E93; padding:4px 20px 0; }
+
+  /* streak hero */
+  .streak { margin:14px 16px 0; background:linear-gradient(135deg,#1A0F0D,#161618);
+    border:1px solid #2A1A18; border-radius:20px; padding:18px 18px 16px; }
+  .streak-top { display:flex; align-items:center; justify-content:space-between; }
+  .streak-flame { display:flex; align-items:center; gap:10px; }
+  .flame-ic { font-size:30px; }
+  .streak-n { font-size:34px; font-weight:900; letter-spacing:-1px; line-height:1; }
+  .streak-n span { font-size:15px; font-weight:700; color:#8E8E93; margin-left:4px; }
+  .streak-lbl { font-size:12px; color:#FF8A00; font-weight:700; margin-top:3px; }
+  .streak-best { text-align:right; font-size:11px; color:#8E8E93; }
+  .streak-best b { display:block; font-size:18px; color:#FFF; font-weight:800; }
+  /* week dots */
+  .week { margin-top:16px; display:flex; gap:7px; }
+  .day { flex:1; text-align:center; }
+  .day .dot { width:30px; height:30px; border-radius:9px; margin:0 auto 5px; display:flex;
+    align-items:center; justify-content:center; font-size:13px; font-weight:800; }
+  .dot.done { background:#FF3B30; color:#FFF; }
+  .dot.today { background:transparent; border:2px dashed #FF3B30; color:#FF3B30; }
+  .dot.empty { background:#1C1C1E; color:#48484A; }
+  .day .dl { font-size:10px; color:#8E8E93; font-weight:600; }
+
+  /* mission section */
+  .sec { padding:24px 20px 10px; display:flex; align-items:baseline; justify-content:space-between; }
+  .sec h2 { font-size:18px; font-weight:700; }
+  .sec .hint { font-size:12px; color:#8E8E93; }
+  .missions { margin:0 16px; }
+  .mission { background:#161618; border-radius:16px; padding:15px 16px; margin-bottom:10px;
+    display:flex; align-items:center; gap:14px; }
+  .mission.clear { background:rgba(43,217,106,.10); }
+  .m-ring { width:44px; height:44px; flex-shrink:0; position:relative; }
+  .m-ring svg { transform:rotate(-90deg); }
+  .m-ring .pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800; }
+  .m-body { flex:1; }
+  .m-title { font-size:15px; font-weight:700; }
+  .m-sub { font-size:12px; color:#8E8E93; margin-top:3px; }
+  .m-sub b { color:#FF8A00; }
+  .m-sub.ok b { color:#2BD96A; }
+  .m-reward { font-size:11px; font-weight:700; color:#FF8A00; background:rgba(255,138,0,.14);
+    padding:5px 9px; border-radius:8px; flex-shrink:0; }
+  .m-reward.got { color:#2BD96A; background:rgba(43,217,106,.15); }
+
+  /* next milestone */
+  .ms { margin:16px 16px 0; background:#0D0D0D; border:1px solid #1C1C1E; border-radius:14px;
+    padding:14px 16px; display:flex; align-items:center; gap:12px; }
+  .ms .ms-ic { font-size:22px; }
+  .ms .ms-t { font-size:13px; color:#C7C7CC; font-weight:600; line-height:1.4; }
+  .ms .ms-t b { color:#FFF; }
+  .note { font-size:11px; color:#6E6E73; text-align:center; padding:18px 24px 0; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="hdr"><div class="date">6월 30일 화요일</div><h1>이번 주, 멈추지 마세요</h1></div>
+  <div class="tagline">방안 A · 홈 최상단을 스트릭+주간 미션으로 — "습관"을 점수로</div>
+
+  <!-- STREAK HERO -->
+  <div class="streak">
+    <div class="streak-top">
+      <div class="streak-flame">
+        <span class="flame-ic">🔥</span>
+        <div>
+          <div class="streak-n">5<span>주 연속</span></div>
+          <div class="streak-lbl">목표 주간 횟수 달성 중</div>
+        </div>
+      </div>
+      <div class="streak-best">최고 기록<b>7주</b></div>
+    </div>
+    <div class="week">
+      <div class="day"><div class="dot done">✓</div><div class="dl">월</div></div>
+      <div class="day"><div class="dot today">·</div><div class="dl">화</div></div>
+      <div class="day"><div class="dot empty">·</div><div class="dl">수</div></div>
+      <div class="day"><div class="dot done">✓</div><div class="dl">목</div></div>
+      <div class="day"><div class="dot empty">·</div><div class="dl">금</div></div>
+      <div class="day"><div class="dot empty">·</div><div class="dl">토</div></div>
+      <div class="day"><div class="dot empty">·</div><div class="dl">일</div></div>
+    </div>
+  </div>
+
+  <!-- WEEKLY MISSIONS -->
+  <div class="sec"><h2>이번 주 미션</h2><span class="hint">2 / 4 달성</span></div>
+  <div class="missions">
+
+    <div class="mission clear">
+      <div class="m-ring">
+        <svg width="44" height="44"><circle cx="22" cy="22" r="18" stroke="#232325" stroke-width="5" fill="none"/><circle cx="22" cy="22" r="18" stroke="#2BD96A" stroke-width="5" fill="none" stroke-dasharray="113" stroke-dashoffset="0" stroke-linecap="round"/></svg>
+        <span class="pct" style="color:#2BD96A">✓</span>
+      </div>
+      <div class="m-body">
+        <div class="m-title">운동 3회 나가기</div>
+        <div class="m-sub ok">3 / 3회 완료 — 출석 미션 달성!</div>
+      </div>
+      <span class="m-reward got">+50</span>
+    </div>
+
+    <div class="mission">
+      <div class="m-ring">
+        <svg width="44" height="44"><circle cx="22" cy="22" r="18" stroke="#232325" stroke-width="5" fill="none"/><circle cx="22" cy="22" r="18" stroke="#FF8A00" stroke-width="5" fill="none" stroke-dasharray="113" stroke-dashoffset="28" stroke-linecap="round"/></svg>
+        <span class="pct">75%</span>
+      </div>
+      <div class="m-body">
+        <div class="m-title">가슴 볼륨 채우기</div>
+        <div class="m-sub">12 / 16세트 · <b>4세트만 더</b> 채우면 성장 구간</div>
+      </div>
+      <span class="m-reward">+40</span>
+    </div>
+
+    <div class="mission">
+      <div class="m-ring">
+        <svg width="44" height="44"><circle cx="22" cy="22" r="18" stroke="#232325" stroke-width="5" fill="none"/><circle cx="22" cy="22" r="18" stroke="#FF8A00" stroke-width="5" fill="none" stroke-dasharray="113" stroke-dashoffset="73" stroke-linecap="round"/></svg>
+        <span class="pct">35%</span>
+      </div>
+      <div class="m-body">
+        <div class="m-title">등 볼륨 채우기</div>
+        <div class="m-sub">9 / 14세트 · <b>5세트 부족</b> — 한 종목 추가</div>
+      </div>
+      <span class="m-reward">+40</span>
+    </div>
+
+    <div class="mission">
+      <div class="m-ring">
+        <svg width="44" height="44"><circle cx="22" cy="22" r="18" stroke="#232325" stroke-width="5" fill="none"/><circle cx="22" cy="22" r="18" stroke="#FF3B30" stroke-width="5" fill="none" stroke-dasharray="113" stroke-dashoffset="0" stroke-linecap="round"/></svg>
+        <span class="pct">✓</span>
+      </div>
+      <div class="m-body">
+        <div class="m-title">개인 신기록 1개</div>
+        <div class="m-sub ok">벤치 탑세트 62.5kg×8 — <b style="color:#2BD96A">달성!</b></div>
+      </div>
+      <span class="m-reward got">+30</span>
+    </div>
+
+  </div>
+
+  <!-- NEXT MILESTONE -->
+  <div class="ms">
+    <span class="ms-ic">🏅</span>
+    <span class="ms-t"><b>2주 더</b> 연속 달성하면 최고 기록(7주) 경신 — 다음 배지 "꾸준함의 화신"까지 <b>120점</b></span>
+  </div>
+
+  <div class="note">동기 장치는 동기일 뿐, 처방 숫자는 엔진이 계산합니다.<br>미션은 "성장 구간(주 10~20세트)·출석"을 목표로 자동 생성돼요.</div>
+</div>
+</body>
+</html>

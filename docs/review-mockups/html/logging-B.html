@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>logging-B — 신뢰등급별 추적 분리</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF; position:relative; padding-bottom:40px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .label { font-size:11px; color:#FF8A00; font-weight:800; letter-spacing:1px; padding:6px 20px 0; }
+  .nav { display:flex; align-items:center; padding:6px 18px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .title { padding:4px 20px 2px; }
+  .title h1 { font-size:24px; font-weight:800; }
+
+  /* 3-track segmented header */
+  .seg { display:flex; gap:8px; margin:14px 16px 2px; }
+  .seg-tab { flex:1; text-align:center; padding:11px 0 9px; border-radius:13px; background:#161618; }
+  .seg-tab .t { font-size:12px; font-weight:800; letter-spacing:.3px; }
+  .seg-tab .n { font-size:11px; color:#8E8E93; margin-top:3px; font-weight:600; }
+  .seg-anchor.act { background:rgba(43,217,106,.16); }
+  .seg-anchor.act .t { color:#2BD96A; }
+  .seg-main.act { background:rgba(142,142,147,.22); }
+  .seg-main.act .t { color:#D5D5DA; }
+  .seg-var.act { background:rgba(255,138,0,.16); }
+  .seg-var.act .t { color:#FF8A00; }
+  .seg-tab:not(.act) { opacity:.45; }
+
+  .track-cap { padding:14px 20px 4px; font-size:12px; color:#8E8E93; font-weight:600; line-height:1.45; }
+  .track-cap b { color:#2BD96A; }
+
+  /* section card */
+  .card { margin:6px 16px 0; background:#161618; border-radius:16px; padding:15px 16px; }
+  .ex-line { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid #232325; }
+  .ex-line:last-child { border-bottom:none; }
+  .ex-l { }
+  .ex-nm { font-size:15px; font-weight:700; }
+  .ex-meta { font-size:11px; color:#8E8E93; margin-top:2px; }
+  .ex-r { text-align:right; }
+  .ex-tgt { font-size:14px; font-weight:800; }
+  .ex-tgt.pr { color:#FF3B30; }
+  .ex-cmp { font-size:11px; margin-top:2px; color:#2BD96A; font-weight:600; }
+
+  .secttl { padding:20px 20px 8px; font-size:13px; color:#8E8E93; font-weight:700; letter-spacing:.4px; }
+
+  /* variable track special */
+  .var-card { margin:6px 16px 0; background:#161618; border-radius:16px; padding:16px; }
+  .var-msg { font-size:13px; color:#FF8A00; font-weight:700; display:flex; gap:8px; align-items:flex-start; }
+  .var-sub { font-size:12px; color:#8E8E93; margin-top:8px; line-height:1.5; }
+  .var-vol { margin-top:13px; display:flex; align-items:center; justify-content:space-between; background:#0D0D0D; border-radius:11px; padding:12px 14px; }
+  .var-vol .vk { font-size:12px; color:#8E8E93; font-weight:600; }
+  .var-vol .vv { font-size:16px; font-weight:800; color:#2BD96A; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="label">방안 B · 신뢰등급별 추적 분리</div>
+  <div class="nav"><span class="back">‹</span></div>
+  <div class="title"><h1>오늘 할 종목</h1></div>
+
+  <!-- 신뢰등급 3트랙 -->
+  <div class="seg">
+    <div class="seg-tab seg-anchor act"><div class="t">앵커</div><div class="n">무게로 판정</div></div>
+    <div class="seg-tab seg-main"><div class="t">메인머신</div><div class="n">세팅 고정</div></div>
+    <div class="seg-tab seg-var"><div class="t">가변</div><div class="n">볼륨만</div></div>
+  </div>
+  <div class="track-cap"><b>앵커</b> — 프리웨이트·체중. 무게×반복을 정밀 비교해 진행을 판정하는 기준 종목.</div>
+
+  <div class="secttl">앵커 · 무게 추적</div>
+  <div class="card">
+    <div class="ex-line">
+      <div class="ex-l"><div class="ex-nm">바벨 백스쿼트</div><div class="ex-meta">탑세트+백오프 · 첫 종목 고정</div></div>
+      <div class="ex-r"><div class="ex-tgt pr">102.5kg</div><div class="ex-cmp">직전 100×5 여유 → +2.5</div></div>
+    </div>
+    <div class="ex-line">
+      <div class="ex-l"><div class="ex-nm">벤치프레스</div><div class="ex-meta">더블 프로그레션</div></div>
+      <div class="ex-r"><div class="ex-tgt">60kg · 27회</div><div class="ex-cmp">직전 24 → +3</div></div>
+    </div>
+  </div>
+
+  <div class="secttl">가변 · 무게 비교 안 함 (미리보기)</div>
+  <div class="var-card">
+    <div class="var-msg"><span>⚠</span><span>처음 보는 시티드 로우 — 무게 절대 비교를 하지 않아요</span></div>
+    <div class="var-sub">머신마다 도르래·레버리지가 달라 표시 무게가 무의미합니다. 이 종목은 <b style="color:#2BD96A">부위 볼륨 적립 + RIR</b>로만 추적합니다.</div>
+    <div class="var-vol"><span class="vk">오늘 기여</span><span class="vv">등 +3세트</span></div>
+    <div class="var-vol" style="margin-top:8px;"><span class="vk">목표 강도</span><span class="vv" style="color:#FF8A00">실패 1~2회 전 (RIR)</span></div>
+  </div>
+</div>
+</body>
+</html>

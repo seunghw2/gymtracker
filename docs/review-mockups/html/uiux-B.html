@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>uiux-B · 축 분리 카드형 (운동 중)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px 0 40px; font-family:-apple-system,"SF Pro Text",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; line-height:1.5; }
+  .cap b { color:#FF3B30; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF; position:relative; padding-bottom:96px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .statusbar .right { display:flex; gap:6px; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:6px 18px 2px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .nav .timer { font-size:14px; font-weight:700; color:#8E8E93; }
+  .nav .more { font-size:22px; color:#8E8E93; }
+  .title { padding:4px 20px 0; }
+  .title h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+
+  /* ── 두 블록으로 강도/볼륨 시각 분리 ── */
+  .block { margin:14px 16px 0; border-radius:18px; overflow:hidden; }
+  .blk-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; }
+  .blk-top .blk-head { background:rgba(255,59,48,.14); }
+  .blk-back .blk-head { background:#1A1A1C; }
+  .blk-title { display:flex; align-items:center; gap:9px; }
+  .blk-title .ic { width:10px; height:10px; border-radius:3px; }
+  .blk-top .ic { background:#FF3B30; }
+  .blk-back .ic { background:#8E8E93; }
+  .blk-title .t { font-size:14px; font-weight:800; letter-spacing:.3px; }
+  .blk-top .t { color:#FF6B61; }
+  .blk-goal { font-size:12px; color:#8E8E93; font-weight:600; }
+  .blk-goal b { color:#fff; }
+  .blk-body { background:#161618; }
+
+  .row { display:flex; align-items:center; padding:13px 16px; border-bottom:1px solid #202022; }
+  .row:last-child { border-bottom:none; }
+  .row.done { background:rgba(43,217,106,.07); }
+  .r-no { width:26px; font-size:13px; font-weight:700; color:#6E6E73; }
+  .r-val { flex:1; display:flex; align-items:baseline; gap:6px; }
+  .r-val .kg { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .r-val .kg.empty { color:#48484A; }
+  .r-val .x { color:#48484A; font-size:16px; }
+  .r-val .rp { font-size:24px; font-weight:800; }
+  .r-val .rp.empty { color:#48484A; }
+  .r-prev { width:96px; text-align:right; font-size:11px; color:#6E6E73; line-height:1.4; }
+  .r-prev b { color:#9B9BA0; font-weight:700; }
+  .r-chk { width:42px; display:flex; justify-content:flex-end; }
+  .circle { width:30px; height:30px; border-radius:50%; border:2px solid #48484A; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .circle.on { background:#FF3B30; border-color:#FF3B30; color:#fff; font-weight:800; }
+  /* delta 칩: 직전 대비 */
+  .delta { font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px; margin-left:6px; }
+  .delta.up { background:rgba(43,217,106,.18); color:#2BD96A; }
+
+  .rir { padding:12px 16px 14px; background:#161618; }
+  .rir-lbl { font-size:11px; color:#6E6E73; font-weight:600; margin-bottom:8px; }
+  .chips { display:flex; gap:7px; }
+  .chip { flex:1; text-align:center; font-size:12px; font-weight:700; padding:9px 0; border-radius:9px; background:#0D0D0D; color:#8E8E93; border:1px solid #2A2A2C; }
+  .chip.sel { background:rgba(255,59,48,.18); color:#FF6B61; border-color:#FF3B30; }
+
+  .add { margin:12px 16px 0; text-align:center; color:#8E8E93; font-size:13px; font-weight:700; padding:11px; border:1px dashed #2A2A2C; border-radius:12px; }
+  .footer { position:fixed; bottom:0; width:390px; background:#0D0D0D; border-top:1px solid #1C1C1E; padding:13px 16px 30px; }
+  .btn-done { display:block; width:100%; background:#FF3B30; color:#fff; border:none; border-radius:15px; padding:16px; font-size:16px; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="cap"><b>B · 축 분리 카드형</b> — 탑/백오프를 한 표에 섞지 않고 <b>강도(탑)·볼륨(백오프) 두 블록</b>으로 분리. 각 블록 헤더에 그 축의 목표("탑 62.5kg 8회", "백오프 총 30회")를 못박아, 탑세트+백오프 룰의 정체성이 화면에서 바로 읽힘. 직전값은 우측 정렬·delta 칩으로 가독. 트레이드오프: 세로가 길어짐.</div>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="nav"><span class="back">‹</span><span class="timer">⏱ 휴식 1:24</span><span class="more">⋯</span></div>
+  <div class="title"><h1>벤치프레스</h1></div>
+
+  <!-- 강도 블록 -->
+  <div class="block blk-top">
+    <div class="blk-head">
+      <div class="blk-title"><span class="ic"></span><span class="t">탑세트 · 강도</span></div>
+      <div class="blk-goal">목표 <b>62.5kg · 8회</b></div>
+    </div>
+    <div class="blk-body">
+      <div class="row done">
+        <span class="r-no">1</span>
+        <span class="r-val"><span class="kg">62.5</span><span class="x">×</span><span class="rp">8</span><span class="delta up">+0.5</span></span>
+        <span class="r-prev">지난 <b>60×8</b></span>
+        <span class="r-chk"><span class="circle on">✓</span></span>
+      </div>
+      <div class="row done">
+        <span class="r-no">2</span>
+        <span class="r-val"><span class="kg">62.5</span><span class="x">×</span><span class="rp">7</span></span>
+        <span class="r-prev">지난 <b>60×7</b></span>
+        <span class="r-chk"><span class="circle on">✓</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 볼륨 블록 -->
+  <div class="block blk-back">
+    <div class="blk-head">
+      <div class="blk-title"><span class="ic"></span><span class="t">백오프 · 볼륨</span></div>
+      <div class="blk-goal">총 <b>30회</b> 목표 · 남은 <b>9회</b></div>
+    </div>
+    <div class="blk-body">
+      <div class="row done">
+        <span class="r-no">1</span>
+        <span class="r-val"><span class="kg">55</span><span class="x">×</span><span class="rp">11</span><span class="delta up">+1</span></span>
+        <span class="r-prev">지난 <b>55×10</b></span>
+        <span class="r-chk"><span class="circle on">✓</span></span>
+      </div>
+      <div class="row">
+        <span class="r-no">2</span>
+        <span class="r-val"><span class="kg">55</span><span class="x">×</span><span class="rp empty">–</span></span>
+        <span class="r-prev">지난 <b>55×10</b></span>
+        <span class="r-chk"><span class="circle"></span></span>
+      </div>
+      <div class="row">
+        <span class="r-no">3</span>
+        <span class="r-val"><span class="kg">55</span><span class="x">×</span><span class="rp empty">–</span></span>
+        <span class="r-prev">지난 <b>55×9</b></span>
+        <span class="r-chk"><span class="circle"></span></span>
+      </div>
+    </div>
+    <div class="rir">
+      <div class="rir-lbl">마지막 백오프 노력도? (선택)</div>
+      <div class="chips">
+        <span class="chip">여유</span>
+        <span class="chip sel">2~3 남음</span>
+        <span class="chip">거의 한계</span>
+        <span class="chip">실패</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="add">+ 세트 추가</div>
+  <div class="footer"><button class="btn-done">운동 완료</button></div>
+</div>
+</body>
+</html>

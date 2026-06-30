@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>방안 C — 룰별 맞춤 처방 UI</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px 0 60px; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; font-weight:600; letter-spacing:.3px; }
+  .cap b { color:#FF8A00; }
+  .frame { width:390px; background:#000; color:#FFF; border-radius:22px; overflow:hidden; border:1px solid #1C1C1E; }
+  .ftitle { padding:13px 18px 10px; font-size:12px; color:#8E8E93; font-weight:700; letter-spacing:.5px; border-bottom:1px solid #1C1C1E; }
+
+  /* 공통 운동 중 배너 셸 */
+  .ex { padding:14px 18px 16px; }
+  .ex-name { font-size:18px; font-weight:800; letter-spacing:-.3px; }
+  .ex-rule { font-size:11px; color:#8E8E93; font-weight:700; margin-top:3px; letter-spacing:.3px; }
+
+  /* 룰별 배너 — 형태가 달라야 함 */
+  .banner { margin-top:13px; border-radius:14px; padding:14px 16px; }
+
+  /* 더블프로그레션: 단일 진척 바 */
+  .b-double { background:rgba(43,217,106,.10); border:1px solid rgba(43,217,106,.30); }
+  .bd-row { display:flex; justify-content:space-between; align-items:baseline; }
+  .bd-main { font-size:16px; font-weight:800; }
+  .bd-main b { color:#2BD96A; }
+  .bd-tag { font-size:11px; color:#8E8E93; font-weight:600; }
+  .ladder { display:flex; gap:6px; margin-top:12px; }
+  .ladder .step { flex:1; text-align:center; padding:7px 0; border-radius:8px; font-size:12px; font-weight:700; background:#1C1C1E; color:#6E6E73; }
+  .ladder .step.done { background:rgba(43,217,106,.18); color:#2BD96A; }
+  .ladder .step.now { background:#2BD96A; color:#06210F; }
+  .ladder .step.next { background:#19120F; color:#FF3B30; border:1px dashed #FF3B30; }
+
+  /* 탑세트+백오프: 좌우 2열 */
+  .b-tsb { background:#161618; border:1px solid #232325; padding:0; }
+  .tsb-cols { display:flex; }
+  .tsb-col { flex:1; padding:14px 15px; }
+  .tsb-col.left { border-right:1px solid #232325; }
+  .tsb-cap { font-size:11px; font-weight:800; padding:3px 8px; border-radius:6px; display:inline-block; letter-spacing:.4px; }
+  .cap-top { background:#FF3B30; color:#fff; }
+  .cap-back { background:#2A2A2C; color:#A8A8AD; }
+  .tsb-rx { font-size:17px; font-weight:800; margin-top:9px; letter-spacing:-.3px; }
+  .tsb-rx .hold { color:#8E8E93; }
+  .tsb-rx .go { color:#FF3B30; }
+  .tsb-sub { font-size:11px; color:#6E6E73; margin-top:5px; font-weight:600; }
+
+  /* 총반복: 큰 카운터 + 도넛 느낌 */
+  .b-total { background:#161618; border:1px solid #232325; display:flex; align-items:center; gap:16px; }
+  .ring { width:74px; height:74px; border-radius:50%; flex-shrink:0; position:relative;
+    background:conic-gradient(#2BD96A 0 78%, #2A2A2C 78% 100%); display:flex; align-items:center; justify-content:center; }
+  .ring::after { content:""; position:absolute; inset:8px; border-radius:50%; background:#161618; }
+  .ring .rv { position:relative; z-index:1; font-size:20px; font-weight:800; }
+  .total-body .tb-main { font-size:15px; font-weight:800; }
+  .total-body .tb-main b { color:#2BD96A; }
+  .total-body .tb-sub { font-size:12px; color:#8E8E93; margin-top:5px; font-weight:600; line-height:1.4; }
+
+  /* 가변머신: 무게 숨김, 볼륨+RIR */
+  .b-var { background:#0D0D0D; border:1px dashed #3A3A3C; }
+  .var-main { font-size:15px; font-weight:800; }
+  .var-main .gray { color:#8E8E93; }
+  .var-chips { display:flex; gap:8px; margin-top:11px; }
+  .var-chip { font-size:11px; font-weight:700; padding:6px 11px; border-radius:9px; background:#1C1C1E; color:#A8A8AD; }
+  .var-chip.on { background:rgba(43,217,106,.16); color:#2BD96A; }
+  .var-note { font-size:11px; color:#6E6E73; margin-top:10px; font-weight:600; }
+</style>
+</head>
+<body>
+  <div class="cap">방안 C — <b>룰별 맞춤 처방 UI</b>: 진행 룰마다 배너 형태 자체가 달라짐. 같은 "오늘 목표"라도 룰이 무엇을 올리는지 시각 구조로 즉시 구분. (한 화면에 4룰 나열)</div>
+
+  <div class="frame">
+    <div class="ftitle">① 더블 프로그레션 — 반복 사다리</div>
+    <div class="ex">
+      <div class="ex-name">인클라인 덤벨프레스</div>
+      <div class="ex-rule">DOUBLE · 8~12회 · 22kg</div>
+      <div class="banner b-double">
+        <div class="bd-row"><span class="bd-main">22kg <b>× 12회 노리기</b></span><span class="bd-tag">다 채우면 24kg</span></div>
+        <div class="ladder">
+          <span class="step done">8</span><span class="step done">9</span>
+          <span class="step done">10</span><span class="step now">11→12</span>
+          <span class="step next">+2kg</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="ftitle">② 탑세트 + 백오프 — 2열 분리</div>
+    <div class="ex">
+      <div class="ex-name">벤치프레스</div>
+      <div class="ex-rule">TOP_SET_BACKOFF · ANCHOR</div>
+      <div class="banner b-tsb">
+        <div class="tsb-cols">
+          <div class="tsb-col left">
+            <span class="tsb-cap cap-top">탑 · 강도</span>
+            <div class="tsb-rx"><span class="hold">62.5×8 유지</span></div>
+            <div class="tsb-sub">8/8 채우면 65kg</div>
+          </div>
+          <div class="tsb-col">
+            <span class="tsb-cap cap-back">백오프 · 볼륨</span>
+            <div class="tsb-rx">55kg <span class="go">총 31회</span></div>
+            <div class="tsb-sub">지난 29 → +2회</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="ftitle">③ 총 반복 목표 — 카운터 링</div>
+    <div class="ex">
+      <div class="ex-name">풀업</div>
+      <div class="ex-rule">TOTAL_REP · 체중 · 목표 40회</div>
+      <div class="banner b-total">
+        <div class="ring"><span class="rv">31</span></div>
+        <div class="total-body">
+          <div class="tb-main">총 <b>40회</b> 채우기 · 세트 자유</div>
+          <div class="tb-sub">지난 38회 → +2 · 40 넘으면 +2.5kg 가중</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="ftitle">④ RIR 자가조절(가변 머신) — 무게 숨김</div>
+    <div class="ex">
+      <div class="ex-name">케이블 시티드로우</div>
+      <div class="ex-rule">RIR_AUTOREG · 가변 · 등</div>
+      <div class="banner b-var">
+        <div class="var-main"><span class="gray">무게 비교 안 함</span> · 같은 RIR서 반복 ↑면 진행</div>
+        <div class="var-chips">
+          <span class="var-chip on">등 볼륨 3세트 적립</span>
+          <span class="var-chip">목표 RIR 1~2</span>
+        </div>
+        <div class="var-note">머신마다 무게가 달라요 — 실패 1~2개 전까지만 밀기</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

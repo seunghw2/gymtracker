@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>방안 B — 추세 신뢰도</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:18px; padding:24px 0 60px; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; font-weight:600; letter-spacing:.3px; }
+  .cap b { color:#FF8A00; }
+  .frame { width:390px; background:#000; color:#FFF; border-radius:22px; overflow:hidden; border:1px solid #1C1C1E; }
+  .nav { padding:14px 18px 4px; font-size:16px; font-weight:700; color:#8E8E93; }
+  .ehead { padding:6px 20px 2px; }
+  .ehead h1 { font-size:25px; font-weight:800; letter-spacing:-.5px; }
+
+  /* 헤드라인: 판정 + 신뢰도 */
+  .verdict { margin:16px 16px 0; background:#161618; border-radius:18px; padding:18px; }
+  .v-top { display:flex; align-items:center; justify-content:space-between; }
+  .v-state { font-size:20px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .v-state .dot { width:11px; height:11px; border-radius:50%; background:#2BD96A; }
+  .conf { font-size:11px; font-weight:800; padding:5px 10px; border-radius:8px; letter-spacing:.3px; }
+  .conf.high { background:rgba(43,217,106,.16); color:#2BD96A; }
+  .v-desc { font-size:13px; color:#A8A8AD; margin-top:9px; line-height:1.5; }
+  .v-desc b { color:#fff; font-weight:700; }
+
+  /* 신뢰도 게이지 */
+  .conf-bar { margin-top:14px; }
+  .conf-bar .cb-lbl { display:flex; justify-content:space-between; font-size:11px; color:#8E8E93; font-weight:600; margin-bottom:6px; }
+  .conf-bar .cb-track { height:7px; border-radius:4px; background:#2A2A2C; overflow:hidden; display:flex; }
+  .conf-bar .cb-track i { display:block; height:100%; }
+  .seg-g { background:#2BD96A; }
+  .seg-y { background:#FF8A00; }
+
+  /* 두 축 신호 — 추세 점들 */
+  .sec { padding:22px 20px 10px; font-size:13px; color:#8E8E93; font-weight:700; letter-spacing:.4px; }
+  .signals { margin:0 16px; background:#161618; border-radius:18px; padding:4px 18px; }
+  .sig { padding:15px 0; border-bottom:1px solid #232325; }
+  .sig:last-child { border-bottom:none; }
+  .sig-top { display:flex; align-items:center; justify-content:space-between; }
+  .sig-name { font-size:14px; font-weight:700; }
+  .sig-name span { color:#8E8E93; font-weight:600; font-size:12px; }
+  .sig-trend { font-size:12px; font-weight:700; }
+  .sig-trend.up { color:#2BD96A; }
+  .sig-trend.flat { color:#FF8A00; }
+  /* 추세 스파크 점들 */
+  .spark { display:flex; align-items:flex-end; gap:7px; height:34px; margin-top:11px; }
+  .spark i { flex:1; border-radius:3px 3px 1px 1px; background:#3A3A3C; }
+  .spark i.cur { background:#2BD96A; }
+  .spark i.cur.flat { background:#FF8A00; }
+  .sig-note { font-size:11px; color:#6E6E73; margin-top:9px; font-weight:600; }
+
+  /* 신뢰도 근거 */
+  .why { margin:12px 16px 0; background:#0D0D0D; border:1px solid #1C1C1E; border-radius:14px; padding:14px 16px; }
+  .why .wt { font-size:12px; color:#8E8E93; font-weight:700; margin-bottom:9px; }
+  .why .wr { display:flex; align-items:center; gap:8px; font-size:12px; color:#C7C7CC; margin-bottom:7px; }
+  .why .wr:last-child { margin-bottom:0; }
+  .why .wr .y { color:#2BD96A; }
+  .why .wr .n { color:#8E8E93; }
+  .tabbar { height:60px; }
+</style>
+</head>
+<body>
+  <div class="cap">방안 B — <b>추세 기반 신뢰도 표시</b>: 판정 옆에 "이 판정을 얼마나 믿을 수 있나"를 데이터 양·일관성으로 게이지화. 단일 세션이 판정을 뒤집지 못하게.</div>
+
+  <div class="frame">
+    <div class="nav">‹ 종목 분석</div>
+    <div class="ehead"><h1>벤치프레스</h1></div>
+
+    <div class="verdict">
+      <div class="v-top">
+        <div class="v-state"><span class="dot"></span>성장 중</div>
+        <span class="conf high">신뢰 높음 · 4주</span>
+      </div>
+      <div class="v-desc"><b>양·질 두 축이 4주째 같은 방향</b>이라 판정이 단단해요. 한 번 부진해도 흔들리지 않습니다.</div>
+      <div class="conf-bar">
+        <div class="cb-lbl"><span>판정 신뢰도</span><span>82%</span></div>
+        <div class="cb-track"><i class="seg-g" style="width:82%"></i><i class="seg-y" style="width:18%"></i></div>
+      </div>
+    </div>
+
+    <div class="sec">두 축 추세 (최근 6세션)</div>
+    <div class="signals">
+      <div class="sig">
+        <div class="sig-top">
+          <span class="sig-name">양 <span>· 주간 가슴 볼륨</span></span>
+          <span class="sig-trend up">↑ 우상향</span>
+        </div>
+        <div class="spark">
+          <i style="height:48%"></i><i style="height:55%"></i><i style="height:62%"></i>
+          <i style="height:65%"></i><i style="height:78%"></i><i class="cur" style="height:92%"></i>
+        </div>
+        <div class="sig-note">10 → 14세트 · 6세션 중 5세션 상승 = 일관됨</div>
+      </div>
+      <div class="sig">
+        <div class="sig-top">
+          <span class="sig-name">질 <span>· 같은 무게 반복/RIR</span></span>
+          <span class="sig-trend up">↑ 개선</span>
+        </div>
+        <div class="spark">
+          <i style="height:40%"></i><i style="height:42%"></i><i style="height:55%"></i>
+          <i style="height:60%"></i><i style="height:70%"></i><i class="cur" style="height:85%"></i>
+        </div>
+        <div class="sig-note">55kg 8회 @3RIR → @1RIR (같은 무게가 점점 빡세짐 = 강해짐)</div>
+      </div>
+    </div>
+
+    <div class="why">
+      <div class="wt">신뢰도를 높이는 것</div>
+      <div class="wr"><span class="y">●</span> 4주 연속 같은 순서(첫 종목)로 비교 — 조건 일치</div>
+      <div class="wr"><span class="y">●</span> 두 축이 같은 방향 (한쪽만 오르면 거품 의심)</div>
+      <div class="wr"><span class="n">○</span> RIR 입력 2/6 — 더 넣으면 90%까지 올라요</div>
+    </div>
+
+    <div class="tabbar"></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>logging-A — 머신 세팅 프리셋</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF; position:relative; padding-bottom:40px; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .label { font-size:11px; color:#FF8A00; font-weight:800; letter-spacing:1px; padding:6px 20px 0; }
+  .nav { display:flex; align-items:center; padding:6px 18px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .title { padding:4px 20px 2px; }
+  .title h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .title .sub { font-size:13px; color:#8E8E93; margin-top:3px; font-weight:600; }
+  .title .sub b { color:#A8A8AD; }
+
+  /* setting preset bar */
+  .setbar { margin:13px 16px 4px; background:#161618; border-radius:14px; padding:13px 15px; }
+  .setbar-top { display:flex; align-items:center; justify-content:space-between; }
+  .setbar-ttl { font-size:13px; font-weight:700; color:#C7C7CC; display:flex; align-items:center; gap:7px; }
+  .setbar-ttl .ic { font-size:15px; }
+  .setbar-edit { font-size:12px; color:#FF3B30; font-weight:700; }
+  .chips { display:flex; gap:7px; flex-wrap:wrap; margin-top:11px; }
+  .schip { font-size:13px; font-weight:700; padding:8px 12px; border-radius:10px; background:#0D0D0D; border:1px solid #2A2A2C; display:flex; flex-direction:column; gap:2px; min-width:62px; }
+  .schip .k { font-size:10px; color:#8E8E93; font-weight:600; }
+  .schip .v { font-size:15px; font-weight:800; }
+  .match { margin-top:11px; display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:#2BD96A; background:rgba(43,217,106,.12); border-radius:9px; padding:8px 11px; }
+  .match.warn { color:#FF8A00; background:rgba(255,138,0,.12); }
+
+  /* banner */
+  .banner { margin:14px 16px 4px; background:rgba(255,59,48,.12); border:1px solid rgba(255,59,48,.35); border-radius:14px; padding:13px 16px; }
+  .banner .b-main { font-size:15px; font-weight:700; }
+  .banner .b-main b { color:#FF3B30; }
+  .banner .b-tag { font-size:11px; color:#8E8E93; margin-top:3px; }
+
+  /* sets */
+  .sets { margin:14px 16px 0; }
+  .col-head { display:flex; padding:0 4px 8px; font-size:11px; color:#8E8E93; font-weight:700; }
+  .c-set { width:42px; } .c-kg { flex:1; text-align:center; } .c-rep { flex:1; text-align:center; } .c-chk { width:42px; text-align:center; }
+  .row { display:flex; align-items:center; background:#161618; border-radius:13px; padding:11px 4px; margin-bottom:9px; }
+  .row.done { background:rgba(43,217,106,.10); }
+  .badge { width:42px; text-align:center; font-size:13px; font-weight:800; color:#8E8E93; }
+  .inp { flex:1; text-align:center; }
+  .inp .v { font-size:20px; font-weight:800; }
+  .inp .v.empty { color:#48484A; }
+  .inp .prev { font-size:11px; color:#6E6E73; margin-top:2px; }
+  .chk { width:42px; display:flex; justify-content:center; }
+  .circle { width:27px; height:27px; border-radius:50%; border:2px solid #48484A; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .circle.on { background:#2BD96A; border-color:#2BD96A; color:#fff; font-weight:800; }
+
+  .note { margin:16px 16px 0; font-size:12px; color:#6E6E73; line-height:1.5; background:#0D0D0D; border-radius:11px; padding:12px 14px; }
+  .note b { color:#FF8A00; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="label">방안 A · 머신 세팅 프리셋 기록</div>
+  <div class="nav"><span class="back">‹</span></div>
+
+  <div class="title">
+    <h1>랫풀다운</h1>
+    <div class="sub">머신 · <b>MAIN_MACHINE</b> 종목</div>
+  </div>
+
+  <!-- 핵심: 세팅 프리셋 바 -->
+  <div class="setbar">
+    <div class="setbar-top">
+      <span class="setbar-ttl"><span class="ic">⚙</span>이 머신 세팅 · 라이프피트니스</span>
+      <span class="setbar-edit">바꾸기</span>
+    </div>
+    <div class="chips">
+      <div class="schip"><span class="k">시트</span><span class="v">4칸</span></div>
+      <div class="schip"><span class="k">무릎패드</span><span class="v">3</span></div>
+      <div class="schip"><span class="k">그립</span><span class="v">와이드</span></div>
+    </div>
+    <div class="match"><span>●</span>지난번과 같은 세팅 — 무게 비교 가능</div>
+  </div>
+
+  <div class="banner">
+    <div class="b-main">오늘 <b>50kg · 3×12</b> · 직전 상단 채움</div>
+    <div class="b-tag">같은 세팅 기준 · 직전 50×11 대비 +1</div>
+  </div>
+
+  <div class="sets">
+    <div class="col-head"><span class="c-set">세트</span><span class="c-kg">kg</span><span class="c-rep">반복</span><span class="c-chk">완료</span></div>
+    <div class="row done"><span class="badge">1</span>
+      <span class="inp"><div class="v">50</div><div class="prev">이전 50×12</div></span>
+      <span class="inp"><div class="v">12</div><div class="prev">이전 12</div></span>
+      <span class="chk"><span class="circle on">✓</span></span></div>
+    <div class="row done"><span class="badge">2</span>
+      <span class="inp"><div class="v">50</div><div class="prev">이전 50×11</div></span>
+      <span class="inp"><div class="v">12</div><div class="prev">이전 11</div></span>
+      <span class="chk"><span class="circle on">✓</span></span></div>
+    <div class="row"><span class="badge">3</span>
+      <span class="inp"><div class="v empty">50</div><div class="prev">이전 50×10</div></span>
+      <span class="inp"><div class="v empty">–</div><div class="prev">이전 10</div></span>
+      <span class="chk"><span class="circle"></span></span></div>
+  </div>
+
+  <div class="note">세팅 한 칸이라도 다르면 배너가 <b>"세팅 다름 — 무게 비교 보류"</b>로 바뀌고, 그 세션은 부위 볼륨에만 적립됩니다. 처음 보는 머신이면 세팅을 한 번 찍어 새 프리셋으로 저장.</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>logging-C — 빠른 로깅 단축</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; justify-content:center; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .phone { width:390px; min-height:844px; background:#000; color:#FFF; position:relative; }
+  .statusbar { height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 22px 6px; font-size:14px; font-weight:600; }
+  .label { font-size:11px; color:#FF8A00; font-weight:800; letter-spacing:1px; padding:6px 20px 0; }
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:6px 18px; }
+  .nav .back { font-size:24px; color:#FF3B30; }
+  .nav .timer { font-size:13px; font-weight:700; color:#8E8E93; }
+  .title { padding:4px 20px 2px; }
+  .title h1 { font-size:23px; font-weight:800; }
+  .title .sub { font-size:13px; color:#8E8E93; margin-top:2px; font-weight:600; }
+
+  /* one-tap target row — primary action */
+  .quick { margin:14px 16px 0; }
+  .qrow { display:flex; align-items:center; background:#161618; border-radius:14px; padding:13px 14px; margin-bottom:9px; gap:12px; }
+  .qrow.done { background:rgba(43,217,106,.10); }
+  .q-badge { width:34px; height:34px; border-radius:9px; background:#0D0D0D; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#8E8E93; flex-shrink:0; }
+  .q-mid { flex:1; }
+  .q-tgt { font-size:18px; font-weight:800; }
+  .q-tgt small { font-size:13px; color:#8E8E93; font-weight:600; }
+  .q-prev { font-size:11px; color:#6E6E73; margin-top:2px; }
+  /* big one-tap confirm */
+  .q-confirm { background:#FF3B30; color:#fff; border-radius:11px; padding:11px 16px; font-size:15px; font-weight:800; white-space:nowrap; }
+  .q-check { width:30px; height:30px; border-radius:50%; background:#2BD96A; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; }
+  /* tiny adjust */
+  .q-adj { display:flex; gap:6px; align-items:center; }
+  .q-step { width:30px; height:30px; border-radius:8px; background:#0D0D0D; border:1px solid #2A2A2C; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800; color:#C7C7CC; }
+
+  .helper { padding:14px 20px 6px; font-size:12px; color:#6E6E73; line-height:1.5; }
+  .helper b { color:#FF3B30; }
+
+  /* divider */
+  .div { height:1px; background:#1C1C1E; margin:6px 20px 0; }
+
+  /* explainer chips at very bottom */
+  .feats { margin:16px 16px 0; display:flex; flex-direction:column; gap:9px; }
+  .feat { display:flex; gap:11px; align-items:flex-start; background:#0D0D0D; border-radius:12px; padding:13px 14px; }
+  .feat .fic { font-size:18px; }
+  .feat .ft { font-size:13px; font-weight:700; }
+  .feat .fd { font-size:12px; color:#8E8E93; margin-top:2px; line-height:1.4; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span class="right">▮▮▮ ⌃ ▮▮◌</span></div>
+  <div class="label">방안 C · 한 탭 빠른 로깅</div>
+  <div class="nav"><span class="back">‹</span><span class="timer">⏱ 휴식 1:24</span></div>
+
+  <div class="title">
+    <h1>벤치프레스</h1>
+    <div class="sub">목표를 그대로 했으면 한 번만 탭 · 다르면 ± 만</div>
+  </div>
+
+  <div class="quick">
+    <!-- 완료된 세트 -->
+    <div class="qrow done">
+      <span class="q-badge" style="color:#FF6B61">탑</span>
+      <div class="q-mid"><div class="q-tgt">62.5 <small>kg ×</small> 8</div><div class="q-prev">목표대로 완료</div></div>
+      <span class="q-check">✓</span>
+    </div>
+
+    <!-- 현재 세트: 한 탭 확정 -->
+    <div class="qrow">
+      <span class="q-badge" style="color:#FF6B61">탑</span>
+      <div class="q-mid">
+        <div class="q-tgt">62.5 <small>kg ×</small> 8</div>
+        <div class="q-prev">이전 60×7 · 탭하면 목표대로 저장</div>
+      </div>
+      <span class="q-confirm">완료 ✓</span>
+    </div>
+
+    <!-- 백오프: 미세조정 -->
+    <div class="qrow">
+      <span class="q-badge">백</span>
+      <div class="q-mid">
+        <div class="q-tgt">55 <small>kg ×</small> 11</div>
+        <div class="q-prev">이전 55×10 · 반복만 ±</div>
+      </div>
+      <div class="q-adj">
+        <span class="q-step">−</span>
+        <span class="q-step" style="background:#FF3B30;border-color:#FF3B30;color:#fff;">＋</span>
+      </div>
+    </div>
+
+    <div class="qrow" style="opacity:.5;">
+      <span class="q-badge">백</span>
+      <div class="q-mid"><div class="q-tgt">55 <small>kg ×</small> 11</div><div class="q-prev">이전 55×10</div></div>
+      <span class="q-confirm" style="background:#1C1C1E;color:#8E8E93;">완료 ✓</span>
+    </div>
+  </div>
+
+  <div class="helper">대부분의 세트는 엔진 목표 그대로 끝납니다. 그래서 기본은 <b>「완료」 한 탭 = 목표값 저장</b>. 무게·반복이 다를 때만 ± 또는 숫자를 직접 누릅니다. 키패드를 거의 안 열어요.</div>
+
+  <div class="div"></div>
+
+  <div class="feats">
+    <div class="feat"><span class="fic">⚡</span><div><div class="ft">한 탭 = 목표대로 저장</div><div class="fd">직전+bump로 미리 채워진 목표를 그대로 기록. 평균 종목당 1~2탭으로 끝.</div></div></div>
+    <div class="feat"><span class="fic">↔</span><div><div class="ft">다를 때만 ± 보정</div><div class="fd">반복 1개 차이는 ± 버튼, 큰 차이만 숫자 키패드. 손가락 이동 최소.</div></div></div>
+    <div class="feat"><span class="fic">⤵</span><div><div class="ft">전 세트 자동 복제</div><div class="fd">두 번째 백오프부터 첫 세트값을 복제해 깔아둠 — 같으면 탭만.</div></div></div>
+  </div>
+</div>
+</body>
+</html>
