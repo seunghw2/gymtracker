@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>안 C 심화 — 룰별 맞춤 배너 (형태 카탈로그)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:14px; padding:22px 0 64px;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; font-weight:600; letter-spacing:.2px; line-height:1.55; }
+  .cap b { color:#FF8A00; }
+  .frame { width:390px; background:#000; color:#FFF; border-radius:22px; overflow:hidden; border:1px solid #1C1C1E; }
+
+  /* 화면 헤더 — 같은 운동 세션 안에서 4룰이 섞여 나옴 */
+  .scr-head { padding:15px 18px 12px; border-bottom:1px solid #161618; }
+  .scr-head .sh-k { font-size:11px; color:#8E8E93; font-weight:700; letter-spacing:.5px; }
+  .scr-head .sh-t { font-size:20px; font-weight:800; letter-spacing:-.4px; margin-top:3px; }
+  .scr-head .sh-s { font-size:12px; color:#6E6E73; font-weight:600; margin-top:3px; }
+
+  /* 공통 종목 셸 — 룰 칩(아이콘+색)이 형태의 "키" */
+  .ex { padding:14px 16px 4px; }
+  .ex:last-child { padding-bottom:16px; }
+  .ex-head { display:flex; align-items:center; gap:9px; }
+  .ex-icon { width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .ex-meta { flex:1; }
+  .ex-name { font-size:16px; font-weight:800; letter-spacing:-.3px; }
+  .ex-rule { font-size:11px; font-weight:800; margin-top:1px; letter-spacing:.3px; }
+  .ex-tier { font-size:10px; color:#6E6E73; font-weight:700; padding:3px 7px; border-radius:6px; background:#161618; }
+
+  /* 룰별 색 키 (왼쪽 막대 + 칩 글자색) */
+  .key-dbl   { background:rgba(43,217,106,.16); color:#2BD96A; }
+  .key-tsb   { background:rgba(255,59,48,.16); color:#FF6B61; }
+  .key-total { background:rgba(255,138,0,.16); color:#FF8A00; }
+  .key-var   { background:#1C1C1E; color:#8E8E93; }
+  .rule-dbl   { color:#2BD96A; }
+  .rule-tsb   { color:#FF6B61; }
+  .rule-total { color:#FF8A00; }
+  .rule-var   { color:#8E8E93; }
+
+  .banner { margin-top:11px; border-radius:14px; overflow:hidden; }
+
+  /* ① 더블 = 반복 사다리 (가로로 차오르는 칸) */
+  .b-dbl { background:rgba(43,217,106,.07); border:1px solid rgba(43,217,106,.26); padding:13px 14px 14px; }
+  .b-dbl .top { display:flex; justify-content:space-between; align-items:baseline; }
+  .b-dbl .rx { font-size:15px; font-weight:800; }
+  .b-dbl .rx b { color:#2BD96A; }
+  .b-dbl .gate { font-size:11px; color:#8E8E93; font-weight:700; }
+  .ladder { display:flex; gap:5px; margin-top:11px; }
+  .ladder .st { flex:1; text-align:center; padding:8px 0 7px; border-radius:8px; font-size:12px; font-weight:800; background:#141414; color:#5A5A5E; position:relative; }
+  .ladder .st.done { background:rgba(43,217,106,.18); color:#2BD96A; }
+  .ladder .st.now  { background:#2BD96A; color:#06210F; box-shadow:0 0 0 2px rgba(43,217,106,.25); }
+  .ladder .st.goal { background:#0F1A12; color:#2BD96A; border:1px dashed #2BD96A; }
+  .b-dbl .foot { font-size:11px; color:#6E6E73; font-weight:600; margin-top:10px; }
+  .b-dbl .foot b { color:#2BD96A; }
+
+  /* ② 탑+백오프 = 좌우 2열 (강도축 | 볼륨축) */
+  .b-tsb { background:#141416; border:1px solid #26262A; }
+  .tsb-cols { display:flex; }
+  .tsb-col { flex:1; padding:13px 13px 14px; }
+  .tsb-col.left { border-right:1px solid #26262A; }
+  .tsb-cap { font-size:10px; font-weight:900; padding:3px 8px; border-radius:6px; display:inline-block; letter-spacing:.5px; }
+  .cap-top  { background:#FF3B30; color:#fff; }
+  .cap-back { background:#2A2A2C; color:#A8A8AD; }
+  .tsb-rx { font-size:16px; font-weight:800; margin-top:8px; letter-spacing:-.3px; }
+  .tsb-rx .hold { color:#9A9AA0; }
+  .tsb-rx .go { color:#FF6B61; }
+  .tsb-sub { font-size:10px; color:#6E6E73; margin-top:5px; font-weight:700; line-height:1.4; }
+  /* 미니 게이트 점 — 축마다 따로 */
+  .tsb-dots { display:flex; gap:4px; margin-top:9px; }
+  .tsb-dots i { width:16px; height:5px; border-radius:3px; background:#2A2A2C; }
+  .tsb-dots i.fill-r { background:#FF3B30; }
+  .tsb-dots i.fill-g { background:#2BD96A; }
+  .tsb-foot { padding:9px 13px; background:#0C0C0D; border-top:1px solid #1E1E20; font-size:10px; color:#7A7A7E; font-weight:700; }
+  .tsb-foot b { color:#FF8A00; }
+
+  /* ③ 총 반복 = 카운터 링 (누적 카운터가 핵심) */
+  .b-total { background:#141416; border:1px solid #26262A; display:flex; align-items:center; gap:15px; padding:13px 15px; }
+  .ring { width:72px; height:72px; border-radius:50%; flex-shrink:0; position:relative;
+    background:conic-gradient(#FF8A00 0 77.5%, #2A2A2C 77.5% 100%); display:flex; align-items:center; justify-content:center; }
+  .ring::after { content:""; position:absolute; inset:7px; border-radius:50%; background:#141416; }
+  .ring .rv { position:relative; z-index:1; text-align:center; }
+  .ring .rv .n { font-size:21px; font-weight:900; line-height:1; }
+  .ring .rv .d { font-size:10px; color:#8E8E93; font-weight:700; margin-top:2px; }
+  .total-body .tb-main { font-size:14px; font-weight:800; }
+  .total-body .tb-main b { color:#FF8A00; }
+  .total-body .tb-sub { font-size:11px; color:#8E8E93; margin-top:6px; font-weight:600; line-height:1.45; }
+  .total-body .tb-sub em { color:#FF8A00; font-style:normal; font-weight:800; }
+
+  /* ④ 가변 머신 = 무게 숨김 + 부위볼륨/RIR 칩 (무게칸 자체가 없음) */
+  .b-var { background:#0B0B0B; border:1px dashed #3A3A3C; padding:13px 14px 14px; }
+  .var-strike { font-size:13px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .var-strike .off { color:#5A5A5E; text-decoration:line-through; text-decoration-color:#48484A; }
+  .var-strike .lock { font-size:11px; color:#8E8E93; font-weight:800; background:#1C1C1E; padding:3px 8px; border-radius:6px; }
+  .var-chips { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; }
+  .var-chip { font-size:11px; font-weight:800; padding:7px 11px; border-radius:9px; background:#161618; color:#A8A8AD; }
+  .var-chip.vol { background:rgba(43,217,106,.14); color:#2BD96A; }
+  .var-chip.rir { background:rgba(255,138,0,.13); color:#FF8A00; }
+  .var-note { font-size:10px; color:#6E6E73; margin-top:10px; font-weight:700; line-height:1.45; }
+
+  /* 하단 범례 — 형태↔룰 매핑 */
+  .legend { width:390px; background:#0D0D0D; border:1px solid #1C1C1E; border-radius:16px; padding:14px 16px; }
+  .legend .lt { font-size:11px; color:#8E8E93; font-weight:800; letter-spacing:.4px; margin-bottom:11px; }
+  .leg-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .leg-row:last-child { margin-bottom:0; }
+  .leg-ic { width:26px; height:26px; border-radius:8px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .leg-tx { font-size:11px; color:#C7C7CC; font-weight:600; line-height:1.4; }
+  .leg-tx b { font-weight:800; }
+</style>
+</head>
+<body>
+  <div class="cap">안 C 심화 — <b>룰별 맞춤 배너</b>: 같은 운동 세션이라도 종목의 진행 룰이 다르면 <b>목표 배너의 형태 자체</b>가 달라진다. 사다리·2열·링·잠금칩 — 글을 안 읽어도 "이 종목이 무엇을 올리는 종목인지"가 1초에 구분된다.</div>
+
+  <div class="frame">
+    <div class="scr-head">
+      <div class="sh-k">오늘의 운동 · 4종목</div>
+      <div class="sh-t">푸시 데이</div>
+      <div class="sh-s">종목마다 룰이 다름 — 배너 형태로 즉시 구분</div>
+    </div>
+
+    <!-- ① 더블 프로그레션 -->
+    <div class="ex">
+      <div class="ex-head">
+        <span class="ex-icon key-dbl">▤</span>
+        <div class="ex-meta">
+          <div class="ex-name">인클라인 덤벨프레스</div>
+          <div class="ex-rule rule-dbl">더블 프로그레션 · 반복 채우기</div>
+        </div>
+        <span class="ex-tier">ANCHOR</span>
+      </div>
+      <div class="banner b-dbl">
+        <div class="top">
+          <span class="rx">22kg <b>× 12회 노리기</b></span>
+          <span class="gate">상단 채우면 24kg</span>
+        </div>
+        <div class="ladder">
+          <span class="st done">8</span>
+          <span class="st done">9</span>
+          <span class="st done">10</span>
+          <span class="st now">11→12</span>
+          <span class="st goal">+2kg</span>
+        </div>
+        <div class="foot">세 세트 다 12 채우면 <b>다음에 24kg·8회부터 리셋</b></div>
+      </div>
+    </div>
+
+    <!-- ② 탑세트 + 백오프 -->
+    <div class="ex">
+      <div class="ex-head">
+        <span class="ex-icon key-tsb">⫶⫶</span>
+        <div class="ex-meta">
+          <div class="ex-name">벤치프레스</div>
+          <div class="ex-rule rule-tsb">탑세트 + 백오프 · 2축 분리</div>
+        </div>
+        <span class="ex-tier">ANCHOR</span>
+      </div>
+      <div class="banner b-tsb">
+        <div class="tsb-cols">
+          <div class="tsb-col left">
+            <span class="tsb-cap cap-top">탑 · 강도축</span>
+            <div class="tsb-rx"><span class="hold">62.5kg × 8 유지</span></div>
+            <div class="tsb-sub">지난 8/7 → 8/8 채우면 65kg</div>
+            <div class="tsb-dots"><i class="fill-r"></i><i></i></div>
+          </div>
+          <div class="tsb-col">
+            <span class="tsb-cap cap-back">백오프 · 볼륨축</span>
+            <div class="tsb-rx">55kg <span class="go">총 31회</span></div>
+            <div class="tsb-sub">지난 29회 → +2회면 진행</div>
+            <div class="tsb-dots"><i class="fill-g"></i><i class="fill-g"></i><i></i></div>
+          </div>
+        </div>
+        <div class="tsb-foot">이번 주는 <b>백오프 반복부터</b> · 백오프 무게 55kg = 탑×88% 자동 고정</div>
+      </div>
+    </div>
+
+    <!-- ③ 총 반복 목표 -->
+    <div class="ex">
+      <div class="ex-head">
+        <span class="ex-icon key-total">◴</span>
+        <div class="ex-meta">
+          <div class="ex-name">딥스</div>
+          <div class="ex-rule rule-total">총 반복 목표 · 세트 자유</div>
+        </div>
+        <span class="ex-tier">체중</span>
+      </div>
+      <div class="banner b-total">
+        <div class="ring"><div class="rv"><div class="n">31</div><div class="d">/ 40</div></div></div>
+        <div class="total-body">
+          <div class="tb-main">총 <b>40회</b> 채우기 · 몇 세트든 자유</div>
+          <div class="tb-sub">지난 38회 → <em>+2</em> · 40 넘으면 다음에 +2.5kg 가중</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ RIR 자가조절 (가변 머신) -->
+    <div class="ex">
+      <div class="ex-head">
+        <span class="ex-icon key-var">⤬</span>
+        <div class="ex-meta">
+          <div class="ex-name">케이블 시티드로우</div>
+          <div class="ex-rule rule-var">RIR 자가조절 · 가변 머신</div>
+        </div>
+        <span class="ex-tier">VARIABLE</span>
+      </div>
+      <div class="banner b-var">
+        <div class="var-strike">
+          <span class="off">무게 비교</span>
+          <span class="lock">🔒 무게 PR 꺼짐</span>
+          <span style="color:#8E8E93;font-weight:700;font-size:11px;">머신마다 달라서요</span>
+        </div>
+        <div class="var-chips">
+          <span class="var-chip vol">등 볼륨 +1세트 적립</span>
+          <span class="var-chip rir">목표 RIR 1~2</span>
+          <span class="var-chip">같은 RIR서 반복↑면 진행</span>
+        </div>
+        <div class="var-note">표시 무게는 참고용 — 실패 1~2개 전까지만 밀기. 진행 판정은 이 종목이 아니라 <b style="color:#8E8E93">부위 주간 볼륨</b>이 합니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 형태 ↔ 룰 범례 -->
+  <div class="legend">
+    <div class="lt">배너 형태가 곧 룰 — 학습 없이 읽히는 키</div>
+    <div class="leg-row">
+      <span class="leg-ic key-dbl">▤</span>
+      <span class="leg-tx"><b style="color:#2BD96A">반복 사다리</b> — 칸이 가로로 차오름 = "반복을 채워 무게로 환산". 다 차면 +무게.</span>
+    </div>
+    <div class="leg-row">
+      <span class="leg-ic key-tsb">⫶⫶</span>
+      <span class="leg-tx"><b style="color:#FF6B61">좌우 2열</b> — 왼쪽 강도(탑 무게 유지)·오른쪽 볼륨(백오프 반복). 두 축이 절대 한 줄로 안 뭉침.</span>
+    </div>
+    <div class="leg-row">
+      <span class="leg-ic key-total">◴</span>
+      <span class="leg-tx"><b style="color:#FF8A00">카운터 링</b> — 세트 구성 무시, 누적 반복만 채우는 게이지. 세트 자유 룰의 시각.</span>
+    </div>
+    <div class="leg-row">
+      <span class="leg-ic key-var">⤬</span>
+      <span class="leg-tx"><b style="color:#8E8E93">무게 잠금 + 볼륨·RIR 칩</b> — 무게칸을 아예 지움. 가짜 PR 원천 차단, 적립은 부위 볼륨으로.</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>안 A-2 — 증량이 뜬 순간 (백오프 게이트 통과)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { background:#000; display:flex; flex-direction:column; align-items:center; gap:18px; padding:24px 0 60px;
+    font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
+  .cap { width:390px; color:#8E8E93; font-size:12px; padding:0 18px; font-weight:600; letter-spacing:.2px; line-height:1.5; }
+  .cap b { color:#2BD96A; }
+  .frame { width:390px; background:#000; color:#FFF; border-radius:24px; overflow:hidden; border:1px solid #1C1C1E; }
+
+  .head { padding:18px 20px 6px; }
+  .head h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .head .meta { display:flex; gap:7px; margin-top:7px; }
+  .pill { font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:7px; letter-spacing:.3px; }
+  .pill-rule { background:#19120F; color:#FF8A00; border:1px solid rgba(255,138,0,.4); }
+  .pill-anchor { background:rgba(43,217,106,.14); color:#2BD96A; }
+  .pill-part { background:#1C1C1E; color:#A8A8AD; }
+
+  .rx { margin:15px 14px 0; background:#161618; border-radius:20px; overflow:hidden; }
+  .rx-head { padding:15px 18px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #232325; }
+  .rx-head .lbl { font-size:11px; color:#8E8E93; font-weight:800; letter-spacing:.5px; }
+  .rx-head .lbl .d { font-size:11px; color:#5A5A5E; font-weight:600; margin-top:3px; letter-spacing:0; }
+  .verdict { font-size:11.5px; font-weight:800; padding:6px 11px; border-radius:9px; white-space:nowrap; }
+  .verdict.go { background:rgba(43,217,106,.18); color:#2BD96A; }
+
+  .axis { padding:16px 18px 17px; }
+  .axis.back { border-top:1px solid #1E1E20; background:#131315; }
+  .axis.fired { background:rgba(43,217,106,.07); box-shadow:inset 3px 0 0 #2BD96A; }
+  .axis-top-row { display:flex; align-items:center; gap:10px; }
+  .ic { width:34px; height:34px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; }
+  .ic-top { background:#FF3B30; color:#fff; }
+  .ic-back { background:#2BD96A; color:#06210F; }
+  .axis-name { flex:1; }
+  .axis-name .t { font-size:14px; font-weight:800; letter-spacing:-.2px; }
+  .axis-name .s { font-size:11px; color:#8E8E93; font-weight:600; margin-top:2px; }
+  .axis-state { font-size:11px; font-weight:800; padding:4px 9px; border-radius:8px; white-space:nowrap; }
+  .st-hold { background:#2A2A2C; color:#A8A8AD; }
+  .st-up { background:rgba(43,217,106,.2); color:#2BD96A; }
+
+  .nextbox { margin-top:13px; display:flex; align-items:flex-end; gap:12px; }
+  .nb-prev { flex-shrink:0; }
+  .nb-prev .k { font-size:10px; color:#6E6E73; font-weight:700; letter-spacing:.3px; }
+  .nb-prev .v { font-size:15px; color:#8E8E93; font-weight:700; margin-top:3px; text-decoration:line-through; text-decoration-color:#48484A; }
+  .nb-arrow { color:#2BD96A; font-size:18px; font-weight:800; padding-bottom:1px; }
+  .nb-arrow.gray { color:#48484A; }
+  .nb-today { flex:1; }
+  .nb-today .k { font-size:10px; color:#6E6E73; font-weight:700; letter-spacing:.3px; }
+  .nb-today .v { font-size:22px; font-weight:800; margin-top:2px; letter-spacing:-.5px; line-height:1.05; }
+  .nb-today .v .unit { font-size:13px; font-weight:700; color:#8E8E93; }
+  .nb-today .v.hold { color:#C7C7CC; }
+  .nb-today .v.up { color:#2BD96A; }
+  .nb-today .v.up .amt { color:#2BD96A; }
+  .delta { font-size:11px; font-weight:800; margin-top:4px; }
+  .delta.up { color:#2BD96A; }
+  .delta.same { color:#6E6E73; }
+
+  .why { margin-top:13px; font-size:12px; color:#A8A8AD; line-height:1.5; }
+  .why b { color:#fff; font-weight:700; }
+  .why .ok { color:#2BD96A; font-weight:700; }
+  .why .warn { color:#FF8A00; font-weight:700; }
+
+  .gate { margin-top:14px; }
+  .gate-lbl { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .gate-lbl .g-name { font-size:10.5px; color:#8E8E93; font-weight:800; letter-spacing:.3px; }
+  .gate-lbl .g-rem { font-size:10.5px; font-weight:800; }
+  .gate-lbl .g-rem.done { color:#2BD96A; }
+  .gate-lbl .g-rem.pend { color:#FF8A00; }
+  .dots { display:flex; gap:6px; align-items:center; }
+  .dot { height:8px; border-radius:4px; flex:1; background:#2A2A2C; }
+  .dot.fill { background:#2BD96A; }
+  .dot.pend { background:#3A3A3C; border:1px dashed #5A5A5E; }
+  .dot-cap { display:flex; gap:6px; margin-top:6px; }
+  .dot-cap span { flex:1; text-align:center; font-size:9px; color:#6E6E73; font-weight:700; }
+  .dot-cap span.now { color:#2BD96A; }
+  .dot-cap span.goal { color:#FF8A00; }
+  .reset-note { margin-top:9px; font-size:10.5px; color:#2BD96A; font-weight:700; background:rgba(43,217,106,.1);
+    border-radius:8px; padding:7px 10px; }
+
+  .lock { margin-top:14px; background:rgba(255,138,0,.08); border:1px solid rgba(255,138,0,.28); border-radius:12px;
+    padding:11px 13px; display:flex; gap:10px; align-items:flex-start; }
+  .lock .li { font-size:14px; }
+  .lock .lt { font-size:11.5px; color:#FFB454; line-height:1.5; font-weight:600; }
+  .lock .lt b { color:#FF8A00; font-weight:800; }
+  .lock .lt .calc { color:#8E8E93; font-weight:700; }
+
+  /* 동시증량 가드 — 한쪽씩 */
+  .dualguard { margin:13px 18px 0; background:rgba(255,138,0,.08); border:1px solid rgba(255,138,0,.28);
+    border-radius:12px; padding:11px 13px; display:flex; gap:10px; align-items:flex-start; }
+  .dualguard .li { font-size:14px; }
+  .dualguard .lt { font-size:11.5px; color:#FFB454; line-height:1.5; font-weight:600; }
+  .dualguard .lt b { color:#FF8A00; font-weight:800; }
+
+  .rx-foot { padding:13px 18px 14px; background:#0D0D0D; display:flex; gap:10px; align-items:center; }
+  .seq { display:flex; gap:5px; align-items:center; }
+  .seq .s { font-size:10px; font-weight:800; padding:4px 8px; border-radius:7px; letter-spacing:.3px; }
+  .seq .s.done { background:rgba(43,217,106,.16); color:#2BD96A; }
+  .seq .s.next { background:#2A2A2C; color:#A8A8AD; }
+  .seq .sa { color:#48484A; font-size:11px; }
+  .foot-txt { flex:1; font-size:11px; color:#8E8E93; font-weight:600; line-height:1.4; }
+
+  .start { margin:16px 14px 16px; }
+  .btn { display:block; width:100%; background:#FF3B30; color:#fff; border:none; border-radius:16px; padding:16px;
+    font-size:16px; font-weight:800; letter-spacing:-.2px; }
+  .start .hint { text-align:center; font-size:11px; color:#6E6E73; margin-top:9px; font-weight:600; }
+</style>
+</head>
+<body>
+  <div class="cap">안 <b>A-2 · 증량이 뜬 순간</b> — 지난 세션에 백오프 세 세트가 모두 10(상단)을 채워 볼륨 게이트 통과. 같은 카드에서 백오프 무게가 <b>57.5kg로 한 칸 오르고 반복은 하단 8로 리셋</b>되는 상태. 자동고정 가드가 새 무게에 재정렬되고, 두 축 동시증량을 막는 "한쪽씩" 가드가 함께 뜬다.</div>
+
+  <div class="frame">
+    <div class="head">
+      <h1>벤치프레스</h1>
+      <div class="meta">
+        <span class="pill pill-rule">탑세트+백오프</span>
+        <span class="pill pill-anchor">ANCHOR</span>
+        <span class="pill pill-part">가슴</span>
+      </div>
+    </div>
+
+    <div class="rx">
+      <div class="rx-head">
+        <div class="lbl">오늘의 처방<div class="d">백오프 볼륨 게이트 통과 · 무게 한 칸 ↑</div></div>
+        <span class="verdict go">백오프 증량 ↑</span>
+      </div>
+
+      <!-- 탑세트 축 — 유지 (동시 증량 금지) -->
+      <div class="axis top">
+        <div class="axis-top-row">
+          <span class="ic ic-top">탑</span>
+          <div class="axis-name">
+            <div class="t">강도축 · 탑세트</div>
+            <div class="s">무게로 진행 · e1RM 추세로 본다</div>
+          </div>
+          <span class="axis-state st-hold">무게 유지</span>
+        </div>
+
+        <div class="nextbox">
+          <div class="nb-prev"><div class="k">지난</div><div class="v">62.5 × 8/8</div></div>
+          <div class="nb-arrow gray">→</div>
+          <div class="nb-today">
+            <div class="k">오늘 탑세트</div>
+            <div class="v hold">62.5<span class="unit">kg</span> × 8회 <span class="unit">2세트</span></div>
+            <div class="delta same">그대로 유지 — 이번엔 백오프만 올린다</div>
+          </div>
+        </div>
+
+        <div class="why">탑은 <span class="ok">8/8 채움(게이트 충족)</span>이라 65kg도 가능하지만, <b>같은 날 두 축 동시 증량은 무리</b> → 이번 주는 백오프에 양보하고 탑은 다음 세션에.</div>
+      </div>
+
+      <!-- 백오프 축 — 증량 발화 -->
+      <div class="axis back fired">
+        <div class="axis-top-row">
+          <span class="ic ic-back">✓</span>
+          <div class="axis-name">
+            <div class="t">볼륨축 · 백오프</div>
+            <div class="s">총 반복 상단 채움 → 무게 한 칸</div>
+          </div>
+          <span class="axis-state st-up">무게 +2.5 ↑</span>
+        </div>
+
+        <div class="nextbox">
+          <div class="nb-prev"><div class="k">지난</div><div class="v">55kg 10/10/10</div></div>
+          <div class="nb-arrow">→</div>
+          <div class="nb-today">
+            <div class="k">오늘 백오프</div>
+            <div class="v up">57.5<span class="unit">kg</span> × <span class="amt">8회부터</span> <span class="unit">3세트</span></div>
+            <div class="delta up">+2.5kg · 반복은 하단 8로 리셋</div>
+          </div>
+        </div>
+
+        <div class="why">지난 백오프 <span class="ok">10/10/10 — 세 세트 모두 상단</span> 도달. 더블 프로그레션 게이트 통과 → 무게 한 칸 올리고 반복 하단부터 다시 쌓는다. 이게 "거품 없는" 진짜 볼륨 진행.</div>
+
+        <div class="gate">
+          <div class="gate-lbl">
+            <span class="g-name">지난 게이트 · 세 세트 모두 10회</span>
+            <span class="g-rem done">통과 ✓</span>
+          </div>
+          <div class="dots">
+            <span class="dot fill"></span>
+            <span class="dot fill"></span>
+            <span class="dot fill"></span>
+          </div>
+          <div class="dot-cap">
+            <span class="now">10 ✓</span>
+            <span class="now">10 ✓</span>
+            <span class="now">10 ✓</span>
+          </div>
+          <div class="reset-note">새 사이클 시작 — 57.5kg 8/8/8부터. 다시 10/10/10 채우면 60kg.</div>
+        </div>
+
+        <div class="lock">
+          <span class="li">🔒</span>
+          <span class="lt">자동고정 재정렬: 백오프 = <b>탑의 88%</b> <span class="calc">(62.5 × 0.88 ≈ 55였다가, 탑 65 오르면 57.5로 따라 올라감)</span>. 지금은 탑 유지라 55가 맞지만, 이번 사이클은 볼륨 진행을 위해 57.5로 한 칸 먼저 올렸어요.</span>
+        </div>
+      </div>
+
+      <!-- 동시증량 금지 가드 -->
+      <div class="dualguard">
+        <span class="li">⚠️</span>
+        <span class="lt">탑·백오프 <b>둘 다 게이트 통과</b>지만, 한 세션에 두 축을 동시에 올리면 회복이 못 따라와요. <b>2주 안엔 한쪽씩</b> — 이번은 백오프, 탑 65kg는 다음 세션 처방으로 대기.</span>
+      </div>
+
+      <div class="rx-foot">
+        <div class="seq">
+          <span class="s done">백오프 ↑ 완료</span>
+          <span class="sa">›</span>
+          <span class="s next">탑 65kg 대기</span>
+        </div>
+        <div class="foot-txt">다음 세션엔 탑 무게 차례.</div>
+      </div>
+    </div>
+
+    <div class="start">
+      <button class="btn">이 처방으로 시작</button>
+      <div class="hint">백오프 57.5kg · 8회가 세트행에 자동 채워집니다</div>
+    </div>
+  </div>
+</body>
+</html>
